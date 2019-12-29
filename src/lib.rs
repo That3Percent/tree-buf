@@ -11,10 +11,15 @@ use crate::error::*;
 use crate::context::*;
 use crate:: branch::*;
 
-pub fn write<T: Writer>(value: &T) -> Vec<u8> {
-    let mut context = Context::new();
-    let root = Branch::root();
-    value.write(&mut context, &root);
+pub fn write<T: Writable>(value: &T) -> Vec<u8>
+    //where T::Writer : std::fmt::Debug,
+{
+    //let mut context = Context::new();
+    //let root = Branch::root();
+    let mut writer = T::Writer::new();
+    writer.write(value);
+    //print!("{:?}", writer);
+    
     // TODO: Get bytes from context.
     todo!();
 }

@@ -12,12 +12,31 @@ struct Item {
     obj_array: Vec<Bob>,
 }
 
-impl Writer for Item {
-    fn write(&self, context: &mut Context<'_>, branch: &Branch<'_>) {
-        Struct.write(context, branch);
-        self.int.write(context, &branch.child("int"));
-        self.obj_array.write(context, &branch.child("obj_array"));
+#[derive(Debug)]
+struct ItemWriter {
+    _struct: <Struct as Writable>::Writer,
+    int: <u32 as Writable>::Writer,
+    obj_array: <Vec<Bob> as Writable>::Writer,
+}
+
+impl Writer for ItemWriter {
+    type Write=Item;
+    fn new() -> Self {
+        Self {
+            _struct: Writer::new(),
+            int: Writer::new(),
+            obj_array: Writer::new(),
+        }
     }
+    fn write(&mut self, value: &Item) {
+        self._struct.write(&Struct);
+        self.int.write(&value.int);
+        self.obj_array.write(&value.obj_array);
+    }
+}
+
+impl Writable for Item {
+    type Writer=ItemWriter;
 }
 
 impl Reader for Item {
@@ -35,11 +54,28 @@ pub struct Bob {
     one: Vec<u32>,
 }
 
-impl Writer for Bob {
-    fn write(&self, context: &mut Context<'_>, branch: &Branch<'_>) {
-        Struct.write(context, branch);
-        self.one.write(context, &branch.child("one"));
+#[derive(Debug)]
+pub struct BobWriter {
+    _struct: <Struct as Writable>::Writer,
+    one: <Vec<u32> as Writable>::Writer,
+}
+
+impl Writer for BobWriter {
+    type Write=Bob;
+    fn new() -> Self {
+        Self {
+            _struct: <Struct as Writable>::Writer::new(),
+            one: <Vec<u32> as Writable>::Writer::new(),
+        }
     }
+    fn write(&mut self, value: &Self::Write) {
+        self._struct.write(&Struct);
+        self.one.write(&value.one);
+    }
+}
+
+impl Writable for Bob {
+    type Writer=BobWriter;
 }
 
 impl Reader for Bob {
@@ -65,4 +101,10 @@ pub fn test() {
     let bytes = crate::write(&item);
     let result = crate::read(&bytes);
     assert_eq!(Ok(item), result);
+}
+
+#[cfg(test)]
+#[test]
+fn play_test() {
+    test();
 }
