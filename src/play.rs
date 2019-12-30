@@ -111,11 +111,18 @@ pub fn test() {
         int: 5,
         obj_array: vec! {
             Bob {
-                one: vec! { 3, 2, 1 },
+                one: vec! { 3, 2, 1, 0 },
+            },
+            Bob {
+                one: vec! { },
+            },
+            Bob {
+                one: vec! { 20, 20, 20, 20, 20, 20, 20 }
             }
         },
     };
     let bytes = crate::write(&item);
+    dbg!(bytes.len());
     let result = crate::read(&bytes);
     assert_eq!(Ok(item), result);
 }

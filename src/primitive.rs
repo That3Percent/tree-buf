@@ -39,6 +39,23 @@ pub enum PrimitiveId {
     // TODO: [u8]
 }
 
+impl PrimitiveId {
+    pub(crate) fn from_u32(v: u32) -> Self {
+        use PrimitiveId::*;
+        // TODO: Add some kind of check that all values are still correct.
+        match v {
+            1 => Struct,
+            2 => Array,
+            3 => Opt,
+            4 => U32,
+            5 => Bool,
+            6 => Usize,
+            7 => Str,
+            _ => todo!("error handling. {}", v)
+        }
+    }
+}
+
 
 
 impl Primitive for Struct {
@@ -119,44 +136,69 @@ pub struct PrimitiveBuffer<T> {
 // TODO: Most uses of this are temporary until compression is used.
 pub(crate) trait EzBytes {
     type Out : std::borrow::Borrow<[u8]>;
-    fn bytes(self) -> Self::Out;
+    fn to_bytes(self) -> Self::Out;
+    fn from_bytes(bytes: Self::Out) -> Self;
     fn write(self, bytes: &mut Vec<u8>) where Self : Sized {
-        let o = self.bytes();
+        let o = self.to_bytes();
         bytes.extend_from_slice(std::borrow::Borrow::borrow(&o));
+    }
+    fn read_bytes<'a>(bytes: &'a [u8], offset: &mut usize) -> Self where Self::Out : std::convert::TryFrom<&'a [u8]>, Self : Sized {
+        let start = *offset;
+        let end = *offset + std::mem::size_of::<Self::Out>();
+        *offset = end;
+        let bytes = &bytes[start..end];
+        
+        let bytes = std::convert::TryFrom::try_from(bytes).unwrap_or_else(|_| todo!("Error handling"));
+        Self::from_bytes(bytes)
     }
 }
 
 impl EzBytes for u32 {
     type Out = [u8; 4];
-    fn bytes(self) -> Self::Out {
+    fn to_bytes(self) -> Self::Out {
         self.to_le_bytes()
+    }
+    fn from_bytes(bytes: Self::Out) -> Self {
+        u32::from_le_bytes(bytes)
     }
 }
 
 impl EzBytes for u64 {
     type Out = [u8; 8];
-    fn bytes(self) -> Self::Out {
+    fn to_bytes(self) -> Self::Out {
         self.to_le_bytes()
+    }
+    fn from_bytes(bytes: Self::Out) -> Self {
+        u64::from_le_bytes(bytes)
     }
 }
 
 impl EzBytes for usize {
     type Out = [u8; 8];
-    fn bytes(self) -> Self::Out {
-        (self as u64).bytes()
+    fn to_bytes(self) -> Self::Out {
+        (self as u64).to_bytes()
+    }
+    fn from_bytes(bytes: Self::Out) -> Self {
+        u64::from_bytes(bytes) as Self
     }
 }
 
 impl EzBytes for bool {
     type Out = [u8; 1];
-    fn bytes(self) -> Self::Out {
-        (self as u8).bytes()
+    fn to_bytes(self) -> Self::Out {
+        (self as u8).to_bytes()
+    }
+    fn from_bytes(bytes: Self::Out) -> Self {
+        u8::from_bytes(bytes) != 0
     }
 }
 
 impl EzBytes for u8 {
     type Out = [u8; 1];
-    fn bytes(self) -> Self::Out {
+    fn from_bytes(bytes: Self::Out) -> Self {
+        Self::from_le_bytes(bytes)
+    }
+    fn to_bytes(self) -> Self::Out {
         self.to_le_bytes()
     }
 }
@@ -184,7 +226,7 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
 
         // Write the primitive id
         // TODO: Include data for the primitive - like int ranges
-        bytes.extend_from_slice(&(T::id() as u32).to_le_bytes());
+        (T::id() as u32).write(bytes);
         T::write_batch(&self.values, bytes);
         
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}

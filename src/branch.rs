@@ -98,12 +98,25 @@ pub struct BranchId<'a> {
     pub parent: usize,
 }
 
-impl BranchId<'_> {
+impl<'a> BranchId<'a> {
     pub(crate) fn flush(&self, bytes: &mut Vec<u8>) {
         // Parent, Name length, name bytes
         self.parent.write(bytes);
         self.name.len().write(bytes);
         bytes.extend_from_slice(self.name.as_bytes());
+    }
+
+    pub(crate) fn read(bytes: &'a [u8], offset: &mut usize) -> Self {
+        let parent: usize = EzBytes::read_bytes(bytes, offset);
+        let str_len: usize = EzBytes::read_bytes(bytes, offset);
+        let end = *offset+str_len;
+        let str_bytes = &bytes[*offset..end];
+        *offset = end;
+        let name = std::str::from_utf8(str_bytes).unwrap(); // TODO: Error handling
+        BranchId {
+            name,
+            parent,
+        }
     }
 }
 
