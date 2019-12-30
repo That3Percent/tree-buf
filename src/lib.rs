@@ -9,19 +9,19 @@ mod play;
 use crate::reader_writer::*;
 use crate::error::*;
 use crate::context::*;
-use crate:: branch::*;
+use crate::branch::*;
 
 pub fn write<T: Writable>(value: &T) -> Vec<u8>
     //where T::Writer : std::fmt::Debug,
 {
-    //let mut context = Context::new();
-    //let root = Branch::root();
     let mut writer = T::Writer::new();
     writer.write(value);
+    let mut bytes = Vec::new();
     //print!("{:?}", writer);
-    
-    // TODO: Get bytes from context.
-    todo!();
+
+    writer.flush(&BranchId { name: "", parent: 0 }, &mut bytes);
+    print!("{:?}", bytes);
+    bytes
 }
 
 pub fn read<T: Reader>(from: &[u8]) -> Result<T, Error> {

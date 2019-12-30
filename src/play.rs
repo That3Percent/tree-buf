@@ -33,6 +33,16 @@ impl Writer for ItemWriter {
         self.int.write(&value.int);
         self.obj_array.write(&value.obj_array);
     }
+    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
+        let own_id = bytes.len();
+        self._struct.flush(branch, bytes);
+
+        let int = BranchId { name: "int", parent: own_id };
+        self.int.flush(&int, bytes);
+
+        let obj_array = BranchId { name: "obj_array", parent: own_id };
+        self.obj_array.flush(&obj_array, bytes);
+    }
 }
 
 impl Writable for Item {
@@ -71,6 +81,13 @@ impl Writer for BobWriter {
     fn write(&mut self, value: &Self::Write) {
         self._struct.write(&Struct);
         self.one.write(&value.one);
+    }
+    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
+        let own_id = bytes.len();
+        self._struct.flush(branch, bytes);
+
+        let one = BranchId { name: "one", parent: own_id };
+        self.one.flush(&one, bytes);
     }
 }
 

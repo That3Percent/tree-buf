@@ -1,4 +1,3 @@
-use crate::play::*;
 use crate::branch::*;
 use crate::reader_writer::*;
 use crate::missing::*;
@@ -8,14 +7,7 @@ use crate::error::*;
 
 pub trait Primitive : Default {
     fn id() -> PrimitiveId;
-    /// The return value (usize, usize) is to indicate the start and length
-    /// of the data written to bytes. The implementation must append only,
-    /// and may return a range that is a sub-range of the appended data.
-    /// This API is to allow for padding and alignment in the future.
-    /// TODO: Maybe a better idea is just to have layout requirements
-    /// as an associated function, and this can be setup on the outside
-    /// to handle it.
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize);
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self>;
 }
 // TODO: The interaction between Default and Missing here may be dubious.
@@ -51,17 +43,17 @@ pub enum PrimitiveId {
 
 impl Primitive for Struct {
     fn id() -> PrimitiveId { PrimitiveId::Struct }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
-        (0, 0)
-    }
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) { }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
         vec![Self; count]
     }
 }
 impl Primitive for Array {
     fn id() -> PrimitiveId { PrimitiveId::Array }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
-        todo!();
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        for item in items {
+            item.0.write(bytes);
+        }
     }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
         todo!();
@@ -69,8 +61,10 @@ impl Primitive for Array {
 }
 impl Primitive for Opt {
     fn id() -> PrimitiveId { PrimitiveId::Opt }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
-        todo!();
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        for item in items {
+            item.0.write(bytes);
+        }
     }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
         todo!();
@@ -78,8 +72,10 @@ impl Primitive for Opt {
 }
 impl Primitive for u32 {
     fn id() -> PrimitiveId { PrimitiveId::U32 }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
-        todo!();
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        for item in items {
+            item.write(bytes);
+        }
     }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
         todo!();
@@ -92,7 +88,7 @@ impl Primitive for usize {
     fn id() -> PrimitiveId {
         PrimitiveId::Usize
     }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         todo!();
     }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
@@ -104,7 +100,7 @@ impl Primitive for bool {
     fn id() -> PrimitiveId {
         PrimitiveId::Bool
     }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) -> (usize, usize) {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         todo!();
     }
     fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
@@ -120,6 +116,51 @@ pub struct PrimitiveBuffer<T> {
     read_offset: usize,
 }
 
+// TODO: Most uses of this are temporary until compression is used.
+pub(crate) trait EzBytes {
+    type Out : std::borrow::Borrow<[u8]>;
+    fn bytes(self) -> Self::Out;
+    fn write(self, bytes: &mut Vec<u8>) where Self : Sized {
+        let o = self.bytes();
+        bytes.extend_from_slice(std::borrow::Borrow::borrow(&o));
+    }
+}
+
+impl EzBytes for u32 {
+    type Out = [u8; 4];
+    fn bytes(self) -> Self::Out {
+        self.to_le_bytes()
+    }
+}
+
+impl EzBytes for u64 {
+    type Out = [u8; 8];
+    fn bytes(self) -> Self::Out {
+        self.to_le_bytes()
+    }
+}
+
+impl EzBytes for usize {
+    type Out = [u8; 8];
+    fn bytes(self) -> Self::Out {
+        (self as u64).bytes()
+    }
+}
+
+impl EzBytes for bool {
+    type Out = [u8; 1];
+    fn bytes(self) -> Self::Out {
+        (self as u8).bytes()
+    }
+}
+
+impl EzBytes for u8 {
+    type Out = [u8; 1];
+    fn bytes(self) -> Self::Out {
+        self.to_le_bytes()
+    }
+}
+
 impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     type Write = T;
     fn new() -> Self {
@@ -130,6 +171,28 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     }
     fn write(&mut self, value: &Self::Write) {
         self.values.push(*value);
+    }
+    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
+        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
+        // TODO: Can use varint if we read the file backward and write lengths at the end.
+        // That would require some sort of reverse prefix varint... suffix varint if you will.
+        let start = bytes.len();
+        0usize.write(bytes);
+
+        // Write the branch
+        branch.flush(bytes);
+
+        // Write the primitive id
+        // TODO: Include data for the primitive - like int ranges
+        bytes.extend_from_slice(&(T::id() as u32).to_le_bytes());
+        T::write_batch(&self.values, bytes);
+        
+        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
+        let end = bytes.len() as u64;
+        let end = end.to_le_bytes();
+        for i in 0..end.len() {
+            bytes[start+i] = end[i];
+        }
     }
 }
 
@@ -152,6 +215,13 @@ impl<T: Writer> Writer for VecWriter<T> {
         for item in value.iter() {
             self.values.write(item);
         }
+    }
+    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
+        let own_id = bytes.len();
+        self.len.flush(branch, bytes);
+
+        let values = BranchId { name: "", parent: own_id };
+        self.values.flush(&values, bytes);
     }
 }
 
@@ -187,6 +257,13 @@ impl<V: Writer> Writer for OptionWriter<V> {
         if let Some(value) = value {
             self.value.write(value);
         }
+    }
+    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
+        let own_id = bytes.len();
+        self.opt.flush(branch, bytes);
+
+        let value = BranchId { name: "value", parent: own_id };
+        self.value.flush(&value, bytes);
     }
 }
 

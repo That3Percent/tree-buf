@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter, Error, Write};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::{DefaultHasher, HashMap};
+use crate::primitive::*;
 
 // TODO: In file, store branch as -
 // Prev branch (id, # in file), name, type, data ptr
@@ -87,6 +88,22 @@ impl <'a, D: Default> BranchMap<'a, D> {
     }
     pub fn get_data_mut(&mut self, key: &'a Branch) -> &mut D {
         &mut self.get_or_default_mut(key).data
+    }
+}
+
+pub struct BranchId<'a> {
+    pub name: &'a str,
+    // The parent is just the start byte of the parent branch.
+    // Every branch must at least write it's primitive id, so these are guaranteed to be unique.
+    pub parent: usize,
+}
+
+impl BranchId<'_> {
+    pub(crate) fn flush(&self, bytes: &mut Vec<u8>) {
+        // Parent, Name length, name bytes
+        self.parent.write(bytes);
+        self.name.len().write(bytes);
+        bytes.extend_from_slice(self.name.as_bytes());
     }
 }
 
