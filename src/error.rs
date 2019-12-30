@@ -1,4 +1,4 @@
-use crate::primitive::*;
+use crate::prelude::*;
 use std::fmt::{Display, Formatter, Debug};
 
 #[derive(Debug, PartialEq)]

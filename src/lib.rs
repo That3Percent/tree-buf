@@ -3,12 +3,10 @@ pub mod primitive;
 pub mod missing;
 pub mod error;
 pub mod reader_writer;
+pub mod prelude;
 mod play;
 
-use crate::reader_writer::*;
-use crate::error::*;
-use crate::branch::*;
-use crate::primitive::*;
+use crate::prelude::*;
 
 // TREEBUF
 const PREAMBLE: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];

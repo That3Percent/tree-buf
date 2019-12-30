@@ -1,6 +1,4 @@
-use crate::branch::*;
-use crate::error::*;
-use crate::primitive::*;
+use crate::prelude::*;
 
 pub trait Missing {
     fn missing<T: Primitive>(&self, branch: &Branch) -> Result<T, Error>;

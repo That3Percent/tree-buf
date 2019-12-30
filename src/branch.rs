@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Error, Write};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::{DefaultHasher};
-use crate::primitive::*;
+use crate::prelude::*;
 
 // TODO: In file, store branch as -
 // Prev branch (id, # in file), name, type, data ptr
