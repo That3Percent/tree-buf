@@ -1,8 +1,5 @@
 use crate::branch::*;
 use crate::reader_writer::*;
-use crate::missing::*;
-use crate::context::*;
-use crate::error::*;
 
 
 pub trait Primitive : Default {
@@ -30,7 +27,7 @@ pub struct Opt(bool);
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum PrimitiveId {
     Struct = 1,
-    Array = 2,
+    Array = 2, // TODO: Support fixed length in primitive id
     Opt = 3,
     U32 = 4,
     Bool = 5,
@@ -56,12 +53,10 @@ impl PrimitiveId {
     }
 }
 
-
-
 impl Primitive for Struct {
     fn id() -> PrimitiveId { PrimitiveId::Struct }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) { }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
+    fn write_batch(_items: &[Self], _bytes: &mut Vec<u8>) { }
+    fn read_batch(_bytes: &[u8], count: usize) -> Vec<Self> {
         vec![Self; count]
     }
 }
@@ -271,16 +266,6 @@ impl<T: Primitive + Copy> Writable for T {
     type Writer=PrimitiveBuffer<T>;
 }
 
-impl<T: Primitive + Copy> Reader for T {
-    fn read(context: &mut Context<'_>, branch: &Branch<'_>, missing: &impl Missing) -> Result<Self, Error> {
-        let reader = context.get_reader::<T>(branch);
-        match reader {
-            Some(reader) => Ok(reader.read()),
-            None => missing.missing(&branch)
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct OptionWriter<V> {
     opt: PrimitiveBuffer<Opt>,
@@ -314,30 +299,11 @@ impl<T: Writable> Writable for Option<T> {
     type Writer=OptionWriter<T::Writer>;
 }
 
-impl<T: Reader> Reader for Option<T> {
-    fn read(context: &mut Context<'_>, branch: &Branch<'_>, missing: &impl Missing) -> Result<Self, Error> {
-        Ok(match Opt::read(context, branch, missing)?.0 {
-            true => Some(T::read(context, &branch.child(""), missing)?),
-            false => None,
-        })
-    }
-}
 
 impl<T: Writable> Writable for Vec<T> {
     type Writer=VecWriter<T::Writer>;
 }
 
-impl<T: Reader> Reader for Vec<T> {
-    fn read(context: &mut Context<'_>, branch: &Branch<'_>, missing: &impl Missing) -> Result<Self, Error> {
-        let length = Array::read(context, branch, missing)?.0;
-        let items = branch.child("");
-        let mut result = Vec::with_capacity(length);
-        for _ in 0..length {
-            result.push(T::read(context, &items, missing)?);
-        }
-        Ok(result)
-    }
-}
 
 // TODO: Split implementation for read/write
 impl<T: Copy> PrimitiveBuffer<T> {

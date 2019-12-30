@@ -3,7 +3,6 @@ pub mod primitive;
 pub mod missing;
 pub mod error;
 pub mod reader_writer;
-pub mod context;
 mod play;
 
 use crate::reader_writer::*;
@@ -27,8 +26,7 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8>
     //print!("{:?}", writer);
 
     writer.flush(&BranchId { name: "", parent: 0 }, &mut bytes);
-    println!("");
-    println!("{:?}", bytes);
+    
     bytes
 }
 
@@ -60,7 +58,7 @@ impl<'a> Stick<'a> {
     }
 }
 
-pub fn read<T: Reader>(bytes: &[u8]) -> Result<T, Error> {
+pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
     
     let mut offset = 0;
     assert_eq!(&PREAMBLE, &bytes[offset..offset+PREAMBLE.len()], "Not valid file"); // TODO: Error handling

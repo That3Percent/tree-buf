@@ -1,15 +1,14 @@
-use crate::context::*;
 use crate::branch::*;
-use crate::missing::*;
-use crate::error::*;
 
 pub trait Writable : Sized {
     type Writer: Writer<Write=Self>;
 }
 
-pub trait Reader {
-    fn read(context: &mut Context, branch: &Branch, missing: &impl Missing) -> Result<Self, Error> where Self : Sized;
+pub trait Readable {
+
 }
+// FIXME: This is just to compile
+impl<T: Writable> Readable for T { }
 
 pub trait Writer {
     type Write: Writable;

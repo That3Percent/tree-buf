@@ -1,9 +1,6 @@
 use crate::branch::*;
 use crate::primitive::*;
-use crate::missing::*;
 use crate::reader_writer::*;
-use crate::error::*;
-use crate::context::*;
 
 
 #[derive(PartialEq, Debug)]
@@ -56,16 +53,6 @@ impl Writable for Item {
     type Writer=ItemWriter;
 }
 
-impl Reader for Item {
-    fn read(context: &mut Context, branch: &Branch, missing: &impl Missing) -> Result<Self, Error> where Self : Sized {
-        Struct::read(context, branch, missing)?;
-        Ok(Self {
-            int: Reader::read(context, &branch.child("int"), missing)?,
-            obj_array: Reader::read(context, &branch.child("obj_array"), missing)?,
-            extra: Reader::read(context, &branch.child("extra"), missing)?,
-        })
-    }
-}
 
 #[derive(PartialEq, Debug)]
 pub struct Bob {
@@ -103,14 +90,6 @@ impl Writable for Bob {
     type Writer=BobWriter;
 }
 
-impl Reader for Bob {
-    fn read(context: &mut Context, branch: &Branch, missing: &impl Missing) -> Result<Self, Error> where Self : Sized {
-        Struct::read(context, branch, missing)?;
-        Ok(Self {
-            one: Reader::read(context, &branch.child("one"), missing)?
-        })
-    }
-}
 
 
 
@@ -132,7 +111,12 @@ pub fn test() {
             }
         },
     };
+    let time = std::time::Instant::now();
     let bytes = crate::write(&item);
+    let time = std::time::Instant::now() - time;
+    dbg!(time);
+    println!("");
+    println!("{:?}", bytes);
     dbg!(bytes.len());
     let result = crate::read(&bytes);
     assert_eq!(Ok(item), result);
