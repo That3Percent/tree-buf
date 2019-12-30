@@ -12,7 +12,7 @@ use crate::branch::*;
 use crate::primitive::*;
 
 // TREEBUF
-const preamble: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];
+const PREAMBLE: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];
 
 pub fn write<T: Writable>(value: &T) -> Vec<u8>
     //where T::Writer : std::fmt::Debug,
@@ -23,7 +23,7 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8>
     // The pre-amble is actually necessary for correctness. Without it,
     // the first branch would get written to the beginning and share
     // the same parent id as the null branch.
-    bytes.extend_from_slice(&preamble);
+    bytes.extend_from_slice(&PREAMBLE);
     //print!("{:?}", writer);
 
     writer.flush(&BranchId { name: "", parent: 0 }, &mut bytes);
@@ -63,8 +63,8 @@ impl<'a> Stick<'a> {
 pub fn read<T: Reader>(bytes: &[u8]) -> Result<T, Error> {
     
     let mut offset = 0;
-    assert_eq!(&preamble, &bytes[offset..offset+preamble.len()], "Not valid file"); // TODO: Error handling
-    offset += preamble.len();
+    assert_eq!(&PREAMBLE, &bytes[offset..offset+PREAMBLE.len()], "Not valid file"); // TODO: Error handling
+    offset += PREAMBLE.len();
     let mut sticks = Vec::new();
     while offset < bytes.len() {
         sticks.push(Stick::read(bytes, &mut offset));

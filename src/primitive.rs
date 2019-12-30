@@ -281,6 +281,7 @@ impl<T: Primitive + Copy> Reader for T {
     }
 }
 
+#[derive(Debug)]
 pub struct OptionWriter<V> {
     opt: PrimitiveBuffer<Opt>,
     value: V,

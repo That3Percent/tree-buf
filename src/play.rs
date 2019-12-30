@@ -10,6 +10,7 @@ use crate::context::*;
 struct Item {
     int: u32,
     obj_array: Vec<Bob>,
+    extra: Option<Bob>,
 }
 
 #[derive(Debug)]
@@ -17,6 +18,7 @@ struct ItemWriter {
     _struct: <Struct as Writable>::Writer,
     int: <u32 as Writable>::Writer,
     obj_array: <Vec<Bob> as Writable>::Writer,
+    extra: <Option<Bob> as Writable>::Writer,
 }
 
 impl Writer for ItemWriter {
@@ -26,12 +28,14 @@ impl Writer for ItemWriter {
             _struct: Writer::new(),
             int: Writer::new(),
             obj_array: Writer::new(),
+            extra: Writer::new(),
         }
     }
     fn write(&mut self, value: &Item) {
         self._struct.write(&Struct);
         self.int.write(&value.int);
         self.obj_array.write(&value.obj_array);
+        self.extra.write(&value.extra);
     }
     fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
         let own_id = bytes.len();
@@ -42,6 +46,9 @@ impl Writer for ItemWriter {
 
         let obj_array = BranchId { name: "obj_array", parent: own_id };
         self.obj_array.flush(&obj_array, bytes);
+
+        let extra = BranchId { name: "extra", parent: own_id };
+        self.extra.flush(&extra, bytes);
     }
 }
 
@@ -55,6 +62,7 @@ impl Reader for Item {
         Ok(Self {
             int: Reader::read(context, &branch.child("int"), missing)?,
             obj_array: Reader::read(context, &branch.child("obj_array"), missing)?,
+            extra: Reader::read(context, &branch.child("extra"), missing)?,
         })
     }
 }
@@ -109,6 +117,9 @@ impl Reader for Bob {
 pub fn test() {
     let item = Item {
         int: 5,
+        extra: Some(Bob {
+            one: vec! { 99 },
+        }),
         obj_array: vec! {
             Bob {
                 one: vec! { 3, 2, 1, 0 },
