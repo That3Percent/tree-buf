@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use crate::prelude::*;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct BranchId<'a> {
@@ -20,14 +20,11 @@ impl<'a> BranchId<'a> {
     pub(crate) fn read(bytes: &'a [u8], offset: &mut usize) -> Self {
         let parent: usize = EzBytes::read_bytes(bytes, offset);
         let str_len: usize = EzBytes::read_bytes(bytes, offset);
-        let end = *offset+str_len;
+        let end = *offset + str_len;
         let str_bytes = &bytes[*offset..end];
         *offset = end;
         let name = std::str::from_utf8(str_bytes).unwrap(); // TODO: Error handling
-        BranchId {
-            name,
-            parent,
-        }
+        BranchId { name, parent }
     }
 
     pub fn find_stick<'s>(&self, sticks: &'s Vec<Stick<'s>>) -> Option<&'s Stick<'s>> {
@@ -39,7 +36,7 @@ impl<'a> BranchId<'a> {
 pub struct Stick<'a> {
     pub(crate) name: &'a str,
     pub(crate) parent: usize,
-    pub(crate) bytes: &'a[u8],
+    pub(crate) bytes: &'a [u8],
     pub(crate) primitive: PrimitiveId,
     pub(crate) start: usize,
 }

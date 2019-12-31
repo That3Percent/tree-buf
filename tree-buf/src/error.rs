@@ -1,12 +1,9 @@
 use crate::prelude::*;
-use std::fmt::{Display, Formatter, Debug};
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    Missing {
-        branch: String,
-        id: PrimitiveId,
-    }
+    Missing { branch: String, id: PrimitiveId },
 }
 
 impl Display for Error {
@@ -16,6 +13,4 @@ impl Display for Error {
     }
 }
 
-impl std::error::Error for Error {
-
-}
+impl std::error::Error for Error {}

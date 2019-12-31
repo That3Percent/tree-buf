@@ -24,7 +24,7 @@ struct ItemReader {
 }
 
 impl Writer for ItemWriter {
-    type Write=Item;
+    type Write = Item;
     fn new() -> Self {
         Self {
             _struct: Writer::new(),
@@ -46,7 +46,10 @@ impl Writer for ItemWriter {
         let int = BranchId { name: "int", parent: own_id };
         self.int.flush(&int, bytes);
 
-        let obj_array = BranchId { name: "obj_array", parent: own_id };
+        let obj_array = BranchId {
+            name: "obj_array",
+            parent: own_id,
+        };
         self.obj_array.flush(&obj_array, bytes);
 
         let extra = BranchId { name: "extra", parent: own_id };
@@ -55,8 +58,8 @@ impl Writer for ItemWriter {
 }
 
 impl Reader for ItemReader {
-    type Read=Item;
-    fn read(&mut self) -> Self::Read  {
+    type Read = Item;
+    fn read(&mut self) -> Self::Read {
         self._struct.read();
         Item {
             int: self.int.read(),
@@ -71,29 +74,26 @@ impl Reader for ItemReader {
         let int = BranchId { name: "int", parent: own_id };
         let int = Reader::new(sticks, &int);
 
-        let obj_array = BranchId { name: "obj_array", parent: own_id };
+        let obj_array = BranchId {
+            name: "obj_array",
+            parent: own_id,
+        };
         let obj_array = Reader::new(sticks, &obj_array);
 
         let extra = BranchId { name: "extra", parent: own_id };
         let extra = Reader::new(sticks, &extra);
 
-        Self {
-            _struct,
-            int,
-            obj_array,
-            extra,
-        }
+        Self { _struct, int, obj_array, extra }
     }
 }
 
 impl Writable for Item {
-    type Writer=ItemWriter;
+    type Writer = ItemWriter;
 }
 
 impl Readable for Item {
-    type Reader=ItemReader;
+    type Reader = ItemReader;
 }
-
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Bob {
@@ -112,7 +112,7 @@ pub struct BobReader {
 }
 
 impl Writer for BobWriter {
-    type Write=Bob;
+    type Write = Bob;
     fn new() -> Self {
         Self {
             _struct: <Struct as Writable>::Writer::new(),
@@ -133,7 +133,7 @@ impl Writer for BobWriter {
 }
 
 impl Reader for BobReader {
-    type Read=Bob;
+    type Read = Bob;
     fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
         let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
         let _struct = Reader::new(sticks, branch);
@@ -141,44 +141,33 @@ impl Reader for BobReader {
         let one = BranchId { name: "one", parent: own_id };
         let one = Reader::new(sticks, &one);
 
-        Self {
-            _struct,
-            one
-        }
+        Self { _struct, one }
     }
     fn read(&mut self) -> Self::Read {
         self._struct.read();
-        Self::Read {
-            one: self.one.read(),
-        }
+        Self::Read { one: self.one.read() }
     }
 }
 
 impl Writable for Bob {
-    type Writer=BobWriter;
+    type Writer = BobWriter;
 }
 
 impl Readable for Bob {
-    type Reader=BobReader;
+    type Reader = BobReader;
 }
 
 fn make_item() -> Item {
     Item {
         int: 5,
-        extra: Some(Bob {
-            one: vec! { 99 },
-        }),
-        obj_array: vec! {
+        extra: Some(Bob { one: vec![99] }),
+        obj_array: vec![
+            Bob { one: vec![3, 2, 1, 0] },
+            Bob { one: vec![] },
             Bob {
-                one: vec! { 3, 2, 1, 0 },
+                one: vec![20, 20, 20, 20, 20, 20, 20],
             },
-            Bob {
-                one: vec! { },
-            },
-            Bob {
-                one: vec! { 20, 20, 20, 20, 20, 20, 20 }
-            }
-        },
+        ],
     }
 }
 

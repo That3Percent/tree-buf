@@ -1,11 +1,11 @@
 use crate::branch::*;
 
-pub trait Writable : Sized {
-    type Writer: Writer<Write=Self>;
+pub trait Writable: Sized {
+    type Writer: Writer<Write = Self>;
 }
 
-pub trait Readable : Sized {
-    type Reader: Reader<Read=Self>;
+pub trait Readable: Sized {
+    type Reader: Reader<Read = Self>;
 }
 
 pub trait Writer {

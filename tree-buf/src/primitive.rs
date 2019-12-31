@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub trait Primitive : Default + BatchData {
+pub trait Primitive: Default + BatchData {
     fn id() -> PrimitiveId;
 }
 // TODO: The interaction between Default and Missing here may be dubious.
@@ -47,12 +47,12 @@ impl PrimitiveId {
             5 => Bool,
             6 => Usize,
             7 => Str,
-            _ => todo!("error handling. {}", v)
+            _ => todo!("error handling. {}", v),
         }
     }
 }
 
-pub trait BatchData : Sized {
+pub trait BatchData: Sized {
     fn read_batch(bytes: &[u8]) -> Vec<Self>;
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
 }
@@ -75,7 +75,9 @@ impl<'a, T: EzBytes + Copy + std::fmt::Debug> BatchData for T {
 }
 
 impl Primitive for Struct {
-    fn id() -> PrimitiveId { PrimitiveId::Struct }
+    fn id() -> PrimitiveId {
+        PrimitiveId::Struct
+    }
 }
 
 impl BatchData for Struct {
@@ -90,7 +92,9 @@ impl BatchData for Struct {
 }
 
 impl Primitive for Array {
-    fn id() -> PrimitiveId { PrimitiveId::Array }
+    fn id() -> PrimitiveId {
+        PrimitiveId::Array
+    }
 }
 
 impl BatchData for Array {
@@ -111,7 +115,9 @@ impl BatchData for Array {
 }
 
 impl Primitive for Opt {
-    fn id() -> PrimitiveId { PrimitiveId::Opt }
+    fn id() -> PrimitiveId {
+        PrimitiveId::Opt
+    }
 }
 impl BatchData for Opt {
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
@@ -131,7 +137,9 @@ impl BatchData for Opt {
 }
 
 impl Primitive for u32 {
-    fn id() -> PrimitiveId { PrimitiveId::U32 }
+    fn id() -> PrimitiveId {
+        PrimitiveId::U32
+    }
 }
 
 /// usize gets it's own primitive which uses varint because we don't know the platform and maximum value here.
@@ -158,14 +166,20 @@ pub struct PrimitiveBuffer<T> {
 
 // TODO: Most uses of this are temporary until compression is used.
 pub trait EzBytes {
-    type Out : std::borrow::Borrow<[u8]> + std::convert::TryFrom<&'static [u8]>;
+    type Out: std::borrow::Borrow<[u8]> + std::convert::TryFrom<&'static [u8]>;
     fn to_bytes(self) -> Self::Out;
     fn from_bytes(bytes: Self::Out) -> Self;
-    fn write(self, bytes: &mut Vec<u8>) where Self : Sized {
+    fn write(self, bytes: &mut Vec<u8>)
+    where
+        Self: Sized,
+    {
         let o = self.to_bytes();
         bytes.extend_from_slice(std::borrow::Borrow::borrow(&o));
     }
-    fn read_bytes(bytes: &[u8], offset: &mut usize) -> Self where Self : Sized {
+    fn read_bytes(bytes: &[u8], offset: &mut usize) -> Self
+    where
+        Self: Sized,
+    {
         let start = *offset;
         let end = *offset + std::mem::size_of::<Self::Out>();
         *offset = end;
@@ -253,18 +267,18 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
         // TODO: Include data for the primitive - like int ranges
         (T::id() as u32).write(bytes);
         T::write_batch(&self.values, bytes);
-        
+
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
         let end = bytes.len() as u64;
         let end = end.to_le_bytes();
         for i in 0..end.len() {
-            bytes[start+i] = end[i];
+            bytes[start + i] = end[i];
         }
     }
 }
 
-impl<T : Primitive + Copy> Reader for PrimitiveBuffer<T> {
-    type Read=T;
+impl<T: Primitive + Copy> Reader for PrimitiveBuffer<T> {
+    type Read = T;
     fn new(sticks: &Vec<Stick<'_>>, branch: &BranchId) -> Self {
         let stick = branch.find_stick(&sticks).unwrap(); // TODO: Error handling
         if stick.primitive != T::id() {
@@ -272,10 +286,7 @@ impl<T : Primitive + Copy> Reader for PrimitiveBuffer<T> {
         }
 
         let values = T::read_batch(stick.bytes);
-        Self {
-            values,
-            read_offset: 0,
-        }
+        Self { values, read_offset: 0 }
     }
     fn read(&mut self) -> Self::Read {
         let value = self.values[self.read_offset];
@@ -296,7 +307,7 @@ pub struct VecReader<T> {
 }
 
 impl<T: Writer> Writer for VecWriter<T> {
-    type Write=Vec<T::Write>;
+    type Write = Vec<T::Write>;
     fn new() -> Self {
         Self {
             len: PrimitiveBuffer::new(),
@@ -319,7 +330,7 @@ impl<T: Writer> Writer for VecWriter<T> {
 }
 
 impl<T: Reader> Reader for VecReader<T> {
-    type Read=Vec<T::Read>;
+    type Read = Vec<T::Read>;
     fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
         let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
         let len = Reader::new(sticks, branch);
@@ -327,10 +338,7 @@ impl<T: Reader> Reader for VecReader<T> {
         let values = BranchId { name: "", parent: own_id };
         let values = Reader::new(sticks, &values);
 
-        Self {
-            len,
-            values,
-        }
+        Self { len, values }
     }
     fn read(&mut self) -> Self::Read {
         let len = self.len.read().0;
@@ -343,11 +351,11 @@ impl<T: Reader> Reader for VecReader<T> {
 }
 
 impl<T: Primitive + Copy> Writable for T {
-    type Writer=PrimitiveBuffer<T>;
+    type Writer = PrimitiveBuffer<T>;
 }
 
 impl<T: Primitive + Copy> Readable for T {
-    type Reader=PrimitiveBuffer<T>;
+    type Reader = PrimitiveBuffer<T>;
 }
 
 #[derive(Debug)]
@@ -362,7 +370,7 @@ pub struct OptionReader<V> {
 }
 
 impl<V: Writer> Writer for OptionWriter<V> {
-    type Write=Option<V::Write>;
+    type Write = Option<V::Write>;
     fn new() -> Self {
         Self {
             opt: PrimitiveBuffer::new(),
@@ -385,17 +393,14 @@ impl<V: Writer> Writer for OptionWriter<V> {
 }
 
 impl<V: Reader> Reader for OptionReader<V> {
-    type Read=Option<V::Read>;
+    type Read = Option<V::Read>;
     fn new(sticks: &Vec<Stick<'_>>, branch: &BranchId) -> Self {
         let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
         let opt = Reader::new(sticks, branch);
 
         let value = BranchId { name: "", parent: own_id };
         let value = Reader::new(sticks, &value);
-        Self {
-            opt,
-            value,
-        }
+        Self { opt, value }
     }
     fn read(&mut self) -> Self::Read {
         if self.opt.read().0 {
@@ -407,20 +412,19 @@ impl<V: Reader> Reader for OptionReader<V> {
 }
 
 impl<T: Writable> Writable for Option<T> {
-    type Writer=OptionWriter<T::Writer>;
+    type Writer = OptionWriter<T::Writer>;
 }
 
 impl<T: Readable> Readable for Option<T> {
-    type Reader=OptionReader<T::Reader>;
+    type Reader = OptionReader<T::Reader>;
 }
 
-
 impl<T: Writable> Writable for Vec<T> {
-    type Writer=VecWriter<T::Writer>;
+    type Writer = VecWriter<T::Writer>;
 }
 
 impl<T: Readable> Readable for Vec<T> {
-    type Reader=VecReader<T::Reader>;
+    type Reader = VecReader<T::Reader>;
 }
 
 // TODO: Split implementation for read/write
