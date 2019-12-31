@@ -12,7 +12,6 @@ use crate::prelude::*;
 const PREAMBLE: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];
 
 pub fn write<T: Writable>(value: &T) -> Vec<u8>
-    //where T::Writer : std::fmt::Debug,
 {
     let mut writer = T::Writer::new();
     writer.write(value);
@@ -21,7 +20,6 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8>
     // the first branch would get written to the beginning and share
     // the same parent id as the null branch.
     bytes.extend_from_slice(&PREAMBLE);
-    //print!("{:?}", writer);
 
     writer.flush(&BranchId { name: "", parent: 0 }, &mut bytes);
     
@@ -29,9 +27,7 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8>
 }
 
 
-
 pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
-    
     let mut offset = 0;
     assert_eq!(&PREAMBLE, &bytes[offset..offset+PREAMBLE.len()], "Not valid file"); // TODO: Error handling
     offset += PREAMBLE.len();
@@ -40,17 +36,10 @@ pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
         sticks.push(Stick::read(bytes, &mut offset));
     }
 
-    println!("");
-    println!("{:?}", sticks);
-
     let branch = BranchId { name: "", parent: 0 };
     let mut reader = T::Reader::new(&sticks, &branch);
     
     Ok(reader.read())
-}
-
-pub fn test_play() {
-    play::test();
 }
 
 

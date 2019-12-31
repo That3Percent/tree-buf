@@ -11,6 +11,9 @@ pub trait Primitive : Default + BatchData {
 // want is to try falling back to the owning struct default implementation instead,
 // but that would require Default on too much. Having the branch type be a part
 // of the lookup somehow, or have missing be able to cancel the branch to something bogus may help.
+//
+// Ammendment to previous. This comment is somewhat out of date, now that Missing isn't really implemented,
+// and that the schema match has been moved to one place.
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Struct;
 // The Default derive enables DefaultOnMissing to have an empty array
@@ -59,9 +62,7 @@ impl<'a, T: EzBytes + Copy + std::fmt::Debug> BatchData for T {
         let mut offset = 0;
         let mut result = Vec::new();
         while offset < bytes.len() {
-            dbg!(offset);
             let value = T::read_bytes(bytes, &mut offset);
-            dbg!(value);
             result.push(value);
         }
         result

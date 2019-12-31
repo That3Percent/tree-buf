@@ -134,7 +134,6 @@ impl Writer for BobWriter {
 impl Reader for BobReader {
     type Read=Bob;
     fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
-        dbg!(branch);
         let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
         let _struct = Reader::new(sticks, branch);
 
@@ -163,7 +162,9 @@ impl Readable for Bob {
 }
 
 
-pub fn test() {
+#[cfg(test)]
+#[test]
+fn play_test() {
     let item = Item {
         int: 5,
         extra: Some(Bob {
@@ -181,20 +182,7 @@ pub fn test() {
             }
         },
     };
-    let time = std::time::Instant::now();
     let bytes = crate::write(&item);
-    let time = std::time::Instant::now() - time;
-    dbg!(time);
-    println!("");
-    println!("{:?}", bytes);
-    dbg!(bytes.len());
     let result = crate::read(&bytes);
-    dbg!(&result);
     assert_eq!(Ok(item), result);
-}
-
-#[cfg(test)]
-#[test]
-fn play_test() {
-    test();
 }
