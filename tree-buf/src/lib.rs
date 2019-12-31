@@ -5,6 +5,9 @@ pub mod prelude;
 pub mod primitive;
 pub mod reader_writer;
 
+// TODO: Move export of some types into an internals module which would re-export named needed by the macro,
+// and make all the mods private with just re-exported read/write, and macros
+
 #[cfg(test)]
 mod tests;
 
