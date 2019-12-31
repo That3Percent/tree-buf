@@ -3,8 +3,15 @@ name = "tree-buf"
 version = "0.1.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
+description = "A prototype binary serialization protocol"
+repository = "https://github.com/That3Percent/tree-buf"
+readme = "README.md"
+keywords = ["serialization", "protocol", "binary", "tree-buf", "treebuf", "tree", "buf", "buffers"]
+categories = ["compression", "parser-implementations"]
+license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+maintenance = { status = "experimental"}
 
 [dependencies]
 extend-lifetime = "0.2.0"
