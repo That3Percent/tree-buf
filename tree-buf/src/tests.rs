@@ -1,20 +1,16 @@
 use crate::prelude::*;
 use std::fmt::Debug;
+use tree_buf_macros::Write;
+use crate as tree_buf; // This warns about being unused, but it's used in the macro.
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Write)]
 struct Item {
     int: u32,
     obj_array: Vec<Bob>,
     extra: Option<Bob>,
 }
 
-#[derive(Debug)]
-struct ItemWriter {
-    _struct: <Struct as Writable>::Writer,
-    int: <u32 as Writable>::Writer,
-    obj_array: <Vec<Bob> as Writable>::Writer,
-    extra: <Option<Bob> as Writable>::Writer,
-}
+
 
 struct ItemReader {
     _struct: <Struct as Readable>::Reader,
@@ -23,39 +19,6 @@ struct ItemReader {
     extra: <Option<Bob> as Readable>::Reader,
 }
 
-impl Writer for ItemWriter {
-    type Write = Item;
-    fn new() -> Self {
-        Self {
-            _struct: Writer::new(),
-            int: Writer::new(),
-            obj_array: Writer::new(),
-            extra: Writer::new(),
-        }
-    }
-    fn write(&mut self, value: &Item) {
-        self._struct.write(&Struct);
-        self.int.write(&value.int);
-        self.obj_array.write(&value.obj_array);
-        self.extra.write(&value.extra);
-    }
-    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
-        let own_id = bytes.len();
-        self._struct.flush(branch, bytes);
-
-        let int = BranchId { name: "int", parent: own_id };
-        self.int.flush(&int, bytes);
-
-        let obj_array = BranchId {
-            name: "obj_array",
-            parent: own_id,
-        };
-        self.obj_array.flush(&obj_array, bytes);
-
-        let extra = BranchId { name: "extra", parent: own_id };
-        self.extra.flush(&extra, bytes);
-    }
-}
 
 impl Reader for ItemReader {
     type Read = Item;
@@ -87,50 +50,21 @@ impl Reader for ItemReader {
     }
 }
 
-impl Writable for Item {
-    type Writer = ItemWriter;
-}
 
 impl Readable for Item {
     type Reader = ItemReader;
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct Bob {
+#[derive(PartialEq, Debug, Clone, Write)]
+struct Bob {
     one: Vec<u32>,
 }
 
-#[derive(Debug)]
-pub struct BobWriter {
-    _struct: <Struct as Writable>::Writer,
-    one: <Vec<u32> as Writable>::Writer,
-}
-
-pub struct BobReader {
+struct BobReader {
     _struct: <Struct as Readable>::Reader,
     one: <Vec<u32> as Readable>::Reader,
 }
 
-impl Writer for BobWriter {
-    type Write = Bob;
-    fn new() -> Self {
-        Self {
-            _struct: <Struct as Writable>::Writer::new(),
-            one: <Vec<u32> as Writable>::Writer::new(),
-        }
-    }
-    fn write(&mut self, value: &Self::Write) {
-        self._struct.write(&Struct);
-        self.one.write(&value.one);
-    }
-    fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
-        let own_id = bytes.len();
-        self._struct.flush(branch, bytes);
-
-        let one = BranchId { name: "one", parent: own_id };
-        self.one.flush(&one, bytes);
-    }
-}
 
 impl Reader for BobReader {
     type Read = Bob;
@@ -147,10 +81,6 @@ impl Reader for BobReader {
         self._struct.read();
         Self::Read { one: self.one.read() }
     }
-}
-
-impl Writable for Bob {
-    type Writer = BobWriter;
 }
 
 impl Readable for Bob {
