@@ -1,6 +1,7 @@
 use crate::prelude::*;
+use std::fmt::Debug;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct Item {
     int: u32,
     obj_array: Vec<Bob>,
@@ -94,7 +95,7 @@ impl Readable for Item {
 }
 
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Bob {
     one: Vec<u32>,
 }
@@ -161,10 +162,8 @@ impl Readable for Bob {
     type Reader=BobReader;
 }
 
-
-#[test]
-fn round_trip() {
-    let item = Item {
+fn make_item() -> Item {
+    Item {
         int: 5,
         extra: Some(Bob {
             one: vec! { 99 },
@@ -180,8 +179,27 @@ fn round_trip() {
                 one: vec! { 20, 20, 20, 20, 20, 20, 20 }
             }
         },
-    };
-    let bytes = crate::write(&item);
+    }
+}
+
+fn round_trip<T: Readable + Writable + Debug + PartialEq>(value: &T) {
+    let bytes = crate::write(value);
     let result = crate::read(&bytes);
-    assert_eq!(Ok(item), result);
+    match result {
+        Ok(parsed) => assert_eq!(value, &parsed),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn round_trip_item() {
+    let item = make_item();
+    round_trip(&item);
+}
+
+#[test]
+fn round_trip_vec() {
+    let item = make_item();
+    let item = vec![item; 5];
+    round_trip(&item);
 }
