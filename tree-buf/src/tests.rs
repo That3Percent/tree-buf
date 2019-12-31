@@ -1,20 +1,26 @@
 use crate::prelude::*;
 use std::fmt::Debug;
-use tree_buf_macros::{Read, Write};
-use crate as tree_buf; // This warns about being unused, but it's used in the macro.
 
-#[derive(Read, Write, PartialEq, Debug, Clone)]
-struct Bits {
-    int: u32,
-    obj_array: Vec<Bobs>,
-    extra: Option<Bobs>,
+// Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
+mod hide_namespace {
+    use crate as tree_buf; // This warns about being unused, but it's used in the macro.
+    use tree_buf_macros::{Read, Write};
+
+
+    #[derive(Read, Write, PartialEq, Debug, Clone)]
+    pub struct Bits {
+        pub int: u32,
+        pub obj_array: Vec<Bobs>,
+        pub extra: Option<Bobs>,
+    }
+
+
+    #[derive(Read, Write, PartialEq, Debug, Clone)]
+    pub struct Bobs {
+        pub one: Vec<u32>,
+    }
 }
-
-
-#[derive(Read, Write, PartialEq, Debug, Clone)]
-struct Bobs {
-    one: Vec<u32>,
-}
+use hide_namespace::{Bits, Bobs};
 
 fn make_item() -> Bits {
     Bits {

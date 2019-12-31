@@ -59,7 +59,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
 
 fn impl_writable(name: &Ident, writer_name: &Ident) -> TokenStream {
     quote! {
-        impl Writable for #name {
+        impl tree_buf::Writable for #name {
             type Writer = #writer_name;
         }
     }
@@ -161,7 +161,7 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::Reader::new(
-                    sticks, &BranchId { name: #ident_str, parent: own_id }
+                    sticks, &tree_buf::BranchId { name: #ident_str, parent: own_id }
                 ),
             }
         }).collect();
@@ -211,7 +211,7 @@ fn impl_writer_struct(writer_name: &Ident, fields: &NamedFields) -> TokenStream 
         }).collect();
 
     quote! {
-        struct #writer_name {
+        pub struct #writer_name {
             _struct: <tree_buf::Struct as tree_buf::Writable>::Writer,
             #(#fields)*
         }
@@ -227,7 +227,7 @@ fn impl_reader_struct(reader_name: &Ident, fields: &NamedFields) -> TokenStream 
         }).collect();
 
     quote! {
-        struct #reader_name {
+        pub struct #reader_name {
             _struct: <tree_buf::Struct as tree_buf::Readable>::Reader,
             #(#fields)*
         }
