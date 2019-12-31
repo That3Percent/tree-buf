@@ -189,6 +189,7 @@ pub fn test() {
     println!("{:?}", bytes);
     dbg!(bytes.len());
     let result = crate::read(&bytes);
+    dbg!(&result);
     assert_eq!(Ok(item), result);
 }
 
