@@ -59,7 +59,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
 
 fn impl_writable(name: &Ident, writer_name: &Ident) -> TokenStream {
     quote! {
-        impl tree_buf::Writable for #name {
+        impl tree_buf::internal::Writable for #name {
             type Writer = #writer_name;
         }
     }
@@ -67,7 +67,7 @@ fn impl_writable(name: &Ident, writer_name: &Ident) -> TokenStream {
 
 fn impl_readable(name: &Ident, reader_name: &Ident) -> TokenStream {
     quote! {
-        impl tree_buf::Readable for #name {
+        impl tree_buf::internal::Readable for #name {
             type Reader = #reader_name;
         }
     }
@@ -96,14 +96,14 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     let init: Vec<_> =
         fields.iter().map(|(ident, _)| {
             quote! {
-                #ident: tree_buf::Writer::new(),
+                #ident: tree_buf::internal::Writer::new(),
             }
         }).collect();
 
     let new = quote! {
         fn new() -> Self {
             Self {
-                _struct: tree_buf::Writer::new(),
+                _struct: tree_buf::internal::Writer::new(),
                 #(#init)*
             }
         }
@@ -119,7 +119,7 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     // TODO: Writing the struct probably isn't necessary, just flushing the struct.
     let write = quote! {
         fn write(&mut self, value: &Self::Write) {
-            self._struct.write(&tree_buf::Struct);
+            self._struct.write(&tree_buf::internal::Struct);
             #(#writers)*
         }
     };
@@ -128,13 +128,13 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
-                let #ident = tree_buf::BranchId { name: #ident_str, parent: _own_id };
+                let #ident = tree_buf::internal::BranchId { name: #ident_str, parent: _own_id };
                 self.#ident.flush(&#ident, bytes);
             }
         }).collect();
 
     let flush = quote! {
-        fn flush(&self, branch: &tree_buf::BranchId<'_>, bytes: &mut Vec<u8>) {
+        fn flush(&self, branch: &tree_buf::internal::BranchId<'_>, bytes: &mut Vec<u8>) {
             let _own_id = bytes.len();
             self._struct.flush(branch, bytes);
 
@@ -143,7 +143,7 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     };
     
     quote! {
-        impl tree_buf::Writer for #writer_name {
+        impl tree_buf::internal::Writer for #writer_name {
             type Write = #name;
             #new
             #write
@@ -160,15 +160,15 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
-                #ident: tree_buf::Reader::new(
-                    sticks, &tree_buf::BranchId { name: #ident_str, parent: own_id }
+                #ident: tree_buf::internal::Reader::new(
+                    sticks, &tree_buf::internal::BranchId { name: #ident_str, parent: own_id }
                 ),
             }
         }).collect();
     let new = quote! {
-        fn new(sticks: &Vec<tree_buf::Stick>, branch: &tree_buf::BranchId) -> Self {
+        fn new(sticks: &Vec<tree_buf::internal::Stick>, branch: &tree_buf::internal::BranchId) -> Self {
             let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
-            let _struct = tree_buf::Reader::new(sticks, branch);
+            let _struct = tree_buf::internal::Reader::new(sticks, branch);
 
             Self {
                 _struct,
@@ -194,7 +194,7 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
     };
 
     quote! {
-        impl tree_buf::Reader for #reader_name {
+        impl tree_buf::internal::Reader for #reader_name {
             type Read = #name;
             #new
             #read
@@ -206,13 +206,13 @@ fn impl_writer_struct(writer_name: &Ident, fields: &NamedFields) -> TokenStream 
     let fields: Vec<_> =
         fields.iter().map(|(ident, ty)| {
             quote! {
-                #ident: <#ty as tree_buf::Writable>::Writer,
+                #ident: <#ty as tree_buf::internal::Writable>::Writer,
             }
         }).collect();
 
     quote! {
         pub struct #writer_name {
-            _struct: <tree_buf::Struct as tree_buf::Writable>::Writer,
+            _struct: <tree_buf::internal::Struct as tree_buf::internal::Writable>::Writer,
             #(#fields)*
         }
     }
@@ -222,13 +222,13 @@ fn impl_reader_struct(reader_name: &Ident, fields: &NamedFields) -> TokenStream 
     let fields: Vec<_> =
         fields.iter().map(|(ident, ty)| {
             quote! {
-                #ident: <#ty as tree_buf::Readable>::Reader,
+                #ident: <#ty as tree_buf::internal::Readable>::Reader,
             }
         }).collect();
 
     quote! {
         pub struct #reader_name {
-            _struct: <tree_buf::Struct as tree_buf::Readable>::Reader,
+            _struct: <tree_buf::internal::Struct as tree_buf::internal::Readable>::Reader,
             #(#fields)*
         }
     }

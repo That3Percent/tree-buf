@@ -1,11 +1,10 @@
-use crate::prelude::*;
+use tree_buf::prelude::*;
+use tree_buf::{Readable, Writable};
 use std::fmt::Debug;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
-    use crate as tree_buf; // This warns about being unused, but it's used in the macro.
     use tree_buf_macros::{Read, Write};
-
 
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bits {
@@ -13,7 +12,6 @@ mod hide_namespace {
         pub obj_array: Vec<Bobs>,
         pub extra: Option<Bobs>,
     }
-
 
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bobs {
@@ -37,8 +35,8 @@ fn make_item() -> Bits {
 }
 
 fn round_trip<T: Readable + Writable + Debug + PartialEq>(value: &T) {
-    let bytes = crate::write(value);
-    let result = crate::read(&bytes);
+    let bytes = write(value);
+    let result = read(&bytes);
     match result {
         Ok(parsed) => assert_eq!(value, &parsed),
         _ => assert!(false),

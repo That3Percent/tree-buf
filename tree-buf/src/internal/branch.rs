@@ -38,7 +38,7 @@ pub struct Stick<'a> {
     pub(crate) parent: usize,
     pub(crate) bytes: &'a [u8],
     pub(crate) primitive: PrimitiveId,
-    pub(crate) start: usize,
+    pub start: usize,
 }
 
 impl<'a> Stick<'a> {

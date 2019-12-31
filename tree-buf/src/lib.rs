@@ -1,17 +1,28 @@
-pub mod branch;
-pub mod error;
-pub mod missing;
-pub mod prelude;
-pub mod primitive;
-pub mod reader_writer;
+pub mod internal;
 
-// TODO: Move export of some types into an internals module which would re-export named needed by the macro,
-// and make all the mods private with just re-exported read/write, and macros
+pub mod prelude {
+    // Likely the minimum API that should go here. It's easier to add later than to remove.
+    pub use {
+        crate:: {
+            read, write
+        },
+        tree_buf_macros:: {
+            Read, Write
+        }
+    };
 
-#[cfg(test)]
-mod tests;
+    // This section makes everything interesting available to the rest of the crate
+    // without bothering to manage imports.
+    pub(crate) use crate::{internal::*, error::*,
+        primitive::{EzBytes, Primitive, PrimitiveId}
+    };
+}
 
-use crate::prelude::*;
+pub use prelude::*;
+pub use internal::error::Error;
+// TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
+// That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
+pub use internal::{Readable, Writable};
 
 // TREEBUF
 const PREAMBLE: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];
