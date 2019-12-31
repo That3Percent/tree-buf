@@ -3,6 +3,14 @@ name = "tree-buf-macros"
 version = "0.2.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
+description = "Proc macros for the tree-buf crate"
+repository = "https://github.com/That3Percent/tree-buf"
+keywords = ["serialization", "protocol", "binary", "buffers"]
+categories = ["compression", "parser-implementations"]
+license = "MIT"
+
+[badges]
+maintenance = { status = "experimental"}
 
 [lib]
 proc-macro = true
