@@ -4,7 +4,9 @@ pub mod missing;
 pub mod error;
 pub mod reader_writer;
 pub mod prelude;
-mod play;
+
+#[cfg(test)]
+mod tests;
 
 use crate::prelude::*;
 

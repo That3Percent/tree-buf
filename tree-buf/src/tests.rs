@@ -162,9 +162,8 @@ impl Readable for Bob {
 }
 
 
-#[cfg(test)]
 #[test]
-fn play_test() {
+fn round_trip() {
     let item = Item {
         int: 5,
         extra: Some(Bob {
