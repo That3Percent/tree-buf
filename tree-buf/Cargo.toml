@@ -1,6 +1,6 @@
 [package]
 name = "tree-buf"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
 description = "A prototype binary serialization protocol"
@@ -15,4 +15,4 @@ maintenance = { status = "experimental"}
 
 [dependencies]
 extend-lifetime = "0.2.0"
-tree-buf-macros = {version = "0.1.0", path="../tree-buf-macros" }
+tree-buf-macros = {version = "0.2.0", path="../tree-buf-macros" }
