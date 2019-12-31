@@ -15,6 +15,13 @@ struct ItemWriter {
     extra: <Option<Bob> as Writable>::Writer,
 }
 
+struct ItemReader {
+    _struct: <Struct as Readable>::Reader,
+    int: <u32 as Readable>::Reader,
+    obj_array: <Vec<Bob> as Readable>::Reader,
+    extra: <Option<Bob> as Readable>::Reader,
+}
+
 impl Writer for ItemWriter {
     type Write=Item;
     fn new() -> Self {
@@ -46,8 +53,44 @@ impl Writer for ItemWriter {
     }
 }
 
+impl Reader for ItemReader {
+    type Read=Item;
+    fn read(&mut self) -> Self::Read  {
+        self._struct.read();
+        Item {
+            int: self.int.read(),
+            obj_array: self.obj_array.read(),
+            extra: self.extra.read(),
+        }
+    }
+    fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
+        let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
+
+        let _struct = Reader::new(sticks, branch);
+        let int = BranchId { name: "int", parent: own_id };
+        let int = Reader::new(sticks, &int);
+
+        let obj_array = BranchId { name: "obj_array", parent: own_id };
+        let obj_array = Reader::new(sticks, &obj_array);
+
+        let extra = BranchId { name: "extra", parent: own_id };
+        let extra = Reader::new(sticks, &extra);
+
+        Self {
+            _struct,
+            int,
+            obj_array,
+            extra,
+        }
+    }
+}
+
 impl Writable for Item {
     type Writer=ItemWriter;
+}
+
+impl Readable for Item {
+    type Reader=ItemReader;
 }
 
 
@@ -60,6 +103,11 @@ pub struct Bob {
 pub struct BobWriter {
     _struct: <Struct as Writable>::Writer,
     one: <Vec<u32> as Writable>::Writer,
+}
+
+pub struct BobReader {
+    _struct: <Struct as Readable>::Reader,
+    one: <Vec<u32> as Readable>::Reader,
 }
 
 impl Writer for BobWriter {
@@ -83,11 +131,36 @@ impl Writer for BobWriter {
     }
 }
 
+impl Reader for BobReader {
+    type Read=Bob;
+    fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
+        dbg!(branch);
+        let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
+        let _struct = Reader::new(sticks, branch);
+
+        let one = BranchId { name: "one", parent: own_id };
+        let one = Reader::new(sticks, &one);
+
+        Self {
+            _struct,
+            one
+        }
+    }
+    fn read(&mut self) -> Self::Read {
+        self._struct.read();
+        Self::Read {
+            one: self.one.read(),
+        }
+    }
+}
+
 impl Writable for Bob {
     type Writer=BobWriter;
 }
 
-
+impl Readable for Bob {
+    type Reader=BobReader;
+}
 
 
 pub fn test() {

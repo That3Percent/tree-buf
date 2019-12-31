@@ -1,9 +1,7 @@
 use crate::prelude::*;
 
-pub trait Primitive : Default {
+pub trait Primitive : Default + BatchData {
     fn id() -> PrimitiveId;
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self>;
 }
 // TODO: The interaction between Default and Missing here may be dubious.
 // What it will ultimately infer is that the struct exists, but that all it's
@@ -51,45 +49,88 @@ impl PrimitiveId {
     }
 }
 
-impl Primitive for Struct {
-    fn id() -> PrimitiveId { PrimitiveId::Struct }
-    fn write_batch(_items: &[Self], _bytes: &mut Vec<u8>) { }
-    fn read_batch(_bytes: &[u8], count: usize) -> Vec<Self> {
-        vec![Self; count]
-    }
+pub trait BatchData : Sized {
+    fn read_batch(bytes: &[u8]) -> Vec<Self>;
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
 }
-impl Primitive for Array {
-    fn id() -> PrimitiveId { PrimitiveId::Array }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        for item in items {
-            item.0.write(bytes);
+
+impl<'a, T: EzBytes + Copy + std::fmt::Debug> BatchData for T {
+    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+        let mut offset = 0;
+        let mut result = Vec::new();
+        while offset < bytes.len() {
+            dbg!(offset);
+            let value = T::read_bytes(bytes, &mut offset);
+            dbg!(value);
+            result.push(value);
         }
+        result
     }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
-        todo!();
-    }
-}
-impl Primitive for Opt {
-    fn id() -> PrimitiveId { PrimitiveId::Opt }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        for item in items {
-            item.0.write(bytes);
-        }
-    }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
-        todo!();
-    }
-}
-impl Primitive for u32 {
-    fn id() -> PrimitiveId { PrimitiveId::U32 }
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         for item in items {
             item.write(bytes);
         }
     }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
-        todo!();
+}
+
+impl Primitive for Struct {
+    fn id() -> PrimitiveId { PrimitiveId::Struct }
+}
+
+impl BatchData for Struct {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        items.len().write(bytes);
     }
+    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+        debug_assert_eq!(bytes.len(), std::mem::size_of::<usize>());
+        let len: usize = EzBytes::read_bytes(bytes, &mut 0);
+        vec![Self; len]
+    }
+}
+
+impl Primitive for Array {
+    fn id() -> PrimitiveId { PrimitiveId::Array }
+}
+
+impl BatchData for Array {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        for item in items {
+            item.0.write(bytes);
+        }
+    }
+    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+        let mut offset = 0;
+        let mut result = Vec::new();
+        while offset < bytes.len() {
+            let value = EzBytes::read_bytes(bytes, &mut offset);
+            result.push(Array(value));
+        }
+        result
+    }
+}
+
+impl Primitive for Opt {
+    fn id() -> PrimitiveId { PrimitiveId::Opt }
+}
+impl BatchData for Opt {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
+        for item in items {
+            item.0.write(bytes);
+        }
+    }
+    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+        let mut offset = 0;
+        let mut result = Vec::new();
+        while offset < bytes.len() {
+            let value = EzBytes::read_bytes(bytes, &mut offset);
+            result.push(Opt(value));
+        }
+        result
+    }
+}
+
+impl Primitive for u32 {
+    fn id() -> PrimitiveId { PrimitiveId::U32 }
 }
 
 /// usize gets it's own primitive which uses varint because we don't know the platform and maximum value here.
@@ -98,23 +139,11 @@ impl Primitive for usize {
     fn id() -> PrimitiveId {
         PrimitiveId::Usize
     }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        todo!();
-    }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
-        todo!();
-    }
 }
 
 impl Primitive for bool {
     fn id() -> PrimitiveId {
         PrimitiveId::Bool
-    }
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        todo!();
-    }
-    fn read_batch(bytes: &[u8], count: usize) -> Vec<Self> {
-        todo!();
     }
 }
 
@@ -127,20 +156,22 @@ pub struct PrimitiveBuffer<T> {
 }
 
 // TODO: Most uses of this are temporary until compression is used.
-pub(crate) trait EzBytes {
-    type Out : std::borrow::Borrow<[u8]>;
+pub trait EzBytes {
+    type Out : std::borrow::Borrow<[u8]> + std::convert::TryFrom<&'static [u8]>;
     fn to_bytes(self) -> Self::Out;
     fn from_bytes(bytes: Self::Out) -> Self;
     fn write(self, bytes: &mut Vec<u8>) where Self : Sized {
         let o = self.to_bytes();
         bytes.extend_from_slice(std::borrow::Borrow::borrow(&o));
     }
-    fn read_bytes<'a>(bytes: &'a [u8], offset: &mut usize) -> Self where Self::Out : std::convert::TryFrom<&'a [u8]>, Self : Sized {
+    fn read_bytes(bytes: &[u8], offset: &mut usize) -> Self where Self : Sized {
         let start = *offset;
         let end = *offset + std::mem::size_of::<Self::Out>();
         *offset = end;
         let bytes = &bytes[start..end];
-        
+        // FIXME: Unsound hack!
+        // Getting around GAT issue temporarily for temporary EzBytes class
+        let bytes = unsafe { extend_lifetime::extend_lifetime(bytes) };
         let bytes = std::convert::TryFrom::try_from(bytes).unwrap_or_else(|_| todo!("Error handling"));
         Self::from_bytes(bytes)
     }
@@ -231,8 +262,34 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     }
 }
 
+impl<T : Primitive + Copy> Reader for PrimitiveBuffer<T> {
+    type Read=T;
+    fn new(sticks: &Vec<Stick<'_>>, branch: &BranchId) -> Self {
+        let stick = branch.find_stick(&sticks).unwrap(); // TODO: Error handling
+        if stick.primitive != T::id() {
+            todo!("error handling. {:?} {:?} {:?}", T::id(), branch, stick);
+        }
+
+        let values = T::read_batch(stick.bytes);
+        Self {
+            values,
+            read_offset: 0,
+        }
+    }
+    fn read(&mut self) -> Self::Read {
+        let value = self.values[self.read_offset];
+        self.read_offset += 1;
+        value
+    }
+}
+
 #[derive(Debug)]
 pub struct VecWriter<T> {
+    len: PrimitiveBuffer<Array>,
+    values: T,
+}
+
+pub struct VecReader<T> {
     len: PrimitiveBuffer<Array>,
     values: T,
 }
@@ -260,12 +317,45 @@ impl<T: Writer> Writer for VecWriter<T> {
     }
 }
 
+impl<T: Reader> Reader for VecReader<T> {
+    type Read=Vec<T::Read>;
+    fn new(sticks: &Vec<Stick>, branch: &BranchId) -> Self {
+        let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
+        let len = Reader::new(sticks, branch);
+
+        let values = BranchId { name: "", parent: own_id };
+        let values = Reader::new(sticks, &values);
+
+        Self {
+            len,
+            values,
+        }
+    }
+    fn read(&mut self) -> Self::Read {
+        let len = self.len.read().0;
+        let mut result = Vec::with_capacity(len);
+        for _ in 0..len {
+            result.push(self.values.read());
+        }
+        result
+    }
+}
+
 impl<T: Primitive + Copy> Writable for T {
     type Writer=PrimitiveBuffer<T>;
 }
 
+impl<T: Primitive + Copy> Readable for T {
+    type Reader=PrimitiveBuffer<T>;
+}
+
 #[derive(Debug)]
 pub struct OptionWriter<V> {
+    opt: PrimitiveBuffer<Opt>,
+    value: V,
+}
+
+pub struct OptionReader<V> {
     opt: PrimitiveBuffer<Opt>,
     value: V,
 }
@@ -288,8 +378,30 @@ impl<V: Writer> Writer for OptionWriter<V> {
         let own_id = bytes.len();
         self.opt.flush(branch, bytes);
 
-        let value = BranchId { name: "value", parent: own_id };
+        let value = BranchId { name: "", parent: own_id };
         self.value.flush(&value, bytes);
+    }
+}
+
+impl<V: Reader> Reader for OptionReader<V> {
+    type Read=Option<V::Read>;
+    fn new(sticks: &Vec<Stick<'_>>, branch: &BranchId) -> Self {
+        let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
+        let opt = Reader::new(sticks, branch);
+
+        let value = BranchId { name: "", parent: own_id };
+        let value = Reader::new(sticks, &value);
+        Self {
+            opt,
+            value,
+        }
+    }
+    fn read(&mut self) -> Self::Read {
+        if self.opt.read().0 {
+            Some(self.value.read())
+        } else {
+            None
+        }
     }
 }
 
@@ -297,11 +409,18 @@ impl<T: Writable> Writable for Option<T> {
     type Writer=OptionWriter<T::Writer>;
 }
 
+impl<T: Readable> Readable for Option<T> {
+    type Reader=OptionReader<T::Reader>;
+}
+
 
 impl<T: Writable> Writable for Vec<T> {
     type Writer=VecWriter<T::Writer>;
 }
 
+impl<T: Readable> Readable for Vec<T> {
+    type Reader=VecReader<T::Reader>;
+}
 
 // TODO: Split implementation for read/write
 impl<T: Copy> PrimitiveBuffer<T> {
