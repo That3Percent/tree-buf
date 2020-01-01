@@ -1,6 +1,6 @@
 [package]
 name = "tree-buf-macros"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
 description = "Proc macros for the tree-buf crate"
