@@ -8,9 +8,11 @@ pub mod primitive;
 pub mod reader_writer;
 pub mod error;
 pub mod missing;
+pub(crate) mod encodings;
 
 pub use {
     reader_writer::{Readable, Reader, Writable, Writer},
     primitive::{Struct, Array, Opt},
     branch::{Stick, BranchId},
+    encodings::*,
 };

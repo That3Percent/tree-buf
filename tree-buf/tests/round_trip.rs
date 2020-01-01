@@ -49,9 +49,19 @@ fn round_trip_item() {
     round_trip(&item);
 }
 
+
 #[test]
 fn round_trip_vec() {
     let item = make_item();
     let item = vec![item; 5];
     round_trip(&item);
+}
+
+#[test]
+fn size_check() {
+    // TODO: Compare output size of file and time to encode and decode as compared to a variety of other formats.
+    let item = make_item();
+    let item = vec![item; 5];
+    let bytes = write(&item);
+    dbg!(bytes.len());
 }
