@@ -103,7 +103,6 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     let new = quote! {
         fn new() -> Self {
             Self {
-                _struct: tree_buf::internal::Writer::new(),
                 #(#init)*
             }
         }
@@ -119,7 +118,6 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     // TODO: Writing the struct probably isn't necessary, just flushing the struct.
     let write = quote! {
         fn write(&mut self, value: &Self::Write) {
-            self._struct.write(&tree_buf::internal::Struct);
             #(#writers)*
         }
     };
@@ -136,7 +134,9 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     let flush = quote! {
         fn flush(&self, branch: &tree_buf::internal::BranchId<'_>, bytes: &mut Vec<u8>) {
             let _own_id = bytes.len();
-            self._struct.flush(branch, bytes);
+            // Do flush a Struct branch as a marker and error check.
+            <tree_buf::internal::Struct as tree_buf::internal::Writable>::Writer::new()
+                .flush(branch, bytes);
 
             #(#flushes)*
         }
@@ -168,10 +168,12 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
     let new = quote! {
         fn new(sticks: &Vec<tree_buf::internal::Stick>, branch: &tree_buf::internal::BranchId) -> Self {
             let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
-            let _struct = tree_buf::internal::Reader::new(sticks, branch);
-
+            // Verify schema is correct by checking for the struct branch.
+            let s = <
+                <tree_buf::internal::Struct as tree_buf::internal::Readable>
+                ::Reader as tree_buf::internal::Reader
+            >::new(sticks, branch);
             Self {
-                _struct,
                 #(#inits)*
             }
         }
@@ -186,7 +188,6 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
 
     let read = quote! {
         fn read(&mut self) -> Self::Read {
-            self._struct.read();
             Self::Read {
                 #(#readers)*
             }
@@ -212,7 +213,6 @@ fn impl_writer_struct(writer_name: &Ident, fields: &NamedFields) -> TokenStream 
 
     quote! {
         pub struct #writer_name {
-            _struct: <tree_buf::internal::Struct as tree_buf::internal::Writable>::Writer,
             #(#fields)*
         }
     }
@@ -228,7 +228,6 @@ fn impl_reader_struct(reader_name: &Ident, fields: &NamedFields) -> TokenStream 
 
     quote! {
         pub struct #reader_name {
-            _struct: <tree_buf::internal::Struct as tree_buf::internal::Readable>::Reader,
             #(#fields)*
         }
     }

@@ -80,14 +80,12 @@ impl Primitive for Struct {
     }
 }
 
+// TODO: Performance - remove the need to allocate vec here.
 impl BatchData for Struct {
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        items.len().write(bytes);
-    }
+    fn write_batch(_items: &[Self], _bytes: &mut Vec<u8>) { }
     fn read_batch(bytes: &[u8]) -> Vec<Self> {
-        debug_assert_eq!(bytes.len(), std::mem::size_of::<usize>());
-        let len: usize = EzBytes::read_bytes(bytes, &mut 0);
-        vec![Self; len]
+        debug_assert_eq!(bytes.len(), 0);
+        Vec::new()
     }
 }
 
