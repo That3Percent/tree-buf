@@ -63,5 +63,8 @@ fn size_check() {
     let item = make_item();
     let item = vec![item; 5];
     let bytes = write(&item);
-    dbg!(bytes.len());
+
+    // Assert a specific size. If we get a number above this size, that's a fail.
+    // If we add compression and achieve lower, we can ratchet the number down.
+    assert_eq!(bytes.len(), 246);
 }
