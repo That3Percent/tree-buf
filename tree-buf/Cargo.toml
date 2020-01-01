@@ -15,4 +15,4 @@ maintenance = { status = "experimental"}
 
 [dependencies]
 extend-lifetime = "0.2.0"
-tree-buf-macros = {version = "0.2.0", path="../tree-buf-macros" }
+tree-buf-macros = {version = "0.3.0", path="../tree-buf-macros" }
