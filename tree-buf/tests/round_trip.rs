@@ -43,6 +43,7 @@ fn round_trip<T: Readable + Writable + Debug + PartialEq>(value: &T) {
     }
 }
 
+// TODO: Re-enable
 #[test]
 fn round_trip_item() {
     let item = make_item();
@@ -66,5 +67,5 @@ fn size_check() {
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 246);
+    assert_eq!(bytes.len(), 169);
 }

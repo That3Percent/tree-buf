@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::internal::encodings::varint::{encode_prefix_varint, decode_prefix_varint};
+use crate::internal::encodings::varint::{encode_prefix_varint, decode_prefix_varint, encode_suffix_varint};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::mem::transmute;
@@ -257,11 +257,7 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
         self.values.push(*value);
     }
     fn flush(&self, branch: &BranchId<'_>, bytes: &mut Vec<u8>) {
-        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
-        // TODO: Can use varint if we read the file backward and write lengths at the end.
-        // That would require some sort of reverse prefix varint... suffix varint if you will.
         let start = bytes.len();
-        bytes.extend_from_slice(&[0; 8]);
 
         // Write the branch
         branch.flush(bytes);
@@ -273,11 +269,8 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
         T::write_batch(&self.values, bytes);
 
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
-        let end = bytes.len() as u64;
-        let end = end.to_le_bytes();
-        for i in 0..end.len() {
-            bytes[start + i] = end[i];
-        }
+        let size = (bytes.len() - start) as u64;
+        encode_suffix_varint(size, bytes);
     }
 }
 

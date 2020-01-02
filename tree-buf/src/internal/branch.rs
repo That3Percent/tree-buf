@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint};
+use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint, decode_suffix_varint};
 use std::fmt::Debug;
-use std::convert::TryInto;
 
 #[derive(Debug)]
 pub struct BranchId<'a> {
@@ -48,26 +47,25 @@ pub struct Stick<'a> {
 impl<'a> Stick<'a> {
     pub(crate) fn read(bytes: &'a [u8], offset: &mut usize) -> Self {
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
-        let start = *offset;
-        // TODO: Store delta instead of end, because it will be smaller.
+        let len = decode_suffix_varint(bytes, offset) as usize;
+        let end = *offset + 1;
+        let start = end - len;
+        *offset = start - 1;
+
+        // Re-let offset for our own use, since we want to preserve
+        // the beginning
+        let mut offset = start;
         // TODO: All the branch data could be flushed at the end of the file using
         // a similar buffering scheme.
-        *offset += 8;
-        let end = &bytes[start..*offset];
-        let end: [u8; 8] = end.try_into().unwrap();
-        let end = u64::from_le_bytes(end) as usize;
-        let branch = BranchId::read(bytes, offset);
-        let BranchId { name, parent } = branch;
-        let primitive = bytes[*offset]; // TODO: Prefix varint
-        *offset += 1;
+        let branch = BranchId::read(bytes, &mut offset);
+        let primitive = bytes[offset]; // TODO: Prefix varint
+        offset += 1;
         let primitive = PrimitiveId::from_u32(primitive as u32);
 
-        let bytes = &bytes[*offset..end];
-        *offset = end;
         Self {
-            name,
-            parent,
-            bytes,
+            name: branch.name,
+            parent: branch.parent,
+            bytes: &bytes[offset..end],
             primitive,
             start,
         }

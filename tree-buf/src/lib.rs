@@ -42,11 +42,10 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8> {
 }
 
 pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
-    let mut offset = 0;
-    assert_eq!(&PREAMBLE, &bytes[offset..offset + PREAMBLE.len()], "Not valid file"); // TODO: Error handling
-    offset += PREAMBLE.len();
+    assert_eq!(&PREAMBLE, &bytes[0..PREAMBLE.len()], "Not valid file"); // TODO: Error handling, file of fewer than PREAMBLE bytes
     let mut sticks = Vec::new();
-    while offset < bytes.len() {
+    let mut offset = bytes.len() - 1;
+    while offset > PREAMBLE.len() {
         sticks.push(Stick::read(bytes, &mut offset));
     }
 
