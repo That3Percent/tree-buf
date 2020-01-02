@@ -12,6 +12,12 @@ pub struct BranchId<'a> {
 
 impl<'a> BranchId<'a> {
     pub(crate) fn flush(&self, bytes: &mut Vec<u8>) {
+        // TODO: The parent could always be the first branch,
+        // and then would not need parent saved. This saves 1 byte by itself,
+        // but also allows removing the pre-amble.
+        //
+        // TODO: Whether the branch name is necessary is knowable from context.
+        // Don't save branch name at all unless it's needed.
         // Parent, Name length, name bytes
         encode_prefix_varint(self.parent as u64, bytes);
         encode_prefix_varint(self.name.len() as u64, bytes);

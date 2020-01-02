@@ -1,11 +1,15 @@
 use tree_buf::prelude::*;
 use tree_buf::{Readable, Writable};
 use std::fmt::Debug;
+use std::time::{Instant, Duration};
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
     use tree_buf_macros::{Read, Write};
+    use serde::{Serialize, Deserialize};
 
+
+    #[derive(Serialize, Deserialize)]
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bits {
         pub int: u32,
@@ -13,12 +17,15 @@ mod hide_namespace {
         pub extra: Option<Bobs>,
     }
 
+    #[derive(Serialize, Deserialize)]
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bobs {
         pub one: Vec<u32>,
     }
 }
 use hide_namespace::{Bits, Bobs};
+
+// TODO: Compare to Avro - https://github.com/flavray/avro-rs
 
 fn make_item() -> Bits {
     Bits {
@@ -56,6 +63,55 @@ fn round_trip_vec() {
     let item = make_item();
     let item = vec![item; 5];
     round_trip(&item);
+}
+
+#[cfg(not(debug_assertions))]
+fn bad_benchmark(f: impl Fn()) -> Duration {
+    // Warmup
+    for _ in 0..100 {
+        f();
+    }
+
+    let start = Instant::now();
+    for _ in 0..100 {
+        f();
+    }
+    let end = Instant::now();
+    end - start
+}
+
+fn better_than(f: impl Fn(&Vec<Bits>) -> Vec<u8>) {
+    let item = make_item();
+    // TODO: This is tuned to win at large numbers. How low can we get this and still reliably be better?
+    let item = vec![item; 25];
+    let bytes_tree = write(&item);
+    let bytes_other = f(&item);
+    assert!(bytes_tree.len() < bytes_other.len(), "Own: {}, other: {}", bytes_tree.len(), bytes_other.len());
+    #[cfg(not(debug_assertions))]
+    {
+        // TODO: Deserialize
+        let time_tree = bad_benchmark(|| { write(&item); });
+        let time_other = bad_benchmark(|| { f(&item); });
+        assert!(time_tree < time_other, "Own: {:?}, other: {:?}", time_tree, time_other);
+    }
+}
+
+#[test]
+fn better_than_json() {
+    better_than(|i| { serde_json::to_vec(i).unwrap() });
+}
+
+#[test]
+fn better_than_message_pack() {
+    use rmp_serde as rmps;
+    use serde::Serialize;
+
+    better_than(|i| {
+        let mut buf = Vec::new();
+        i.serialize(&mut rmps::Serializer::new(&mut buf)).unwrap();
+        buf
+
+    })
 }
 
 #[test]
