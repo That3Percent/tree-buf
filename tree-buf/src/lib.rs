@@ -22,38 +22,36 @@ pub use prelude::*;
 pub use internal::error::Error;
 // TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
 // That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
-pub use internal::{Readable, Writable};
-
-// TREEBUF
-const PREAMBLE: [u8; 7] = [84, 82, 69, 69, 66, 85, 70];
+pub use internal::{Readable, Writable, StaticRootBranch};
 
 pub fn write<T: Writable>(value: &T) -> Vec<u8> {
     let mut writer = T::Writer::new();
     writer.write(value);
     let mut bytes = Vec::new();
-    // The pre-amble is actually necessary for correctness. Without it,
-    // the first branch would get written to the beginning and share
-    // the same parent id as the null branch.
-    bytes.extend_from_slice(&PREAMBLE);
-
-    writer.flush(&BranchId { name: "", parent: 0 }, &mut bytes);
+    writer.flush(StaticRootBranch, &mut bytes);
 
     bytes
 }
 
 pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
-    assert_eq!(&PREAMBLE, &bytes[0..PREAMBLE.len()], "Not valid file"); // TODO: Error handling, file of fewer than PREAMBLE bytes
+    todo!(); 
+    /*
     let mut sticks = Vec::new();
     let mut offset = bytes.len() - 1;
     while offset > PREAMBLE.len() {
         sticks.push(Stick::read(bytes, &mut offset));
     }
 
-    let branch = BranchId { name: "", parent: 0 };
-    let mut reader = T::Reader::new(&sticks, &branch);
+    let mut reader = T::Reader::new(&sticks, StaticRootBranch);
 
     Ok(reader.read())
+    */
 }
 
 // TODO: When deriving, use the assert implements check that eg: Clone does, to give good compiler errors
 //       If this is not possible because it's an internal API, use static_assert
+
+
+// TODO: Evaluate TurboPFor https://github.com/powturbo/TurboPFor
+// or consider the best parts of it. The core differentiator here
+// is the ability to use this.

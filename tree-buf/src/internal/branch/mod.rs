@@ -1,6 +1,19 @@
 use crate::prelude::*;
-use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint, decode_suffix_varint};
+use crate::internal::encodings::varint::{decode_prefix_varint, decode_suffix_varint};
 use std::fmt::Debug;
+
+pub mod dyn_branch;
+pub mod static_branch;
+pub use dyn_branch::*;
+pub use static_branch::*;
+
+
+pub trait StaticBranch : 'static {
+    fn children_in_array_context() -> bool;
+    fn self_in_array_context() -> bool;
+    #[inline(always)]
+    fn name(&self) -> Option<&str> { None }
+}
 
 #[derive(Debug)]
 pub struct BranchId<'a> {
@@ -11,19 +24,6 @@ pub struct BranchId<'a> {
 }
 
 impl<'a> BranchId<'a> {
-    pub(crate) fn flush(&self, bytes: &mut Vec<u8>) {
-        // TODO: The parent could always be the first branch,
-        // and then would not need parent saved. This saves 1 byte by itself,
-        // but also allows removing the pre-amble.
-        //
-        // TODO: Whether the branch name is necessary is knowable from context.
-        // Don't save branch name at all unless it's needed.
-        // Parent, Name length, name bytes
-        encode_prefix_varint(self.parent as u64, bytes);
-        encode_prefix_varint(self.name.len() as u64, bytes);
-        bytes.extend_from_slice(self.name.as_bytes());
-    }
-
     pub(crate) fn read(bytes: &'a [u8], offset: &mut usize) -> Self {
         let parent = decode_prefix_varint(bytes, offset) as usize;
         let str_len = decode_prefix_varint(bytes, offset) as usize;

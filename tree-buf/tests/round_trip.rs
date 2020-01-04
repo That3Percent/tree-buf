@@ -80,6 +80,7 @@ fn bad_benchmark(f: impl Fn()) -> Duration {
     end - start
 }
 
+// TODO: Move these tests to a wholly different project and use on a variety of real world data sets rather than toys
 fn better_than(f: impl Fn(&Vec<Bits>) -> Vec<u8>) {
     let item = make_item();
     // TODO: This is tuned to win at large numbers. How low can we get this and still reliably be better?
@@ -118,10 +119,10 @@ fn better_than_message_pack() {
 fn size_check() {
     // TODO: Compare output size of file and time to encode and decode as compared to a variety of other formats.
     let item = make_item();
-    let item = vec![item; 5];
+    //let item = vec![item; 5];
     let bytes = write(&item);
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 169);
+    assert_eq!(bytes.len(), 89);
 }
