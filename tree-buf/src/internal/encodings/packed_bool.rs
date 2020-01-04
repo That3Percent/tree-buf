@@ -44,4 +44,35 @@ pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
     result
 }
 
-// TODO: Test
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::tests::round_trip;
+
+    #[test]
+    fn round_trip_packed_bool() {
+        let cases = vec! [
+            vec! [],
+            vec! [true],
+            vec! [false],
+            vec! [true, true, true, true, true, true, true],
+            vec! [true, true, true, true, true, true, true, true],
+            vec! [true, true, true, true, true, true, true, true, true],
+            vec! [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+            vec! [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true],
+            vec! [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, true, true],
+            vec! [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, false, false],
+        ];
+
+        for case in cases {
+            let mut bytes = Vec::new();
+            encode_packed_bool(&case, &mut bytes);
+            let result = decode_packed_bool(&bytes);
+            
+            // Can't simply assert_eq, because the decoder will pad with false at the end.
+            for i in 0..case.len() {
+                assert_eq!(case[i], result[i]);
+            }
+        }
+    }
+}

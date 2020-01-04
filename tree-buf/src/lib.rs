@@ -28,6 +28,7 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8> {
     let mut writer = T::Writer::new();
     writer.write(value);
     let mut bytes = Vec::new();
+    // TODO: The pre-amble could come back as optional, as long as it has it's own PrimitiveId
     writer.flush(StaticRootBranch, &mut bytes);
 
     bytes

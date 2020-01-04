@@ -296,17 +296,10 @@ pub fn decode_suffix_varint(values: &[u8], offset: &mut usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::read_all;
+    use super::super::tests::round_trip;
 
     fn round_trip_prefix(values: &[u64]) {
-        let mut bytes = Vec::new();
-        for value in values.iter() {
-            encode_prefix_varint(*value, &mut bytes);
-        }
-
-        let result = read_all(&bytes, decode_prefix_varint);
-        
-        assert_eq!(&result, &values);
+        round_trip(values, encode_prefix_varint, decode_prefix_varint);
     }
 
     fn round_trip_suffix(values: &[u64]) {
