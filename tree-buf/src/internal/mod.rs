@@ -7,7 +7,6 @@ pub mod branch;
 pub mod primitive;
 pub mod reader_writer;
 pub mod error;
-pub mod missing;
 pub(crate) mod encodings;
 pub mod types;
 

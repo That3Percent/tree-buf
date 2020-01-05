@@ -5,43 +5,75 @@ use crate::internal::encodings::{
 use std::convert::{TryInto};
 use std::fmt::Debug;
 
+
+
 pub trait Primitive: Default + BatchData {
     fn id() -> PrimitiveId;
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum PrimitiveId {
-    Object = 1,
-    Array = 2, // TODO: Support fixed length in primitive id
-    Nullable = 3,
+    Object { num_fields: usize },
+    Array, // TODO: Support fixed length in primitive id
+    Nullable,
     // TODO: The idea for int is to always encode up to 64 bit values,
     // but for any data store the min value and offset first, then use
     // that to select an optimal encoding. When deserializing, the min and
     // offset can be used to find if the data type required by the schema
     // matches.
     // Consider something like this - https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
-    Integer = 4,
-    Boolean = 5,
-    Usize = 6,
-    String = 7,
+    Integer,
+    Boolean,
+
+    // TODO: String,
     // TODO: Bytes = [u8]
     // TODO: Date
+    // TODO: Void
+    // TODO: Enum - Something like this... needs to simmer.
+    //              The enum primitive id contains 1 number which is the discriminant count.
+    //              The enum discriminant as int is contained in the enum branch
+    //              Each sub-branch contains the discriminant name (string)
+    //              Each branch may have a sub-branch for data belonging to the variant for that discriminant in each entry.
+    //              In many cases, this data will be Void, which may be wasteful to have a branch for.
+    //              ..
+    //              Because enum is so flexible, it's possible to wrap some dynamic data into it. Eg: EnumValue<T>.
+    //              This would create some number of sub-branches 'dynamically'.
     
 }
 
 impl PrimitiveId {
-    pub(crate) fn from_u32(v: u32) -> Self {
+    pub(crate) fn write(self: &Self, bytes: &mut Vec<u8>) {
         use PrimitiveId::*;
-        // TODO: Add some kind of check that all values are still correct.
-        match v {
-            1 => Object,
+        dbg!(self);
+        dbg!(bytes.len());
+        match self {
+            Object { num_fields } => {
+                bytes.push(1);
+                encode_prefix_varint(*num_fields as u64, bytes);
+            },
+            _ => {
+                let discriminant = match self {
+                    Object {..} => unreachable!(),
+                    Array => 2,
+                    Nullable => 3,
+                    Integer => 4,
+                    Boolean => 5,
+                };
+                bytes.push(discriminant);
+            }
+        }
+    }
+    pub(crate) fn read(bytes: &[u8], offset: &mut usize) -> Self {
+        use PrimitiveId::*;
+        let discriminant = bytes[*offset];
+        *offset += 1;
+        match discriminant {
+            1 => Object { num_fields: decode_prefix_varint(bytes, offset) as usize },
             2 => Array,
             3 => Nullable,
             4 => Integer,
             5 => Boolean,
-            6 => Usize,
-            7 => String,
-            _ => todo!("error handling. {}", v),
+            _ => todo!("error handling. {}", discriminant),
         }
     }
 }
@@ -51,16 +83,22 @@ pub trait BatchData: Sized {
     fn read_batch(bytes: &[u8]) -> Vec<Self>;
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
     fn write_one(item: Self, bytes: &mut Vec<u8>) {
+        // TODO: Overload these
+        Self::write_batch(&[item], bytes)
+    }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
         todo!()
     }
 }
 
 
-/// usize gets it's own primitive which uses varint because we don't know the platform and maximum value here.
-/// This enables support for arbitrarily large indices, with runtime errors for values unsupported by the platform
+
 impl Primitive for usize {
+    // TODO: I wrote this earlier, but now I'm not sure it makes sense.
+    // usize gets it's own primitive which uses varint because we don't know the platform and maximum value here.
+    // This enables support for arbitrarily large indices, with runtime errors for values unsupported by the platform
     fn id() -> PrimitiveId {
-        PrimitiveId::Usize
+        PrimitiveId::Integer
     }
 }
 
@@ -99,34 +137,29 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     fn write(&mut self, value: &Self::Write) {
         self.values.push(*value);
     }
-    fn flush<ParentBranch: StaticBranch>(&self, branch: ParentBranch, bytes: &mut Vec<u8>) {
-        let start = bytes.len();
+    fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
+        T::id().write(bytes);
 
-        // TODO: Move the number of children for a struct to the branch primitive id
-        if let Some(name) = branch.name() {
-            encode_prefix_varint(name.len() as u64, bytes);
-            bytes.extend_from_slice(name.as_bytes());
-        }
-
-        // Write the primitive id
-        // TODO: Include data for the primitive - like int ranges
-        bytes.push(T::id() as u8);
-
-        // TODO: If not in an array context, use T::write_one
-        T::write_batch(&self.values, bytes);
-
-        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712} 
-        // FIXME: This can't go here, it needs to go to the end of the file.
         if ParentBranch::self_in_array_context() {
-            let size = (bytes.len() - start) as u64;
-            encode_suffix_varint(size, bytes);
+            let start = bytes.len();
+            T::write_batch(&self.values, bytes);
+            let len = bytes.len() - start;
+            lens.push(len);
+        } else {
+            let Self { mut values, .. } = self;
+            // TODO: This may be 0 for Object
+            assert_eq!(values.len(), 1);
+            let value = values.pop().unwrap();
+            T::write_one(value, bytes);
+
         }
     }
 }
 
 impl<T: Primitive + Copy> Reader for PrimitiveBuffer<T> {
     type Read = T;
-    fn new<ParentBranch: StaticBranch>(sticks: &Vec<Stick<'_>>, branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
         todo!()
         /*
         let stick = branch.find_stick(&sticks).unwrap(); // TODO: Error handling

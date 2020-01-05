@@ -23,6 +23,7 @@ mod hide_namespace {
         pub one: Vec<u32>,
     }
 }
+
 use hide_namespace::{Bits, Bobs};
 
 // TODO: Compare to Avro - https://github.com/flavray/avro-rs
@@ -84,7 +85,7 @@ fn bad_benchmark(f: impl Fn()) -> Duration {
 fn better_than(f: impl Fn(&Vec<Bits>) -> Vec<u8>) {
     let item = make_item();
     // TODO: This is tuned to win at large numbers. How low can we get this and still reliably be better?
-    let item = vec![item; 25];
+    let item = vec![item; 11];
     let bytes_tree = write(&item);
     let bytes_other = f(&item);
     assert!(bytes_tree.len() < bytes_other.len(), "Own: {}, other: {}", bytes_tree.len(), bytes_other.len());

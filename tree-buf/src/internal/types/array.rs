@@ -70,19 +70,27 @@ impl<T: Writer> Writer for ArrayWriter<T> {
             self.values.write(item);
         }
     }
-    fn flush<ParentBranch: StaticBranch>(&self, branch: ParentBranch, bytes: &mut Vec<u8>) {
-        self.len.flush(branch, bytes);
-        self.values.flush(StaticArrayBranch::<ParentBranch>::new(), bytes);
+    fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+        self.len.flush(branch, bytes, lens);
+        self.values.flush(StaticArrayBranch::<ParentBranch>::new(), bytes, lens);
     }
 }
 
 impl<T: Reader> Reader for ArrayReader<T> {
     type Read = Vec<T::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: &Vec<Stick>, branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, branch: ParentBranch) -> Self {
+        match sticks {
+            DynBranch::Array {len, values} => {
+                todo!()
+            },
+            _ => todo!(), // Schema mismatch
+        }
+        /*
         Self {
             len: Reader::new(sticks, branch),
             values: Reader::new(sticks, StaticArrayBranch::<ParentBranch>::new())
         }
+        */
     }
     fn read(&mut self) -> Self::Read {
         let len = self.len.read().0;

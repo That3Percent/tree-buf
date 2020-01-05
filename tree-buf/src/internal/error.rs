@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Debug, PartialEq)]
 pub enum Error {
     Missing { branch: String, id: PrimitiveId },
+    InvalidFile,
 }
 
 impl Display for Error {

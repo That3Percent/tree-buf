@@ -50,19 +50,22 @@ impl<V: Writer> Writer for NullableWriter<V> {
             self.value.write(value);
         }
     }
-    fn flush<B: StaticBranch>(&self, branch: B, bytes: &mut Vec<u8>) {
-        self.opt.flush(branch, bytes);
-        self.value.flush(OnlyBranch::<B>::new(), bytes);
+    fn flush<B: StaticBranch>(self, branch: B, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+        self.opt.flush(branch, bytes, lens);
+        self.value.flush(OnlyBranch::<B>::new(), bytes, lens);
     }
 }
 
 impl<V: Reader> Reader for NullableReader<V> {
     type Read = Option<V::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: &Vec<Stick<'_>>, branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
+        todo!()
+        /*
         Self {
             opt: Reader::new(sticks, branch),
             value: Reader::new(sticks, OnlyBranch::<ParentBranch>::new()),
         }
+        */
     }
     fn read(&mut self) -> Self::Read {
         if self.opt.read().0 {

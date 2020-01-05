@@ -5,8 +5,9 @@ pub mod integer;
 pub mod object;
 pub mod nullable;
 pub mod boolean;
+pub mod string;
 
-pub use {array::*, integer::*, object::*, nullable::*, boolean::*};
+pub use {array::*, integer::*, object::*, nullable::*, boolean::*, string::*};
 
 use std::mem::transmute;
 

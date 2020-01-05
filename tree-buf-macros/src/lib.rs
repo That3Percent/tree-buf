@@ -126,16 +126,18 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
-                let #ident = tree_buf::internal::ObjectBranch::<ParentBranch>::new(#ident_str);
-                self.#ident.flush(#ident, bytes);
+                let #ident = tree_buf::internal::ObjectBranch::<ParentBranch>::new();
+                tree_buf::internal::ObjectBranch::<ParentBranch>::flush(#ident_str, bytes);
+                self.#ident.flush(#ident, bytes, lens);
             }
         }).collect();
 
+    let num_fields = flushes.len();
     let flush = quote! {
-        fn flush<ParentBranch: tree_buf::internal::StaticBranch>(&self, branch: ParentBranch, bytes: &mut Vec<u8>) {
+        fn flush<ParentBranch: tree_buf::internal::StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
             // Do flush an Object branch as a marker and error check.
-            <tree_buf::internal::Object as tree_buf::internal::Writable>::Writer::new()
-                .flush(branch, bytes);
+            tree_buf::internal::Object { num_fields: #num_fields }
+                .flush(branch, bytes, lens);
 
             #(#flushes)*
         }
@@ -157,12 +159,14 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::internal::Reader::new(
-                    sticks, tree_buf::internal::ObjectBranch::<ParentBranch>::new(#ident_str),
+                    sticks, tree_buf::internal::ObjectBranch::<ParentBranch>::new(),
                 ),
             }
         }).collect();
     let new = quote! {
-        fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: &Vec<tree_buf::internal::Stick>, branch: ParentBranch) -> Self {
+        fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: tree_buf::internal::DynBranch, branch: ParentBranch) -> Self {
+            todo!("struct impl in macro")
+            /*
             // Verify schema is correct by checking for the struct branch.
             let s = <
                 <tree_buf::internal::Object as tree_buf::internal::Readable>
@@ -171,6 +175,7 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             Self {
                 #(#inits)*
             }
+            */
         }
     };
 

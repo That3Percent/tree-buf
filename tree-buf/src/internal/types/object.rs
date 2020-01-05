@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use std::marker::PhantomData;
+use crate::encodings::varint::encode_prefix_varint;
 
 // TODO: The interaction between Default and Missing here may be dubious.
 // What it will ultimately infer is that the struct exists, but that all it's
@@ -13,35 +14,30 @@ use std::marker::PhantomData;
 // Ammendment to previous. This comment is somewhat out of date, now that Missing isn't really implemented,
 // and that the schema match has been moved to one place.
 #[derive(Copy, Clone, Default, Debug)]
-pub struct Object;
-
-impl Primitive for Object {
-    fn id() -> PrimitiveId {
-        PrimitiveId::Object
-    }
+pub struct Object {
+    pub num_fields: usize,
 }
 
 
-// TODO: Performance - remove the need to allocate vec here.
-impl BatchData for Object {
-    fn write_batch(_items: &[Self], _bytes: &mut Vec<u8>) { }
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
-        debug_assert_eq!(bytes.len(), 0);
-        Vec::new()
-    }
-}
+// TODO: Object should not be Primitive!
+// There needs to be a separation between types and primitives.
+// When flushing, Object flushes a no-data branch, and that doesn't
+// make much sense. It should be writer, but not be BatchData.
+// Because it's BatchData, right now we're even wasting a byte for
+// specifying it's a 0 length array.
 
 pub struct ObjectBranch<T> {
-    name: &'static str,
     _marker: PhantomData<*const T>
 }
 
 impl<T: StaticBranch> ObjectBranch<T> {
-    pub fn new(name: &'static str) -> Self {
+    pub fn new() -> Self {
         Self {
-            name,
             _marker: PhantomData,
         }
+    }
+    pub fn flush(name: &str, bytes: &mut Vec<u8>) {
+        Str::write_one(name, bytes);
     }
 }
 
@@ -54,8 +50,19 @@ impl <T: StaticBranch> StaticBranch for ObjectBranch<T> {
     fn self_in_array_context() -> bool {
         T::children_in_array_context()
     }
-    #[inline(always)]
-    fn name(&self) -> Option<&str> {
-        Some(self.name)
+}
+
+impl Object {
+    // TODO: ParentBranch no longer contain data, so just go ahead and get rid of it as an argument.
+    pub fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+        PrimitiveId::Object { num_fields: self.num_fields }.write(bytes);
     }
+}
+
+pub trait Writer {
+    type Write: Writable;
+
+    fn write(&mut self, value: &Self::Write);
+    fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>);
+    fn new() -> Self;
 }
