@@ -126,16 +126,17 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
-                let #ident = tree_buf::internal::BranchId { name: #ident_str, parent: _own_id };
-                self.#ident.flush(&#ident, bytes);
+                let #ident = tree_buf::internal::ObjectBranch::<ParentBranch>::new();
+                tree_buf::internal::ObjectBranch::<ParentBranch>::flush(#ident_str, bytes);
+                self.#ident.flush(#ident, bytes, lens);
             }
         }).collect();
 
+    let num_fields = flushes.len();
     let flush = quote! {
-        fn flush(&self, branch: &tree_buf::internal::BranchId<'_>, bytes: &mut Vec<u8>) {
-            let _own_id = bytes.len();
-            // Do flush a Struct branch as a marker and error check.
-            <tree_buf::internal::Struct as tree_buf::internal::Writable>::Writer::new()
+        fn flush<ParentBranch: tree_buf::internal::StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+            // Do flush an Object branch as a marker and error check.
+            tree_buf::internal::Object { num_fields: #num_fields }
                 .flush(branch, bytes);
 
             #(#flushes)*
@@ -153,26 +154,22 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
 }
 
 fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> TokenStream {
-    // TODO: I think finding the stick again here to get the own_id is unnecessary. We could
-    // take a stick as argument and pass it to the primitive reader, which would then match the type.
-    
     let inits: Vec<_> =
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::internal::Reader::new(
-                    sticks, &tree_buf::internal::BranchId { name: #ident_str, parent: own_id }
+                    children.remove(#ident_str).unwrap_or_else(|| todo!("schema mismatch error handling")),
+                    tree_buf::internal::ObjectBranch::<ParentBranch>::new(),
                 ),
             }
         }).collect();
     let new = quote! {
-        fn new(sticks: &Vec<tree_buf::internal::Stick>, branch: &tree_buf::internal::BranchId) -> Self {
-            let own_id = branch.find_stick(sticks).unwrap().start; // TODO: Error handling
-            // Verify schema is correct by checking for the struct branch.
-            let s = <
-                <tree_buf::internal::Struct as tree_buf::internal::Readable>
-                ::Reader as tree_buf::internal::Reader
-            >::new(sticks, branch);
+        fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: tree_buf::internal::DynBranch, branch: ParentBranch) -> Self {
+            let mut children = match sticks {
+                tree_buf::internal::DynBranch::Object { children } => children,
+                _ => todo!("schema mismatch error handling")
+            };
             Self {
                 #(#inits)*
             }

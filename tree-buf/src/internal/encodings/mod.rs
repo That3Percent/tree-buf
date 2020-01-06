@@ -13,3 +13,19 @@ pub fn read_all<T>(bytes: &[u8], f: impl Fn(&[u8], &mut usize)->T) -> Vec<T> {
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fmt::Debug;
+    pub fn round_trip<T: Copy + PartialEq + Debug>(data: &[T], encoder: impl Fn(T, &mut Vec<u8>), decoder: impl Fn(&[u8], &mut usize)->T) {
+        let mut bytes = Vec::new();
+        for value in data.iter() {
+            encoder(*value, &mut bytes);
+        }
+
+        let result = read_all(&bytes, decoder);
+        
+        assert_eq!(&result, &data);
+    }
+}

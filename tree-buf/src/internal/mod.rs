@@ -7,12 +7,13 @@ pub mod branch;
 pub mod primitive;
 pub mod reader_writer;
 pub mod error;
-pub mod missing;
 pub(crate) mod encodings;
+pub mod types;
 
 pub use {
     reader_writer::{Readable, Reader, Writable, Writer},
-    primitive::{Struct, Array, Opt},
-    branch::{Stick, BranchId},
+    primitive::*,
+    branch::*,
     encodings::*,
+    types::*,
 };
