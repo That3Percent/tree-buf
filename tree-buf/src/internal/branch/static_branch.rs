@@ -12,10 +12,6 @@ impl StaticBranch for StaticRootBranch {
     fn children_in_array_context() -> bool {
         false
     }
-    #[inline(always)]
-    fn self_in_array_context() -> bool {
-        false
-    }
 }
 
 pub struct OnlyBranch<T>(PhantomData<*const T>);
@@ -29,10 +25,6 @@ impl<T: StaticBranch> OnlyBranch<T> {
 impl<T: StaticBranch> StaticBranch for OnlyBranch<T> {
     #[inline(always)]
     fn children_in_array_context() -> bool {
-        Self::self_in_array_context()
-    }
-    #[inline(always)]
-    fn self_in_array_context() -> bool {
         T::children_in_array_context()
     }
 }

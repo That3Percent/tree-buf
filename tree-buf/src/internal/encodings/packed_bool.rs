@@ -47,7 +47,6 @@ pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::tests::round_trip;
 
     #[test]
     fn round_trip_packed_bool() {

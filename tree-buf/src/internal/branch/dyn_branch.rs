@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::internal::encodings::varint::{decode_prefix_varint, decode_suffix_varint};
+use crate::internal::encodings::varint::decode_suffix_varint;
 use std::collections::HashMap;
 
 
@@ -9,14 +9,11 @@ pub enum OneOrMany<'a, T> {
     Many(&'a [u8]),
 }
 
-impl<'a, T: BatchData> OneOrMany<'a, T> {
+impl<'a, T: BatchData + std::fmt::Debug> OneOrMany<'a, T> {
     pub fn new(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is_array_context: bool) -> Self {
         if is_array_context {
             let len = decode_suffix_varint(bytes, lens) as usize;
-            let start = *offset;
-            let end = start + len;
-            *offset = end;
-            let bytes = &bytes[start..end];
+            let bytes = read_bytes(bytes, len, offset);
             OneOrMany::Many(bytes)
         } else {
             let value = T::read_one(bytes, offset);
@@ -35,17 +32,14 @@ pub enum DynBranch<'a> {
 }
 
 fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is_array_context: bool) -> DynBranch<'a> {
-    dbg!(*offset);
     let primitive = PrimitiveId::read(bytes, offset);
-    dbg!(primitive);
 
     // TODO: The PrimitiveId isn't really pulling it's weight, considering how each type is getting special cased here anyway
     match primitive {
         PrimitiveId::Object { num_fields } => {
-            let mut children = HashMap::with_capacity(dbg!(num_fields));
+            let mut children = HashMap::with_capacity(num_fields);
             for _ in 0..num_fields {
                 let name = Str::read_one(bytes, offset);
-                dbg!(name);
                 let child = read_next(bytes, offset, lens, is_array_context);
                 children.insert(name, child);
             }
@@ -75,5 +69,5 @@ fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is
 pub fn read_root(bytes: &[u8]) -> DynBranch<'_> {
     let mut lens = bytes.len() - 1;
     let mut offset = 0;
-    dbg!(read_next(bytes, &mut offset, &mut lens, false))
+    read_next(bytes, &mut offset, &mut lens, false)
 } 

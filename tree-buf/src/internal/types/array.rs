@@ -14,6 +14,9 @@ impl Primitive for Array {
     fn id() -> PrimitiveId {
         PrimitiveId::Array
     }
+    fn from_dyn_branch(_branch: DynBranch) -> OneOrMany<Self> {
+        unreachable!()
+    }
 }
 
 struct StaticArrayBranch<T>(PhantomData<*const T>);
@@ -29,10 +32,6 @@ impl<'a, T: StaticBranch> StaticBranch for StaticArrayBranch<T> {
     fn children_in_array_context() -> bool {
         true
     }
-    #[inline(always)]
-    fn self_in_array_context() -> bool {
-        T::children_in_array_context()
-    }
 }
 
 impl BatchData for Array {
@@ -41,6 +40,12 @@ impl BatchData for Array {
     }
     fn read_batch(bytes: &[u8]) -> Vec<Self> {
         Wrapper::read_batch(bytes)
+    }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+        unsafe { std::mem::transmute(usize::read_one(bytes, offset)) }
+    }
+    fn write_one(value: Self, bytes: &mut Vec<u8>) {
+        unsafe { usize::write_one(std::mem::transmute(value), bytes) }
     }
 }
 
@@ -72,25 +77,24 @@ impl<T: Writer> Writer for ArrayWriter<T> {
     }
     fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
         self.len.flush(branch, bytes, lens);
+        
         self.values.flush(StaticArrayBranch::<ParentBranch>::new(), bytes, lens);
     }
 }
 
 impl<T: Reader> Reader for ArrayReader<T> {
     type Read = Vec<T::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, _branch: ParentBranch) -> Self {
         match sticks {
             DynBranch::Array {len, values} => {
-                todo!()
+                let values = *values;
+                Self {
+                    len: PrimitiveBuffer::read_from(len),
+                    values: Reader::new(values, StaticArrayBranch::<ParentBranch>::new()),
+                }
             },
-            _ => todo!(), // Schema mismatch
+            _ => todo!("schema mismatch"), // Schema mismatch
         }
-        /*
-        Self {
-            len: Reader::new(sticks, branch),
-            values: Reader::new(sticks, StaticArrayBranch::<ParentBranch>::new())
-        }
-        */
     }
     fn read(&mut self) -> Self::Read {
         let len = self.len.read().0;

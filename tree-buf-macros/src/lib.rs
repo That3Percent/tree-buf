@@ -137,7 +137,7 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
         fn flush<ParentBranch: tree_buf::internal::StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
             // Do flush an Object branch as a marker and error check.
             tree_buf::internal::Object { num_fields: #num_fields }
-                .flush(branch, bytes, lens);
+                .flush(branch, bytes);
 
             #(#flushes)*
         }
@@ -159,23 +159,20 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::internal::Reader::new(
-                    sticks, tree_buf::internal::ObjectBranch::<ParentBranch>::new(),
+                    children.remove(#ident_str).unwrap_or_else(|| todo!("schema mismatch error handling")),
+                    tree_buf::internal::ObjectBranch::<ParentBranch>::new(),
                 ),
             }
         }).collect();
     let new = quote! {
         fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: tree_buf::internal::DynBranch, branch: ParentBranch) -> Self {
-            todo!("struct impl in macro")
-            /*
-            // Verify schema is correct by checking for the struct branch.
-            let s = <
-                <tree_buf::internal::Object as tree_buf::internal::Readable>
-                ::Reader as tree_buf::internal::Reader
-            >::new(sticks, branch);
+            let mut children = match sticks {
+                tree_buf::internal::DynBranch::Object { children } => children,
+                _ => todo!("schema mismatch error handling")
+            };
             Self {
                 #(#inits)*
             }
-            */
         }
     };
 

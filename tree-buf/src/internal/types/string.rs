@@ -11,10 +11,7 @@ impl Str {
     }
     pub fn read_one<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> &'a str {
         let len = decode_prefix_varint(bytes, offset) as usize;
-        let start = *offset;
-        let end = start + len;
-        let str_bytes = &bytes[start..end];
-        *offset += len;
-        std::str::from_utf8(str_bytes).unwrap() // FIXME: Error handling
+        let utf8 = read_bytes(bytes, len, offset);
+        std::str::from_utf8(utf8).unwrap() // FIXME: Error handling
     }
 }

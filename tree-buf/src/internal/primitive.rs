@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::internal::encodings::{
-    varint::{encode_prefix_varint, decode_prefix_varint, encode_suffix_varint},
+    varint::{encode_prefix_varint, decode_prefix_varint},
 };
 use std::convert::{TryInto};
 use std::fmt::Debug;
@@ -9,6 +9,7 @@ use std::fmt::Debug;
 
 pub trait Primitive: Default + BatchData {
     fn id() -> PrimitiveId;
+    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self>;
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -44,8 +45,6 @@ pub enum PrimitiveId {
 impl PrimitiveId {
     pub(crate) fn write(self: &Self, bytes: &mut Vec<u8>) {
         use PrimitiveId::*;
-        dbg!(self);
-        dbg!(bytes.len());
         match self {
             Object { num_fields } => {
                 bytes.push(1);
@@ -86,9 +85,7 @@ pub trait BatchData: Sized {
         // TODO: Overload these
         Self::write_batch(&[item], bytes)
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
-        todo!()
-    }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self;
 }
 
 
@@ -99,6 +96,17 @@ impl Primitive for usize {
     // This enables support for arbitrarily large indices, with runtime errors for values unsupported by the platform
     fn id() -> PrimitiveId {
         PrimitiveId::Integer
+    }
+    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self> {
+        match branch {
+            DynBranch::Integer(r) => {
+                match r {
+                    OneOrMany::One(i) => OneOrMany::One(i as usize),
+                    OneOrMany::Many(b) => OneOrMany::Many(b),
+                }
+            },
+            _ => todo!("schema mismatch"),
+        }
     }
 }
 
@@ -115,6 +123,9 @@ impl BatchData for usize {
             encode_prefix_varint(v, bytes);
         }
     }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+        decode_prefix_varint(bytes, offset) as usize
+    }
 }
 
 
@@ -125,6 +136,20 @@ pub struct PrimitiveBuffer<T> {
     values: Vec<T>,
     read_offset: usize,
 }
+
+impl<T: BatchData> PrimitiveBuffer<T> {
+    pub fn read_from(items: OneOrMany<T>) -> Self {
+        let values = match items {
+            OneOrMany::One(one) => vec![one],
+            OneOrMany::Many(bytes) => T::read_batch(bytes)
+        };
+        Self {
+            values,
+            read_offset: 0,
+        }
+    }
+}
+
 
 impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     type Write = T;
@@ -137,11 +162,11 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     fn write(&mut self, value: &Self::Write) {
         self.values.push(*value);
     }
-    fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+    fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
         T::id().write(bytes);
 
-        if ParentBranch::self_in_array_context() {
+        if ParentBranch::children_in_array_context() {
             let start = bytes.len();
             T::write_batch(&self.values, bytes);
             let len = bytes.len() - start;
@@ -159,17 +184,9 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
 
 impl<T: Primitive + Copy> Reader for PrimitiveBuffer<T> {
     type Read = T;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
-        todo!()
-        /*
-        let stick = branch.find_stick(&sticks).unwrap(); // TODO: Error handling
-        if stick.primitive != T::id() {
-            todo!("error handling. {:?} {:?} {:?}", T::id(), branch, stick);
-        }
-
-        let values = T::read_batch(stick.bytes);
-        Self { values, read_offset: 0 }
-        */
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> Self {
+        let values = T::from_dyn_branch(sticks);
+        Self::read_from(values)
     }
     fn read(&mut self) -> Self::Read {
         let value = self.values[self.read_offset];

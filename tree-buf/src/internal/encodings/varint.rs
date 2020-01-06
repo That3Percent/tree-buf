@@ -148,8 +148,8 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
     }
 }
 
-pub fn decode_prefix_varint(values: &[u8], offset: &mut usize) -> u64 {
-    let first = values[*offset];
+pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
+    let first = bytes[*offset];
     let shift = first.trailing_zeros();
 
     let result = match shift {
@@ -158,61 +158,61 @@ pub fn decode_prefix_varint(values: &[u8], offset: &mut usize) -> u64 {
         },
         1 => {
             (first >> 2) as u64 |
-            ((values[*offset + 1] as u64) << 6)
+            ((bytes[*offset + 1] as u64) << 6)
         },
         2 => {
             (first >> 3) as u64 |
-            ((values[*offset + 1] as u64) << 5) |
-            ((values[*offset + 2] as u64) << 13)
+            ((bytes[*offset + 1] as u64) << 5) |
+            ((bytes[*offset + 2] as u64) << 13)
         },
         3 => {
             (first >> 4) as u64 |
-            ((values[*offset + 1] as u64) << 4) |
-            ((values[*offset + 2] as u64) << 12) |
-            ((values[*offset + 3] as u64) << 20)
+            ((bytes[*offset + 1] as u64) << 4) |
+            ((bytes[*offset + 2] as u64) << 12) |
+            ((bytes[*offset + 3] as u64) << 20)
         },
         4 => {
             (first >> 5) as u64 |
-            ((values[*offset + 1] as u64) << 3) |
-            ((values[*offset + 2] as u64) << 11) |
-            ((values[*offset + 3] as u64) << 19) |
-            ((values[*offset + 4] as u64) << 27)
+            ((bytes[*offset + 1] as u64) << 3) |
+            ((bytes[*offset + 2] as u64) << 11) |
+            ((bytes[*offset + 3] as u64) << 19) |
+            ((bytes[*offset + 4] as u64) << 27)
         },
         5 => {
             (first >> 6) as u64 |
-            ((values[*offset + 1] as u64) << 2) |
-            ((values[*offset + 2] as u64) << 10) |
-            ((values[*offset + 3] as u64) << 18) |
-            ((values[*offset + 4] as u64) << 26) |
-            ((values[*offset + 5] as u64) << 34)
+            ((bytes[*offset + 1] as u64) << 2) |
+            ((bytes[*offset + 2] as u64) << 10) |
+            ((bytes[*offset + 3] as u64) << 18) |
+            ((bytes[*offset + 4] as u64) << 26) |
+            ((bytes[*offset + 5] as u64) << 34)
         },
         6 => {
             (first >> 7) as u64 |
-            ((values[*offset + 1] as u64) << 1) |
-            ((values[*offset + 2] as u64) << 9) |
-            ((values[*offset + 3] as u64) << 17) |
-            ((values[*offset + 4] as u64) << 25) |
-            ((values[*offset + 5] as u64) << 33) |
-            ((values[*offset + 6] as u64) << 41)
+            ((bytes[*offset + 1] as u64) << 1) |
+            ((bytes[*offset + 2] as u64) << 9) |
+            ((bytes[*offset + 3] as u64) << 17) |
+            ((bytes[*offset + 4] as u64) << 25) |
+            ((bytes[*offset + 5] as u64) << 33) |
+            ((bytes[*offset + 6] as u64) << 41)
         },
         7 => {
-            ((values[*offset + 1] as u64)) |
-            ((values[*offset + 2] as u64) << 8) |
-            ((values[*offset + 3] as u64) << 16) |
-            ((values[*offset + 4] as u64) << 24) |
-            ((values[*offset + 5] as u64) << 32) |
-            ((values[*offset + 6] as u64) << 40) |
-            ((values[*offset + 7] as u64) << 48)
+            ((bytes[*offset + 1] as u64)) |
+            ((bytes[*offset + 2] as u64) << 8) |
+            ((bytes[*offset + 3] as u64) << 16) |
+            ((bytes[*offset + 4] as u64) << 24) |
+            ((bytes[*offset + 5] as u64) << 32) |
+            ((bytes[*offset + 6] as u64) << 40) |
+            ((bytes[*offset + 7] as u64) << 48)
         },
         8 => {
-            ((values[*offset + 1] as u64)) |
-            ((values[*offset + 2] as u64) << 8) |
-            ((values[*offset + 3] as u64) << 16) |
-            ((values[*offset + 4] as u64) << 24) |
-            ((values[*offset + 5] as u64) << 32) |
-            ((values[*offset + 6] as u64) << 40) |
-            ((values[*offset + 7] as u64) << 48) |
-            ((values[*offset + 8] as u64) << 56)
+            ((bytes[*offset + 1] as u64)) |
+            ((bytes[*offset + 2] as u64) << 8) |
+            ((bytes[*offset + 3] as u64) << 16) |
+            ((bytes[*offset + 4] as u64) << 24) |
+            ((bytes[*offset + 5] as u64) << 32) |
+            ((bytes[*offset + 6] as u64) << 40) |
+            ((bytes[*offset + 7] as u64) << 48) |
+            ((bytes[*offset + 8] as u64) << 56)
         },
         _ => unreachable!()
     };
@@ -221,8 +221,8 @@ pub fn decode_prefix_varint(values: &[u8], offset: &mut usize) -> u64 {
 }
 
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
-pub fn decode_suffix_varint(values: &[u8], offset: &mut usize) -> u64 {
-    let first = values[*offset];
+pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
+    let first = bytes[*offset];
     let shift = first.trailing_zeros();
 
     let result = match shift {
@@ -231,61 +231,61 @@ pub fn decode_suffix_varint(values: &[u8], offset: &mut usize) -> u64 {
         },
         1 => {
             (first >> 2) as u64 |
-            ((values[*offset - 1] as u64) << 6)
+            ((bytes[*offset - 1] as u64) << 6)
         },
         2 => {
             (first >> 3) as u64 |
-            ((values[*offset - 2] as u64) << 5) |
-            ((values[*offset - 1] as u64) << 13)
+            ((bytes[*offset - 2] as u64) << 5) |
+            ((bytes[*offset - 1] as u64) << 13)
         },
         3 => {
             (first >> 4) as u64 |
-            ((values[*offset - 3] as u64) << 4) |
-            ((values[*offset - 2] as u64) << 12) |
-            ((values[*offset - 1] as u64) << 20)
+            ((bytes[*offset - 3] as u64) << 4) |
+            ((bytes[*offset - 2] as u64) << 12) |
+            ((bytes[*offset - 1] as u64) << 20)
         },
         4 => {
             (first >> 5) as u64 |
-            ((values[*offset - 4] as u64) << 3) |
-            ((values[*offset - 3] as u64) << 11) |
-            ((values[*offset - 2] as u64) << 19) |
-            ((values[*offset - 1] as u64) << 27)
+            ((bytes[*offset - 4] as u64) << 3) |
+            ((bytes[*offset - 3] as u64) << 11) |
+            ((bytes[*offset - 2] as u64) << 19) |
+            ((bytes[*offset - 1] as u64) << 27)
         },
         5 => {
             (first >> 6) as u64 |
-            ((values[*offset - 5] as u64) << 2) |
-            ((values[*offset - 4] as u64) << 10) |
-            ((values[*offset - 3] as u64) << 18) |
-            ((values[*offset - 2] as u64) << 26) |
-            ((values[*offset - 1] as u64) << 34)
+            ((bytes[*offset - 5] as u64) << 2) |
+            ((bytes[*offset - 4] as u64) << 10) |
+            ((bytes[*offset - 3] as u64) << 18) |
+            ((bytes[*offset - 2] as u64) << 26) |
+            ((bytes[*offset - 1] as u64) << 34)
         },
         6 => {
             (first >> 7) as u64 |
-            ((values[*offset - 6] as u64) << 1) |
-            ((values[*offset - 5] as u64) << 9) |
-            ((values[*offset - 4] as u64) << 17) |
-            ((values[*offset - 3] as u64) << 25) |
-            ((values[*offset - 2] as u64) << 33) |
-            ((values[*offset - 1] as u64) << 41)
+            ((bytes[*offset - 6] as u64) << 1) |
+            ((bytes[*offset - 5] as u64) << 9) |
+            ((bytes[*offset - 4] as u64) << 17) |
+            ((bytes[*offset - 3] as u64) << 25) |
+            ((bytes[*offset - 2] as u64) << 33) |
+            ((bytes[*offset - 1] as u64) << 41)
         },
         7 => {
-            ((values[*offset - 7] as u64)) |
-            ((values[*offset - 6] as u64) << 8) |
-            ((values[*offset - 5] as u64) << 16) |
-            ((values[*offset - 4] as u64) << 24) |
-            ((values[*offset - 3] as u64) << 32) |
-            ((values[*offset - 2] as u64) << 40) |
-            ((values[*offset - 1] as u64) << 48)
+            ((bytes[*offset - 7] as u64)) |
+            ((bytes[*offset - 6] as u64) << 8) |
+            ((bytes[*offset - 5] as u64) << 16) |
+            ((bytes[*offset - 4] as u64) << 24) |
+            ((bytes[*offset - 3] as u64) << 32) |
+            ((bytes[*offset - 2] as u64) << 40) |
+            ((bytes[*offset - 1] as u64) << 48)
         },
         8 => {
-            ((values[*offset - 8] as u64)) |
-            ((values[*offset - 7] as u64) << 8) |
-            ((values[*offset - 6] as u64) << 16) |
-            ((values[*offset - 5] as u64) << 24) |
-            ((values[*offset - 4] as u64) << 32) |
-            ((values[*offset - 3] as u64) << 40) |
-            ((values[*offset - 2] as u64) << 48) |
-            ((values[*offset - 1] as u64) << 56)
+            ((bytes[*offset - 8] as u64)) |
+            ((bytes[*offset - 7] as u64) << 8) |
+            ((bytes[*offset - 6] as u64) << 16) |
+            ((bytes[*offset - 5] as u64) << 24) |
+            ((bytes[*offset - 4] as u64) << 32) |
+            ((bytes[*offset - 3] as u64) << 40) |
+            ((bytes[*offset - 2] as u64) << 48) |
+            ((bytes[*offset - 1] as u64) << 56)
         },
         _ => unreachable!()
     };

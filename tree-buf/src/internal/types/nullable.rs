@@ -10,17 +10,27 @@ unsafe impl Wrapper for Nullable {
 }
 
 impl BatchData for Nullable {
+    // TODO: This is boilerplate, want blanket implementation to cover this and Array
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         Wrapper::write_batch(items, bytes)
     }
     fn read_batch(bytes: &[u8]) -> Vec<Self> {
         Wrapper::read_batch(bytes)
     }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+        unsafe { std::mem::transmute(bool::read_one(bytes, offset)) }
+    }
+    fn write_one(value: Self, bytes: &mut Vec<u8>) {
+        unsafe { bool::write_one(std::mem::transmute(value), bytes) }
+    }
 }
 
 impl Primitive for Nullable {
     fn id() -> PrimitiveId {
         PrimitiveId::Nullable
+    }
+    fn from_dyn_branch(_branch: DynBranch) -> OneOrMany<Self> {
+        unreachable!();
     }
 }
 
@@ -58,14 +68,17 @@ impl<V: Writer> Writer for NullableWriter<V> {
 
 impl<V: Reader> Reader for NullableReader<V> {
     type Read = Option<V::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
-        todo!()
-        /*
-        Self {
-            opt: Reader::new(sticks, branch),
-            value: Reader::new(sticks, OnlyBranch::<ParentBranch>::new()),
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> Self {
+        match sticks {
+            DynBranch::Nullable { opt, values } => {
+                let values = *values;
+                Self {
+                    opt: PrimitiveBuffer::read_from(opt),
+                    value: Reader::new(values, OnlyBranch::<ParentBranch>::new()),
+                }
+            },
+            _ => todo!("schema mismatch"),
         }
-        */
     }
     fn read(&mut self) -> Self::Read {
         if self.opt.read().0 {

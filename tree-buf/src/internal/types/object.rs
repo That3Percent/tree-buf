@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use std::marker::PhantomData;
-use crate::encodings::varint::encode_prefix_varint;
 
 // TODO: The interaction between Default and Missing here may be dubious.
 // What it will ultimately infer is that the struct exists, but that all it's
@@ -44,17 +43,13 @@ impl<T: StaticBranch> ObjectBranch<T> {
 impl <T: StaticBranch> StaticBranch for ObjectBranch<T> {
     #[inline(always)]
     fn children_in_array_context() -> bool {
-        Self::self_in_array_context()
-    }
-    #[inline(always)]
-    fn self_in_array_context() -> bool {
         T::children_in_array_context()
     }
 }
 
 impl Object {
     // TODO: ParentBranch no longer contain data, so just go ahead and get rid of it as an argument.
-    pub fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+    pub fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>) {
         PrimitiveId::Object { num_fields: self.num_fields }.write(bytes);
     }
 }

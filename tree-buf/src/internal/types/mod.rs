@@ -6,18 +6,19 @@ pub mod object;
 pub mod nullable;
 pub mod boolean;
 pub mod string;
+pub mod bytes;
 
-pub use {array::*, integer::*, object::*, nullable::*, boolean::*, string::*};
+pub use {array::*, integer::*, object::*, nullable::*, boolean::*, string::*, bytes::*};
 
 use std::mem::transmute;
 
 pub unsafe trait Wrapper : Sized {
-    type Inner;
+    type Inner: BatchData;
 
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) where Self::Inner : BatchData {
+    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         unsafe { Self::Inner::write_batch(transmute(items), bytes) }
     }
-    fn read_batch(bytes: &[u8]) -> Vec<Self> where Self::Inner : BatchData {
+    fn read_batch(bytes: &[u8]) -> Vec<Self> {
         unsafe { transmute(Self::Inner::read_batch(bytes)) }
     }
 }

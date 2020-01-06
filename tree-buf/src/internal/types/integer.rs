@@ -16,6 +16,10 @@ impl<T: IntFromU64> BatchData for T {
             encode_prefix_varint(v, bytes);
         }
     }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+        let v = decode_prefix_varint(bytes, offset);
+        v.try_into().unwrap_or_else(|_| todo!()) // TODO: Error handling (which won't be needed when schema match occurs)s
+    }
 }
 
 pub trait IntFromU64 : Into<u64> + TryFrom<u64> + Copy + Default {}
@@ -27,4 +31,15 @@ impl IntFromU64 for u64 {}
 
 impl<T: IntFromU64> Primitive for T {
     fn id() -> PrimitiveId { PrimitiveId::Integer }
+    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self> {
+        match branch {
+            DynBranch::Integer(v) => {
+                match v {
+                    OneOrMany::One(v) => OneOrMany::One(v.try_into().unwrap_or_else(|_| todo!("schema mismatch"))),
+                    OneOrMany::Many(b) => OneOrMany::Many(b),
+                }
+            },
+            _ => todo!("schema mismatch"),
+        }
+    }
 }
