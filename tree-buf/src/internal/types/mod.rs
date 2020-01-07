@@ -7,8 +7,9 @@ pub mod nullable;
 pub mod boolean;
 pub mod string;
 pub mod bytes;
+pub mod float;
 
-pub use {array::*, integer::*, object::*, nullable::*, boolean::*, string::*, bytes::*};
+pub use {array::*, integer::*, object::*, nullable::*, boolean::*, string::*, bytes::*, float::*};
 
 use std::mem::transmute;
 

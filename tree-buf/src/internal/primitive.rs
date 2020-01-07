@@ -25,7 +25,9 @@ pub enum PrimitiveId {
     // Consider something like this - https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
     Integer,
     Boolean,
+    Float,
 
+    // TODO: Tuple,
     // TODO: String,
     // TODO: Bytes = [u8]
     // TODO: Date
@@ -57,6 +59,7 @@ impl PrimitiveId {
                     Nullable => 3,
                     Integer => 4,
                     Boolean => 5,
+                    Float => 6,
                 };
                 bytes.push(discriminant);
             }
@@ -72,6 +75,7 @@ impl PrimitiveId {
             3 => Nullable,
             4 => Integer,
             5 => Boolean,
+            6 => Float,
             _ => todo!("error handling. {}", discriminant),
         }
     }

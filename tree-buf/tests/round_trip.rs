@@ -13,7 +13,7 @@ mod hide_namespace {
     #[derive(Serialize, Deserialize)]
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bits {
-        pub int: u32,
+        pub f: f64,
         pub obj_array: Vec<Bobs>,
         pub extra: Option<Bobs>,
     }
@@ -31,7 +31,7 @@ use hide_namespace::{Bits, Bobs};
 
 fn make_item() -> Bits {
     Bits {
-        int: 5,
+        f: 5.0,
         extra: Some(Bobs { one: vec![99] }),
         obj_array: vec![
             Bobs { one: vec![3, 2, 1, 0] },
@@ -69,23 +69,23 @@ fn round_trip_vec() {
 #[cfg(not(debug_assertions))]
 fn bad_benchmark(f: impl Fn()) -> Duration {
     // Warmup
-    for _ in 0..1000 {
+    for _ in 0..10000 {
         f();
     }
 
     let start = Instant::now();
-    for _ in 0..1000 {
+    for _ in 0..100000 {
         f();
     }
     let end = Instant::now();
-    (end - start) / 1000
+    (end - start) / 100000
 }
 
 // TODO: Move these tests to a wholly different project and use on a variety of real world data sets rather than toys
 fn better_than(f: impl Fn(&Vec<Bits>) -> Vec<u8>) {
     let item = make_item();
     // TODO: This is tuned to win at large numbers. How low can we get this and still reliably be better?
-    let item = vec![item; 50];
+    let item = vec![item; 30];
     let bytes_tree = write(&item);
     let bytes_other = f(&item);
     assert!(bytes_tree.len() < bytes_other.len(), "Own: {}, other: {}", bytes_tree.len(), bytes_other.len());
@@ -125,5 +125,5 @@ fn size_check() {
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 63);
+    assert_eq!(bytes.len(), 68);
 }
