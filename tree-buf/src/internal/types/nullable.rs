@@ -62,19 +62,19 @@ impl<V: Writer> Writer for NullableWriter<V> {
     }
     fn flush<B: StaticBranch>(self, branch: B, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
         self.opt.flush(branch, bytes, lens);
-        self.value.flush(OnlyBranch::<B>::new(), bytes, lens);
+        self.value.flush(branch, bytes, lens);
     }
 }
 
 impl<V: Reader> Reader for NullableReader<V> {
     type Read = Option<V::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
         match sticks {
             DynBranch::Nullable { opt, values } => {
                 let values = *values;
                 Self {
                     opt: PrimitiveBuffer::read_from(opt),
-                    value: Reader::new(values, OnlyBranch::<ParentBranch>::new()),
+                    value: Reader::new(values, branch),
                 }
             },
             _ => todo!("schema mismatch"),

@@ -25,6 +25,7 @@ impl<'a, T: BatchData + std::fmt::Debug> OneOrMany<'a, T> {
 #[derive(Debug)]
 pub enum DynBranch<'a> {
     Object { children: HashMap<&'a str, DynBranch<'a>> },
+    Tuple { children: Vec<DynBranch<'a>> },
     Array { len: OneOrMany<'a, Array>, values: Box<DynBranch<'a>> },
     Integer(OneOrMany<'a, u64>),
     Nullable {opt: OneOrMany<'a, Nullable>, values: Box<DynBranch<'a>> },
@@ -46,6 +47,14 @@ fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is
             }
             DynBranch::Object {children }
         },
+        PrimitiveId::Tuple { num_fields } => {
+            let mut children = Vec::with_capacity(num_fields);
+            for _ in 0..num_fields {
+                let child = read_next(bytes, offset, lens, is_array_context);
+                children.push(child)
+            }
+            DynBranch::Tuple { children }
+        }
         PrimitiveId::Array => {
             let len = OneOrMany::new(bytes, offset, lens, is_array_context);
             let values = read_next(bytes, offset, lens, true);

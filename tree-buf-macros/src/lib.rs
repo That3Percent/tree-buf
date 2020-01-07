@@ -126,9 +126,8 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
         fields.iter().map(|(ident, _)| {
             let ident_str = format!("{}", ident);
             quote! {
-                let #ident = tree_buf::internal::ObjectBranch::<ParentBranch>::new();
-                tree_buf::internal::ObjectBranch::<ParentBranch>::flush(#ident_str, bytes);
-                self.#ident.flush(#ident, bytes, lens);
+                tree_buf::internal::Str::write_one(#ident_str, bytes);
+                self.#ident.flush(branch, bytes, lens);
             }
         }).collect();
 
@@ -160,7 +159,7 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             quote! {
                 #ident: tree_buf::internal::Reader::new(
                     children.remove(#ident_str).unwrap_or_else(|| todo!("schema mismatch error handling")),
-                    tree_buf::internal::ObjectBranch::<ParentBranch>::new(),
+                    branch,
                 ),
             }
         }).collect();

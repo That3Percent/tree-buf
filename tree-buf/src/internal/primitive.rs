@@ -26,6 +26,7 @@ pub enum PrimitiveId {
     Integer,
     Boolean,
     Float,
+    Tuple { num_fields: usize },
 
     // TODO: Tuple,
     // TODO: String,
@@ -52,9 +53,14 @@ impl PrimitiveId {
                 bytes.push(1);
                 encode_prefix_varint(*num_fields as u64, bytes);
             },
+            Tuple { num_fields } => {
+                bytes.push(7);
+                encode_prefix_varint(*num_fields as u64, bytes);
+            }
             _ => {
                 let discriminant = match self {
                     Object {..} => unreachable!(),
+                    Tuple {..} => unreachable!(),
                     Array => 2,
                     Nullable => 3,
                     Integer => 4,
@@ -76,6 +82,7 @@ impl PrimitiveId {
             4 => Integer,
             5 => Boolean,
             6 => Float,
+            7 => Tuple { num_fields: decode_prefix_varint(bytes, offset) as usize },
             _ => todo!("error handling. {}", discriminant),
         }
     }
@@ -170,7 +177,7 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
         // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
         T::id().write(bytes);
 
-        if ParentBranch::children_in_array_context() {
+        if ParentBranch::in_array_context() {
             let start = bytes.len();
             T::write_batch(&self.values, bytes);
             let len = bytes.len() - start;

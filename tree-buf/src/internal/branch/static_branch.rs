@@ -5,26 +5,12 @@
 use super::*;
 use std::marker::PhantomData;
 
-pub struct StaticRootBranch;
+#[derive(Copy, Clone)]
+pub struct NonArrayBranch;
 
-impl StaticBranch for StaticRootBranch {
+impl StaticBranch for NonArrayBranch {
     #[inline(always)]
-    fn children_in_array_context() -> bool {
+    fn in_array_context() -> bool {
         false
-    }
-}
-
-pub struct OnlyBranch<T>(PhantomData<*const T>);
-
-impl<T: StaticBranch> OnlyBranch<T> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<T: StaticBranch> StaticBranch for OnlyBranch<T> {
-    #[inline(always)]
-    fn children_in_array_context() -> bool {
-        T::children_in_array_context()
     }
 }

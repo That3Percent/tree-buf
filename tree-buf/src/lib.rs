@@ -22,7 +22,7 @@ pub use prelude::*;
 pub use internal::error::Error;
 // TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
 // That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
-pub use internal::{Readable, Writable, StaticRootBranch};
+pub use internal::{Readable, Writable, NonArrayBranch};
 use internal::encodings::varint::{encode_suffix_varint};
 
 pub fn write<T: Writable>(value: &T) -> Vec<u8> {
@@ -31,7 +31,7 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8> {
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
     // TODO: The pre-amble could come back as optional, as long as it has it's own PrimitiveId
-    writer.flush(StaticRootBranch, &mut bytes, &mut lens);
+    writer.flush(NonArrayBranch, &mut bytes, &mut lens);
 
     for len in lens.iter().rev() {
         encode_suffix_varint(*len as u64, &mut bytes);
@@ -45,7 +45,7 @@ pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
         return Err(Error::InvalidFile);
     }
     let sticks = read_root(bytes);
-    let mut reader = T::Reader::new(sticks, StaticRootBranch);
+    let mut reader = T::Reader::new(sticks, NonArrayBranch);
     Ok(reader.read())
 }
 

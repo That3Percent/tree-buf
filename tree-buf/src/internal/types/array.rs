@@ -19,17 +19,12 @@ impl Primitive for Array {
     }
 }
 
-struct StaticArrayBranch<T>(PhantomData<*const T>);
+#[derive(Copy, Clone)]
+struct ArrayBranch;
 
-impl<'a, T: StaticBranch> StaticArrayBranch<T> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<'a, T: StaticBranch> StaticBranch for StaticArrayBranch<T> {
+impl StaticBranch for ArrayBranch {
     #[inline(always)]
-    fn children_in_array_context() -> bool {
+    fn in_array_context() -> bool {
         true
     }
 }
@@ -78,7 +73,7 @@ impl<T: Writer> Writer for ArrayWriter<T> {
     fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
         self.len.flush(branch, bytes, lens);
         
-        self.values.flush(StaticArrayBranch::<ParentBranch>::new(), bytes, lens);
+        self.values.flush(ArrayBranch, bytes, lens);
     }
 }
 
@@ -90,7 +85,7 @@ impl<T: Reader> Reader for ArrayReader<T> {
                 let values = *values;
                 Self {
                     len: PrimitiveBuffer::read_from(len),
-                    values: Reader::new(values, StaticArrayBranch::<ParentBranch>::new()),
+                    values: Reader::new(values, ArrayBranch),
                 }
             },
             _ => todo!("schema mismatch"), // Schema mismatch
