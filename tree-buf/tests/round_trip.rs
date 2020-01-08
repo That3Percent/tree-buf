@@ -22,7 +22,7 @@ mod hide_namespace {
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bobs {
         pub one: Vec<u32>,
-        pub tup: (f64, ),
+        pub tup: (f64, f64),
     }
 }
 
@@ -35,20 +35,20 @@ fn make_item() -> Bits {
         f: 5.0,
         extra: Some(Bobs {
             one: vec![99],
-            tup: (9999.99, ),
+            tup: (9999.99, 200.1),
         }),
         obj_array: vec![
             Bobs {
                 one: vec![3, 2, 1, 0],
-                tup: (10.0,),
+                tup: (10.0, 200.2),
             },
             Bobs {
                 one: vec![],
-                tup: (2.2,),
+                tup: (2.2, 200.3),
             },
             Bobs {
                 one: vec![20, 20, 20, 20, 20, 20, 20],
-                tup: (0.0, ),
+                tup: (0.0, 200.4),
             },
         ],
     }
@@ -136,5 +136,5 @@ fn size_check() {
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 115);
+    assert_eq!(bytes.len(), 150);
 }

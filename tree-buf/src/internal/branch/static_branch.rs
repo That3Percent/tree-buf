@@ -3,7 +3,6 @@
 ///! Monomorphization will write out code that is as though every function simply knows what to
 ///! do based on the context it was called in.
 use super::*;
-use std::marker::PhantomData;
 
 #[derive(Copy, Clone)]
 pub struct NonArrayBranch;
