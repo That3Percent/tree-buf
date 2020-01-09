@@ -6,7 +6,7 @@ use std::time::{Instant, Duration};
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
-    use tree_buf_macros::{Read, Write};
+    use tree_buf::{Read, Write};
     use serde::{Serialize, Deserialize};
 
 
