@@ -37,12 +37,12 @@ impl Primitive for Nullable {
 
 #[derive(Debug)]
 pub struct NullableWriter<V> {
-    opt: PrimitiveBuffer<Nullable>,
+    opt: <Nullable as Writable>::Writer,
     value: V,
 }
 
 pub struct NullableReader<V> {
-    opt: PrimitiveBuffer<Nullable>,
+    opt: <Nullable as Readable>::Reader,
     value: V,
 }
 
@@ -50,7 +50,7 @@ impl<V: Writer> Writer for NullableWriter<V> {
     type Write = Option<V::Write>;
     fn new() -> Self {
         Self {
-            opt: PrimitiveBuffer::new(),
+            opt: Writer::new(),
             value: V::new(),
         }
     }
@@ -73,7 +73,7 @@ impl<V: Reader> Reader for NullableReader<V> {
             DynBranch::Nullable { opt, values } => {
                 let values = *values;
                 Self {
-                    opt: PrimitiveBuffer::read_from(opt),
+                    opt: PrimitiveReader::read_from(opt),
                     value: Reader::new(values, branch),
                 }
             },

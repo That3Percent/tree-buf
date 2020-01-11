@@ -4,6 +4,7 @@ use crate::internal::encodings::{
 };
 use std::convert::{TryInto};
 use std::fmt::Debug;
+use std::vec::IntoIter;
 
 
 
@@ -145,18 +146,20 @@ impl BatchData for usize {
 #[derive(Debug)]
 pub struct PrimitiveBuffer<T> {
     values: Vec<T>,
-    read_offset: usize,
 }
 
-impl<T: BatchData> PrimitiveBuffer<T> {
+pub struct PrimitiveReader<T> {
+    values: IntoIter<T>,
+}
+
+impl<T: BatchData> PrimitiveReader<T> {
     pub fn read_from(items: OneOrMany<T>) -> Self {
         let values = match items {
             OneOrMany::One(one) => vec![one],
             OneOrMany::Many(bytes) => T::read_batch(bytes)
         };
         Self {
-            values,
-            read_offset: 0,
+            values: values.into_iter(),
         }
     }
 }
@@ -167,7 +170,6 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
     fn new() -> Self {
         Self {
             values: Vec::new(),
-            read_offset: 0,
         }
     }
     fn write(&mut self, value: &Self::Write) {
@@ -188,21 +190,18 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
             assert_eq!(values.len(), 1);
             let value = values.pop().unwrap();
             T::write_one(value, bytes);
-
         }
     }
 }
 
-impl<T: Primitive + Copy> Reader for PrimitiveBuffer<T> {
+impl<T: Primitive> Reader for PrimitiveReader<T> {
     type Read = T;
     fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> Self {
         let values = T::from_dyn_branch(sticks);
         Self::read_from(values)
     }
     fn read(&mut self) -> Self::Read {
-        let value = self.values[self.read_offset];
-        self.read_offset += 1;
-        value
+        self.values.next().unwrap() // TODO: Error handling
     }
 }
 
@@ -211,25 +210,15 @@ impl<T: Primitive + Copy> Writable for T {
     type Writer = PrimitiveBuffer<T>;
 }
 
-impl<T: Primitive + Copy> Readable for T {
-    type Reader = PrimitiveBuffer<T>;
+impl<T: Primitive> Readable for T {
+    type Reader = PrimitiveReader<T>;
 }
 
-// TODO: Split implementation for read/write
-impl<T: Copy> PrimitiveBuffer<T> {
-    pub fn read(&mut self) -> T {
-        // TODO: Consider handling index out of bounds
-        let value = self.values[self.read_offset];
-        self.read_offset += 1;
-        value
-    }
-}
 
 impl<T: Primitive> PrimitiveBuffer<T> {
     pub fn new() -> Self {
         Self {
             values: Vec::new(),
-            read_offset: 0,
         }
     }
 }

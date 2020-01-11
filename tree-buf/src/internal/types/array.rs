@@ -46,12 +46,12 @@ impl BatchData for Array {
 
 #[derive(Debug)]
 pub struct ArrayWriter<T> {
-    len: PrimitiveBuffer<Array>,
+    len: <Array as Writable>::Writer,
     values: T,
 }
 
 pub struct ArrayReader<T> {
-    len: PrimitiveBuffer<Array>,
+    len: <Array as Readable>::Reader,
     values: T,
 }
 
@@ -59,7 +59,7 @@ impl<T: Writer> Writer for ArrayWriter<T> {
     type Write = Vec<T::Write>;
     fn new() -> Self {
         Self {
-            len: PrimitiveBuffer::new(),
+            len: Writer::new(),
             values: T::new(),
         }
     }
@@ -83,7 +83,7 @@ impl<T: Reader> Reader for ArrayReader<T> {
             DynBranch::Array {len, values} => {
                 let values = *values;
                 Self {
-                    len: PrimitiveBuffer::read_from(len),
+                    len: PrimitiveReader::read_from(len),
                     values: Reader::new(values, ArrayBranch),
                 }
             },
