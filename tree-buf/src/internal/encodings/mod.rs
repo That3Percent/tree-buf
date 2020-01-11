@@ -1,5 +1,6 @@
 pub mod varint;
 pub mod packed_bool;
+pub mod delta;
 
 /// Reads all items from some byte aligned encoding
 pub fn read_all<T>(bytes: &[u8], f: impl Fn(&[u8], &mut usize)->T) -> Vec<T> {
