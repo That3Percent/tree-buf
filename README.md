@@ -12,10 +12,10 @@ It's key features are:
 
 Tree-buf is built for scale. Its data layout enables the use of SIMD accellerated, bit-packed compression techniques under the hood.
 
-##Warning!
+## Warning!
 Tree-buf is in early development and the format is changing rapidly. It may not be a good idea to use Tree-buf in production. If you do, make sure you test a lot and be prepared to do data migrations on every major release of the format. I take no responsibility for your poor choice of using Tree-buf.
 
-#Getting started with Tree-buf
+# Getting started with Tree-buf
 
 While the Tree-buf format is language agnostic, it is currently only available for Rust.
 
