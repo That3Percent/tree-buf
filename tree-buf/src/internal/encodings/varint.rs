@@ -339,7 +339,7 @@ mod tests {
             vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
         };
         for vec in vecs.iter() {
-            round_trip_prefix(vec);
+            round_trip_prefix(vec)?;
         }
 
         // All the numbers with between 0 and 3 bits set
@@ -363,7 +363,7 @@ mod tests {
             vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
         };
         for vec in vecs.iter() {
-            round_trip_suffix(vec);
+            round_trip_suffix(vec)?;
         }
 
         // All the numbers with between 0 and 2 bits set
@@ -376,7 +376,7 @@ mod tests {
                     let num = (1u64 << a) | (1u64 << b) | (1u64 << c);
                     vec.push(num);
                 }
-                round_trip_suffix(&vec);
+                round_trip_suffix(&vec)?;
                 vec.clear();
             }
         }

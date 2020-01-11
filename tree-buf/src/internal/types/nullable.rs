@@ -38,7 +38,7 @@ impl Primitive for Nullable {
 #[derive(Debug)]
 pub struct NullableWriter<V> {
     opt: <Nullable as Writable>::Writer,
-    value: V,
+    value: Option<V>,
 }
 
 pub struct NullableReader<V> {
@@ -51,41 +51,58 @@ impl<V: Writer> Writer for NullableWriter<V> {
     fn new() -> Self {
         Self {
             opt: Writer::new(),
-            value: V::new(),
+            value: None,
         }
     }
     fn write(&mut self, value: &Self::Write) {
         self.opt.write(&Nullable(value.is_some()));
         if let Some(value) = value {
-            self.value.write(value);
+            self.value
+                .get_or_insert_with(|| V::new())
+                .write(value);
         }
     }
     fn flush<B: StaticBranch>(self, branch: B, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
-        self.opt.flush(branch, bytes, lens);
-        self.value.flush(branch, bytes, lens);
+        if let Some(value) = self.value {
+            self.opt.flush(branch, bytes, lens);
+            value.flush(branch, bytes, lens);
+        } else {
+            // TODO: Since Option can react to no branch, we can
+            // save some bytes here by returning a value which (possibly) rolls back the outer value.
+            // Eg: in struct this would simply remove the field name string that was written,
+            // tuple is a bit more nuanced as it must write the void if there is a non-void that follows.
+            PrimitiveId::Void.write(bytes);
+        }
+        
     }
 }
 
-impl<V: Reader> Reader for NullableReader<V> {
+impl<V: Reader> Reader for Option<NullableReader<V>> {
     type Read = Option<V::Read>;
     fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> ReadResult<Self> {
         match sticks {
             DynBranch::Nullable { opt, values } => {
                 let values = *values;
-                Ok(Self {
+                Ok(Some(NullableReader {
                     opt: PrimitiveReader::read_from(opt)?,
                     value: Reader::new(values, branch)?,
-                })
+                }))
             },
+            DynBranch::Void => Ok(None),
             _ => Err(ReadError::SchemaMismatch)?,
         }
     }
     fn read(&mut self) -> ReadResult<Self::Read> {
-        Ok(if self.opt.read()?.0 {
-            Some(self.value.read()?)
+        let value = if let Some(inner) = self {
+            if inner.opt.read()?.0 {
+                Some(inner.value.read()?)
+            } else {
+                None
+            }
         } else {
             None
-        })
+        };
+        Ok(value)
     }
 }
 
@@ -94,5 +111,5 @@ impl<T: Writable> Writable for Option<T> {
 }
 
 impl<T: Readable> Readable for Option<T> {
-    type Reader = NullableReader<T::Reader>;
+    type Reader = Option<NullableReader<T::Reader>>;
 }

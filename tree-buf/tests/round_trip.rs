@@ -54,6 +54,11 @@ fn make_item() -> Bits {
     }
 }
 
+fn round_trip_default<T: Default + Readable + Writable + Debug + PartialEq>() {
+    let data = T::default();
+    round_trip(&data);
+}
+
 fn round_trip<T: Readable + Writable + Debug + PartialEq>(value: &T) {
     let bytes = write(value);
     let result = read(&bytes);
@@ -137,4 +142,23 @@ fn size_check() {
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
     assert_eq!(bytes.len(), 150);
+}
+
+// TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
+
+// TODO: It should be able to do interesting things with Option<T>, like not schema match for struct and tuple fields. 
+
+#[test]
+fn various_types() {
+    round_trip_default::<u64>();
+    round_trip_default::<u32>();
+    round_trip_default::<u16>();
+    round_trip_default::<u8>();
+    round_trip_default::<(u64, u64)>();
+    round_trip_default::<(u64, u32)>();
+    round_trip_default::<f64>();
+    round_trip_default::<Vec<u32>>();
+    round_trip_default::<Option<Vec<u32>>>();
+    round_trip_default::<Option<u32>>();
+    round_trip_default::<Vec<Option<u32>>>();
 }

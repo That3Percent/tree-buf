@@ -43,9 +43,6 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8> {
 }
 
 pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
-    if bytes.len() == 0 {
-        return Err(ReadError::InvalidFormat);
-    }
     let sticks = read_root(bytes)?;
     let mut reader = T::Reader::new(sticks, NonArrayBranch)?;
     reader.read()

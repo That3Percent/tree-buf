@@ -28,6 +28,7 @@ pub enum PrimitiveId {
     Boolean,
     Float,
     Tuple { num_fields: usize },
+    Void,
 
     // TODO: Tuple,
     // TODO: String,
@@ -67,6 +68,7 @@ impl PrimitiveId {
                     Integer => 4,
                     Boolean => 5,
                     Float => 6,
+                    Void => 8,
                 };
                 bytes.push(discriminant);
             }
@@ -84,6 +86,7 @@ impl PrimitiveId {
             5 => Boolean,
             6 => Float,
             7 => Tuple { num_fields: decode_prefix_varint(bytes, offset)? as usize },
+            8 => Void,
             _ => Err(ReadError::InvalidFormat)?,
         })
     }

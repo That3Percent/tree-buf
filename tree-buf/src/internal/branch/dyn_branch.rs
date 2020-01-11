@@ -31,6 +31,7 @@ pub enum DynBranch<'a> {
     Nullable {opt: OneOrMany<'a, Nullable>, values: Box<DynBranch<'a>> },
     Boolean(OneOrMany<'a, bool>),
     Float(OneOrMany<'a, f64>),
+    Void,
 }
 
 fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is_array_context: bool) -> ReadResult<DynBranch<'a>> {
@@ -67,20 +68,18 @@ fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is
             let values = Box::new(values);
             DynBranch::Nullable {opt, values}
         }
-        PrimitiveId::Integer => {
-            DynBranch::Integer(OneOrMany::new(bytes, offset, lens, is_array_context)?)
-        },
-        PrimitiveId::Boolean => {
-            DynBranch::Boolean(OneOrMany::new(bytes, offset, lens, is_array_context)?)
-        },
-        PrimitiveId::Float => {
-            DynBranch::Float(OneOrMany::new(bytes, offset, lens, is_array_context)?)
-        }
+        PrimitiveId::Integer => DynBranch::Integer(OneOrMany::new(bytes, offset, lens, is_array_context)?),
+        PrimitiveId::Boolean => DynBranch::Boolean(OneOrMany::new(bytes, offset, lens, is_array_context)?),
+        PrimitiveId::Float => DynBranch::Float(OneOrMany::new(bytes, offset, lens, is_array_context)?),
+        PrimitiveId::Void => DynBranch::Void,
     };
     Ok(branch)
 }
 
 pub fn read_root(bytes: &[u8]) -> ReadResult<DynBranch<'_>> {
+    if bytes.len() == 0 {
+        return Ok(DynBranch::Void);
+    }
     let mut lens = bytes.len() - 1;
     let mut offset = 0;
     read_next(bytes, &mut offset, &mut lens, false)
