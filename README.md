@@ -54,7 +54,7 @@ pub fn round_trip() {
     // Write to Vec<u8>
     let bytes = write(&data);
     // Read from &[u8]
-    let copy = read(&bytes);
+    let copy = read(&bytes).unwrap();
     // Success!
     assert_eq!(&copy, &data);
 }
@@ -168,7 +168,7 @@ Depending on the game, Tree-buf may require on average only 14 bits per move. ~3
 
 As compared to `json`? With 14 bits per move we can get... `"t`. Actually that went over budget a bit and took 16 bits. Didn't quite make it as far as `"time_seconds":`. The complete, minified move will require a whopping 336 bits, 24 times as much as `Tree-buf`.
 
-## Other tricks
+# Other tricks
 
 Because the data model separates data by path down the schema, it becomes easy to selectively load parts of the file without requiring loading, parsing, and de-compressing data we aren't interested in.
 
