@@ -13,7 +13,7 @@ impl Primitive for Array {
     fn id() -> PrimitiveId {
         PrimitiveId::Array
     }
-    fn from_dyn_branch(_branch: DynBranch) -> OneOrMany<Self> {
+    fn from_dyn_branch(_branch: DynBranch) -> ReadResult<OneOrMany<Self>> {
         unreachable!()
     }
 }
@@ -32,10 +32,10 @@ impl BatchData for Array {
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         Wrapper::write_batch(items, bytes)
     }
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
         Wrapper::read_batch(bytes)
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
         unsafe { std::mem::transmute(usize::read_one(bytes, offset)) }
     }
     fn write_one(value: Self, bytes: &mut Vec<u8>) {
@@ -78,25 +78,25 @@ impl<T: Writer> Writer for ArrayWriter<T> {
 
 impl<T: Reader> Reader for ArrayReader<T> {
     type Read = Vec<T::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, _branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, _branch: ParentBranch) -> ReadResult<Self> {
         match sticks {
             DynBranch::Array {len, values} => {
                 let values = *values;
-                Self {
-                    len: PrimitiveReader::read_from(len),
-                    values: Reader::new(values, ArrayBranch),
-                }
+                Ok(Self {
+                    len: PrimitiveReader::read_from(len)?,
+                    values: Reader::new(values, ArrayBranch)?,
+                })
             },
-            _ => todo!("schema mismatch"), // Schema mismatch
+            _ => Err(ReadError::SchemaMismatch), // Schema mismatch
         }
     }
-    fn read(&mut self) -> Self::Read {
-        let len = self.len.read().0;
+    fn read(&mut self) -> ReadResult<Self::Read> {
+        let len = self.len.read()?.0;
         let mut result = Vec::with_capacity(len);
         for _ in 0..len {
-            result.push(self.values.read());
+            result.push(self.values.read()?);
         }
-        result
+        Ok(result)
     }
 }
 

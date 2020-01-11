@@ -1,17 +1,26 @@
-use crate::prelude::*;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub enum Error {
-    Missing { branch: String, id: PrimitiveId },
-    InvalidFile,
+pub enum ReadError {
+    SchemaMismatch,
+    InvalidFormat,
 }
 
-impl Display for Error {
+impl Display for ReadError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        // TODO: Don't use the debug implementation
-        Debug::fmt(self, f)
+        use ReadError::*;
+        match self {
+            SchemaMismatch => f.write_str("The expected schema did not match that in the file"),
+            InvalidFormat => f.write_str("The data is not a valid Tree-Buf"),
+        }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for ReadError {}
+
+
+impl From<std::str::Utf8Error> for ReadError {
+    fn from(_: std::str::Utf8Error) -> Self {
+        ReadError::InvalidFormat
+    }
+}

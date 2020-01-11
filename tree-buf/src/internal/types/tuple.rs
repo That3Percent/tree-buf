@@ -85,26 +85,28 @@ macro_rules! impl_tuple {
         
         impl <$($ts: Reader),+> Reader for ($($ts),+) {
             type Read=($($ts::Read),+);
-            fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, branch: ParentBranch) -> Self {
+            fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, branch: ParentBranch) -> ReadResult<Self> {
                 match sticks {
                     DynBranch::Tuple { mut children } => {
+                        // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
                         if children.len() != $count {
-                            todo!("schema mismatch");
+                            return Err(ReadError::SchemaMismatch)
                         }
                         let mut children = children.drain(..);
-                        (
-                            $($ts::new(children.next().unwrap(), branch)),+
-                        )
+                        Ok((
+                            // This unwrap is ok because we verified the len already. See alsoa abb368f2-6c99-4c44-8f9f-4b00868adaaf
+                            $($ts::new(children.next().unwrap(), branch)?),+
+                        ))
                     },
-                    _ => todo!("schema mismatch")
+                    _ => Err(ReadError::SchemaMismatch)
                 }
             }
-            fn read(&mut self) -> Self::Read {
+            fn read(&mut self) -> ReadResult<Self::Read> {
                 let ($($ts),+) = self;
 
-                (
-                    $($ts.read()),+
-                )
+                Ok((
+                    $($ts.read()?),+
+                ))
             }
         }
     };

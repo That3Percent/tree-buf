@@ -5,23 +5,23 @@ impl Primitive for bool {
     fn id() -> PrimitiveId {
         PrimitiveId::Boolean
     }
-    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self> {
+    fn from_dyn_branch(branch: DynBranch) -> ReadResult<OneOrMany<Self>> {
         match branch {
-            DynBranch::Boolean(v) => v,
-            _ => todo!("schema mismatch"),
+            DynBranch::Boolean(v) => Ok(v),
+            _ => Err(ReadError::SchemaMismatch),
         }
     }
 }
 
 impl BatchData for bool {
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
-        decode_packed_bool(bytes)
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
+        Ok(decode_packed_bool(bytes))
     }
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         encode_packed_bool(items, bytes);
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
+    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
         // TODO: Performance
-        Self::read_batch(read_bytes(bytes, 1, offset))[0]
+        Ok(Self::read_batch(read_bytes(bytes, 1, offset)?)?[0])
     }
 }

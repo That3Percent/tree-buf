@@ -14,11 +14,11 @@ impl BatchData for Nullable {
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         Wrapper::write_batch(items, bytes)
     }
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
         Wrapper::read_batch(bytes)
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
-        unsafe { std::mem::transmute(bool::read_one(bytes, offset)) }
+    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
+        Ok(unsafe { std::mem::transmute(bool::read_one(bytes, offset)?) })
     }
     fn write_one(value: Self, bytes: &mut Vec<u8>) {
         unsafe { bool::write_one(std::mem::transmute(value), bytes) }
@@ -29,7 +29,7 @@ impl Primitive for Nullable {
     fn id() -> PrimitiveId {
         PrimitiveId::Nullable
     }
-    fn from_dyn_branch(_branch: DynBranch) -> OneOrMany<Self> {
+    fn from_dyn_branch(_branch: DynBranch) -> ReadResult<OneOrMany<Self>> {
         unreachable!();
     }
 }
@@ -68,24 +68,24 @@ impl<V: Writer> Writer for NullableWriter<V> {
 
 impl<V: Reader> Reader for NullableReader<V> {
     type Read = Option<V::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> Self {
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> ReadResult<Self> {
         match sticks {
             DynBranch::Nullable { opt, values } => {
                 let values = *values;
-                Self {
-                    opt: PrimitiveReader::read_from(opt),
-                    value: Reader::new(values, branch),
-                }
+                Ok(Self {
+                    opt: PrimitiveReader::read_from(opt)?,
+                    value: Reader::new(values, branch)?,
+                })
             },
-            _ => todo!("schema mismatch"),
+            _ => Err(ReadError::SchemaMismatch)?,
         }
     }
-    fn read(&mut self) -> Self::Read {
-        if self.opt.read().0 {
-            Some(self.value.read())
+    fn read(&mut self) -> ReadResult<Self::Read> {
+        Ok(if self.opt.read()?.0 {
+            Some(self.value.read()?)
         } else {
             None
-        }
+        })
     }
 }
 

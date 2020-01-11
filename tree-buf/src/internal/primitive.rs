@@ -10,7 +10,7 @@ use std::vec::IntoIter;
 
 pub trait Primitive: Default + BatchData {
     fn id() -> PrimitiveId;
-    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self>;
+    fn from_dyn_branch(branch: DynBranch) -> ReadResult<OneOrMany<Self>>;
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -72,32 +72,32 @@ impl PrimitiveId {
             }
         }
     }
-    pub(crate) fn read(bytes: &[u8], offset: &mut usize) -> Self {
+    pub(crate) fn read(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
         use PrimitiveId::*;
         let discriminant = bytes[*offset];
         *offset += 1;
-        match discriminant {
-            1 => Object { num_fields: decode_prefix_varint(bytes, offset) as usize },
+        Ok(match discriminant {
+            1 => Object { num_fields: decode_prefix_varint(bytes, offset)? as usize },
             2 => Array,
             3 => Nullable,
             4 => Integer,
             5 => Boolean,
             6 => Float,
-            7 => Tuple { num_fields: decode_prefix_varint(bytes, offset) as usize },
-            _ => todo!("error handling. {}", discriminant),
-        }
+            7 => Tuple { num_fields: decode_prefix_varint(bytes, offset)? as usize },
+            _ => Err(ReadError::InvalidFormat)?,
+        })
     }
 }
 
 
 pub trait BatchData: Sized {
-    fn read_batch(bytes: &[u8]) -> Vec<Self>;
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>>;
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>);
     fn write_one(item: Self, bytes: &mut Vec<u8>) {
         // TODO: Overload these
         Self::write_batch(&[item], bytes)
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self;
+    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self>;
 }
 
 
@@ -109,24 +109,24 @@ impl Primitive for usize {
     fn id() -> PrimitiveId {
         PrimitiveId::Integer
     }
-    fn from_dyn_branch(branch: DynBranch) -> OneOrMany<Self> {
+    fn from_dyn_branch(branch: DynBranch) -> ReadResult<OneOrMany<Self>> {
         match branch {
             DynBranch::Integer(r) => {
-                match r {
+                Ok(match r {
                     OneOrMany::One(i) => OneOrMany::One(i as usize),
                     OneOrMany::Many(b) => OneOrMany::Many(b),
-                }
+                })
             },
-            _ => todo!("schema mismatch"),
+            _ => Err(ReadError::SchemaMismatch),
         }
     }
 }
 
 impl BatchData for usize {
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
         read_all(bytes, |b, o| {
-            let v = decode_prefix_varint(b, o);
-            v.try_into().unwrap_or_else(|_| todo!()) // TODO: Error handling (which won't be needed when schema match occurs)
+            let v = decode_prefix_varint(b, o)?;
+            Ok(v.try_into().unwrap_or_else(|_| todo!())) // TODO: Error handling (which won't be needed when schema match occurs)
         })
     }
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
@@ -135,8 +135,8 @@ impl BatchData for usize {
             encode_prefix_varint(v, bytes);
         }
     }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> Self {
-        decode_prefix_varint(bytes, offset) as usize
+    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
+        Ok(decode_prefix_varint(bytes, offset)? as usize)
     }
 }
 
@@ -153,14 +153,14 @@ pub struct PrimitiveReader<T> {
 }
 
 impl<T: BatchData> PrimitiveReader<T> {
-    pub fn read_from(items: OneOrMany<T>) -> Self {
+    pub fn read_from(items: OneOrMany<T>) -> ReadResult<Self> {
         let values = match items {
             OneOrMany::One(one) => vec![one],
-            OneOrMany::Many(bytes) => T::read_batch(bytes)
+            OneOrMany::Many(bytes) => T::read_batch(bytes)?
         };
-        Self {
+        Ok(Self {
             values: values.into_iter(),
-        }
+        })
     }
 }
 
@@ -196,12 +196,12 @@ impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
 
 impl<T: Primitive> Reader for PrimitiveReader<T> {
     type Read = T;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> Self {
-        let values = T::from_dyn_branch(sticks);
+    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> ReadResult<Self> {
+        let values = T::from_dyn_branch(sticks)?;
         Self::read_from(values)
     }
-    fn read(&mut self) -> Self::Read {
-        self.values.next().unwrap() // TODO: Error handling
+    fn read(&mut self) -> ReadResult<Self::Read> {
+        self.values.next().ok_or(ReadError::InvalidFormat)
     }
 }
 

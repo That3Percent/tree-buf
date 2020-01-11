@@ -20,7 +20,7 @@ pub unsafe trait Wrapper : Sized {
     fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
         unsafe { Self::Inner::write_batch(transmute(items), bytes) }
     }
-    fn read_batch(bytes: &[u8]) -> Vec<Self> {
-        unsafe { transmute(Self::Inner::read_batch(bytes)) }
+    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
+        Ok(unsafe { transmute(Self::Inner::read_batch(bytes)?) })
     }
 }

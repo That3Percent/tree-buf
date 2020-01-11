@@ -16,10 +16,12 @@ pub mod prelude {
     pub(crate) use crate::{internal::*, error::*,
         primitive::{Primitive, PrimitiveId}
     };
+
+    pub(crate) type ReadResult<T> = Result<T, ReadError>;
 }
 
 pub use prelude::*;
-pub use internal::error::Error;
+pub use internal::error::ReadError;
 // TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
 // That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
 pub use internal::{Readable, Writable, NonArrayBranch};
@@ -40,13 +42,13 @@ pub fn write<T: Writable>(value: &T) -> Vec<u8> {
     bytes
 }
 
-pub fn read<T: Readable>(bytes: &[u8]) -> Result<T, Error> {
+pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
     if bytes.len() == 0 {
-        return Err(Error::InvalidFile);
+        return Err(ReadError::InvalidFormat);
     }
-    let sticks = read_root(bytes);
-    let mut reader = T::Reader::new(sticks, NonArrayBranch);
-    Ok(reader.read())
+    let sticks = read_root(bytes)?;
+    let mut reader = T::Reader::new(sticks, NonArrayBranch)?;
+    reader.read()
 }
 
 // TODO: Figure out recursion, at least enough to handle this: https://docs.rs/serde_json/1.0.44/serde_json/value/enum.Value.html

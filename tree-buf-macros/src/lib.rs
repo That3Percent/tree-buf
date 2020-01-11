@@ -158,35 +158,35 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::internal::Reader::new(
-                    children.remove(#ident_str).unwrap_or_else(|| todo!("schema mismatch error handling")),
+                    children.remove(#ident_str).ok_or_else(|| tree_buf::ReadError::SchemaMismatch)?,
                     branch,
-                ),
+                )?,
             }
         }).collect();
     let new = quote! {
-        fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: tree_buf::internal::DynBranch, branch: ParentBranch) -> Self {
+        fn new<ParentBranch: tree_buf::internal::StaticBranch>(sticks: tree_buf::internal::DynBranch, branch: ParentBranch) -> Result<Self, tree_buf::ReadError> {
             let mut children = match sticks {
                 tree_buf::internal::DynBranch::Object { children } => children,
-                _ => todo!("schema mismatch error handling")
+                _ => Err(tree_buf::ReadError::SchemaMismatch)?,
             };
-            Self {
+            Ok(Self {
                 #(#inits)*
-            }
+            })
         }
     };
 
     let readers: Vec<_> = 
         fields.iter().map(|(ident, _)| {
             quote! {
-                #ident: self.#ident.read(),
+                #ident: self.#ident.read()?,
             }
         }).collect();
 
     let read = quote! {
-        fn read(&mut self) -> Self::Read {
-            Self::Read {
+        fn read(&mut self) -> Result<Self::Read, tree_buf::ReadError> {
+            Ok(Self::Read {
                 #(#readers)*
-            }
+            })
         }
     };
 

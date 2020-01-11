@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 pub fn encode_prefix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
         into.push((value << 1) as u8 | 1);
@@ -148,9 +150,14 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
     }
 }
 
-pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
-    let first = bytes[*offset];
+pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
     let shift = first.trailing_zeros();
+
+    // TODO: Check that the compiler does unchecked indexing after this
+    if (*offset + (shift as usize)) >= bytes.len() {
+        return Err(ReadError::InvalidFormat)
+    }
 
     let result = match shift {
         0 => {
@@ -217,13 +224,18 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
         _ => unreachable!()
     };
     *offset += (shift + 1) as usize;
-    result
+    Ok(result)
 }
 
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
-pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
-    let first = bytes[*offset];
+pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
     let shift = first.trailing_zeros();
+    
+    // TODO: Ensure unchecked indexing follows.
+    if *offset < (shift as usize) {
+        return Err(ReadError::InvalidFormat);
+    }
 
     let result = match shift {
         0 => {
@@ -290,19 +302,20 @@ pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> u64 {
         _ => unreachable!()
     };
     *offset = offset.wrapping_sub((shift + 1) as usize);
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::*;
     use super::*;
     use super::super::tests::round_trip;
 
-    fn round_trip_prefix(values: &[u64]) {
-        round_trip(values, encode_prefix_varint, decode_prefix_varint);
+    fn round_trip_prefix(values: &[u64]) -> ReadResult<()> {
+        round_trip(values, encode_prefix_varint, decode_prefix_varint)
     }
 
-    fn round_trip_suffix(values: &[u64]) {
+    fn round_trip_suffix(values: &[u64]) -> ReadResult<()> {
         let mut bytes = Vec::new();
         for value in values.iter() {
             encode_suffix_varint(*value, &mut bytes);
@@ -311,16 +324,17 @@ mod tests {
         let mut result = Vec::new();
         let mut offset = bytes.len().wrapping_sub(1);
         while offset != std::usize::MAX {
-            let next = decode_suffix_varint(&bytes, &mut offset);
+            let next = decode_suffix_varint(&bytes, &mut offset)?;
             result.push(next);
         }
         result.reverse();
         
         assert_eq!(&result, &values);
+        Ok(())
     }
 
     #[test]
-    fn test_prefix() {
+    fn test_prefix() -> ReadResult<()> {
         let vecs = vec! {
             vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
         };
@@ -337,13 +351,14 @@ mod tests {
                     let num = (1u64 << a) | (1u64 << b) | (1u64 << c);
                     vec.push(num);
                 }
-                round_trip_prefix(&vec);
+                round_trip_prefix(&vec)?;
                 vec.clear();
             }
         }
+        Ok(())
     }
     #[test]
-    fn test_suffix() {
+    fn test_suffix() -> ReadResult<()> {
         let vecs = vec! {
             vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
         };
@@ -365,5 +380,7 @@ mod tests {
                 vec.clear();
             }
         }
+
+        Ok(())
     }
 }
