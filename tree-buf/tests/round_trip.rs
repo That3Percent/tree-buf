@@ -146,8 +146,6 @@ fn size_check() {
 
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 
-// TODO: It should be able to do interesting things with Option<T>, like not schema match for struct and tuple fields. 
-
 #[test]
 fn various_types() {
     round_trip_default::<u64>();

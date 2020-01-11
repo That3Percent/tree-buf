@@ -34,6 +34,12 @@ pub enum DynBranch<'a> {
     Void,
 }
 
+impl<'a> Default for DynBranch<'a> {
+    fn default() -> Self {
+        DynBranch::Void
+    }
+}
+
 fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is_array_context: bool) -> ReadResult<DynBranch<'a>> {
     let primitive = PrimitiveId::read(bytes, offset)?;
 

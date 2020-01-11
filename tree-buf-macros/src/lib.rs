@@ -158,7 +158,7 @@ fn impl_reader(name: &Ident, reader_name: &Ident, fields: &NamedFields) -> Token
             let ident_str = format!("{}", ident);
             quote! {
                 #ident: tree_buf::internal::Reader::new(
-                    children.remove(#ident_str).ok_or_else(|| tree_buf::ReadError::SchemaMismatch)?,
+                    children.remove(#ident_str).unwrap_or_default(),
                     branch,
                 )?,
             }
