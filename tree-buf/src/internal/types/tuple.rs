@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use crate::prelude::*;
 
 // TODO: I don't know how to get this part in the macro because it would require 2 bindings with the same name given the pattern
@@ -38,6 +40,18 @@ fn write_five<T0: Writer, T1: Writer, T2: Writer, T3: Writer, T4: Writer> (
     writer.2.write(&value.2);
     writer.3.write(&value.3);
     writer.4.write(&value.4);
+}
+
+#[inline(always)]
+fn write_six<T0: Writer, T1: Writer, T2: Writer, T3: Writer, T4: Writer, T5:Writer> (
+        writer: &mut (T0, T1, T2, T3, T4, T5),
+        value: &(T0::Write, T1::Write, T2::Write, T3::Write, T4::Write, T5::Write)) {
+    writer.0.write(&value.0);
+    writer.1.write(&value.1);
+    writer.2.write(&value.2);
+    writer.3.write(&value.3);
+    writer.4.write(&value.4);
+    writer.5.write(&value.5);
 }
 
 macro_rules! impl_tuple {
@@ -106,5 +120,6 @@ impl_tuple!(2, write_two, T0, T1);
 impl_tuple!(3, write_three, T0, T1, T2);
 impl_tuple!(4, write_four, T0, T1, T2, T3);
 impl_tuple!(5, write_five, T0, T1, T2, T3, T4);
+impl_tuple!(6, write_six, T0, T1, T2, T3, T4, T5);
 
 // TODO: Support tuple structs in the macro
