@@ -107,3 +107,4 @@ impl_tuple!(3, write_three, T0, T1, T2);
 impl_tuple!(4, write_four, T0, T1, T2, T3);
 impl_tuple!(5, write_five, T0, T1, T2, T3, T4);
 
+// TODO: Support tuple structs in the macro
