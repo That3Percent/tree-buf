@@ -18,6 +18,8 @@ impl Primitive for Array {
     }
 }
 
+impl_primitive_reader_writer!(Array);
+
 #[derive(Copy, Clone)]
 struct ArrayBranch;
 
@@ -43,7 +45,7 @@ impl BatchData for Array {
     }
 }
 
-
+// TODO: Have Void for recursion support
 #[derive(Debug, Default)]
 pub struct ArrayWriter<'a, T> {
     len: <Array as Writable<'a>>::Writer,

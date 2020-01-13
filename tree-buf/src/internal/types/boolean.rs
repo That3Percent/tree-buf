@@ -13,6 +13,8 @@ impl Primitive for bool {
     }
 }
 
+impl_primitive_reader_writer!(bool);
+
 impl BatchData for bool {
     fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
         Ok(decode_packed_bool(bytes))

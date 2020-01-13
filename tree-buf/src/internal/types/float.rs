@@ -32,3 +32,5 @@ impl Primitive for f64 {
         }
     }
 }
+
+impl_primitive_reader_writer!(f64);

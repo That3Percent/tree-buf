@@ -34,6 +34,7 @@ impl Primitive for Nullable {
     }
 }
 
+impl_primitive_reader_writer!(Nullable);
 
 #[derive(Default)]
 pub struct NullableWriter<'a, V> {

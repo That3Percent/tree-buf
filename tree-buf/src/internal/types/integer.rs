@@ -39,6 +39,9 @@ macro_rules! integer_impl {
                 Ok(branch)
             }
         }
+
+        impl_primitive_reader_writer!($T);
+
     };
 }
 

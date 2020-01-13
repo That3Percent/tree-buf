@@ -6,8 +6,6 @@ use std::convert::{TryInto};
 use std::fmt::Debug;
 use std::vec::IntoIter;
 
-
-
 pub trait Primitive: Default + BatchData {
     fn id() -> PrimitiveId;
     fn from_dyn_branch(branch: DynBranch) -> ReadResult<OneOrMany<Self>>;
@@ -106,7 +104,6 @@ pub trait BatchData: Sized {
 }
 
 
-
 impl Primitive for usize {
     // TODO: I wrote this earlier, but now I'm not sure it makes sense.
     // usize gets it's own primitive which uses varint because we don't know the platform and maximum value here.
@@ -150,11 +147,11 @@ impl BatchData for usize {
 
 #[derive(Debug, Default)]
 pub struct PrimitiveBuffer<T> {
-    values: Vec<T>,
+    pub(crate) values: Vec<T>,
 }
 
 pub struct PrimitiveReader<T> {
-    values: IntoIter<T>,
+    pub(crate) values: IntoIter<T>,
 }
 
 impl<T: BatchData> PrimitiveReader<T> {
@@ -170,49 +167,57 @@ impl<T: BatchData> PrimitiveReader<T> {
 }
 
 
-impl<'a, T: Primitive + Copy> Writer<'a> for PrimitiveBuffer<T> {
-    type Write = T;
-    fn write<'b : 'a>(&mut self, value: &'a Self::Write) {
-        self.values.push(*value);
-    }
-    fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
-        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
-        T::id().write(bytes);
-
-        if ParentBranch::in_array_context() {
-            let start = bytes.len();
-            T::write_batch(&self.values, bytes);
-            let len = bytes.len() - start;
-            lens.push(len);
-        } else {
-            let Self { mut values, .. } = self;
-            // TODO: This may be 0 for Object
-            assert_eq!(values.len(), 1);
-            let value = values.pop().unwrap();
-            T::write_one(value, bytes);
+/// This is a substitute for a blanket impl, since the blanket impl makes us run afoul of orphan rules.
+/// The core problem is that if we want to impl<'a, T: Primitive> Writable for PrimitiveBuffer<T>, then we can't also impl Writer for Box<Writer>
+#[macro_export]
+macro_rules! impl_primitive_reader_writer {
+    ($T:ty) => {
+        impl Reader for PrimitiveReader<$T> {
+            type Read = $T;
+            fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> ReadResult<Self> {
+                let values = <$T>::from_dyn_branch(sticks)?;
+                Self::read_from(values)
+            }
+            fn read(&mut self) -> ReadResult<Self::Read> {
+                self.values.next().ok_or(ReadError::InvalidFormat)
+            }
         }
-    }
+        
+        impl<'a> Writer<'a> for PrimitiveBuffer<$T> {
+            type Write = $T;
+            fn write<'b : 'a>(&mut self, value: &'a Self::Write) {
+                self.values.push(*value);
+            }
+            fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
+                // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
+                <$T>::id().write(bytes);
+
+                if ParentBranch::in_array_context() {
+                    let start = bytes.len();
+                    BatchData::write_batch(&self.values, bytes);
+                    let len = bytes.len() - start;
+                    lens.push(len);
+                } else {
+                    let Self { mut values, .. } = self;
+                    // TODO: This may be 0 for Object
+                    assert_eq!(values.len(), 1);
+                    let value = values.pop().unwrap();
+                    <$T>::write_one(value, bytes);
+                }
+            }
+        }
+
+        impl<'a> Writable<'a> for $T {
+            type Writer = PrimitiveBuffer<$T>;
+        }
+        
+        impl Readable for $T {
+            type Reader = PrimitiveReader<$T>;
+        }
+    };
 }
 
-impl<T: Primitive> Reader for PrimitiveReader<T> {
-    type Read = T;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, _branch: ParentBranch) -> ReadResult<Self> {
-        let values = T::from_dyn_branch(sticks)?;
-        Self::read_from(values)
-    }
-    fn read(&mut self) -> ReadResult<Self::Read> {
-        self.values.next().ok_or(ReadError::InvalidFormat)
-    }
-}
-
-
-impl<'a, T: Primitive + Copy> Writable<'a> for T {
-    type Writer = PrimitiveBuffer<T>;
-}
-
-impl<T: Primitive> Readable for T {
-    type Reader = PrimitiveReader<T>;
-}
+impl_primitive_reader_writer!(usize);
 
 
 impl<T: Primitive> PrimitiveBuffer<T> {
