@@ -4,11 +4,13 @@
 ///! the implementation details cannot be relied upon.
 
 pub mod branch;
+#[macro_use]
 pub mod primitive;
 pub mod reader_writer;
 pub mod error;
 pub(crate) mod encodings;
 pub mod types;
+pub mod rust_std;
 
 pub use {
     reader_writer::{Readable, Reader, Writable, Writer},
@@ -16,4 +18,5 @@ pub use {
     branch::*,
     encodings::*,
     types::*,
+    rust_std::*,
 };
