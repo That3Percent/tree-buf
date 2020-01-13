@@ -16,6 +16,7 @@ mod hide_namespace {
         pub f: f64,
         pub obj_array: Vec<Bobs>,
         pub extra: Option<Bobs>,
+        pub s: String,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -37,6 +38,7 @@ fn make_item() -> Bits {
             one: vec![99],
             tup: (9999.99, 200.1),
         }),
+        s: "abc".to_owned(),
         obj_array: vec![
             Bobs {
                 one: vec![3, 2, 1, 0],
@@ -54,12 +56,12 @@ fn make_item() -> Bits {
     }
 }
 
-fn round_trip_default<T: Default + Readable + Writable + Debug + PartialEq>() {
+fn round_trip_default<T: for<'a> Default + Readable + for<'a> Writable<'a> + Debug + PartialEq>() {
     let data = T::default();
     round_trip(&data);
 }
 
-fn round_trip<T: Readable + Writable + Debug + PartialEq>(value: &T) {
+fn round_trip<'a, 'b : 'a, T: Readable + Writable<'a> + Debug + PartialEq>(value: &'b T) {
     let bytes = write(value);
     let result = read(&bytes);
     match result {
@@ -141,11 +143,10 @@ fn size_check() {
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 150);
+    assert_eq!(bytes.len(), 157);
 }
 
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
-
 #[test]
 fn various_types() {
     round_trip_default::<u64>();
@@ -159,4 +160,5 @@ fn various_types() {
     round_trip_default::<Option<Vec<u32>>>();
     round_trip_default::<Option<u32>>();
     round_trip_default::<Vec<Option<u32>>>();
+    round_trip_default::<String>();
 }

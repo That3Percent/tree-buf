@@ -3,8 +3,7 @@ use tree_buf::ReadError;
 use tree_buf::{Readable, Writable};
 use std::fmt::Debug;
 
-
-fn expect_schema_mismatch<TIn: Writable + Default, TOut: Debug + Readable>() {
+fn expect_schema_mismatch<TIn: for<'a> Writable<'a> + Default, TOut: Debug + Readable>() {
     let data = TIn::default();
     let bytes = write(&data);
     let result = read::<TOut>(&bytes);

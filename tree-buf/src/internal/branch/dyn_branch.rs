@@ -32,6 +32,7 @@ pub enum DynBranch<'a> {
     Boolean(OneOrMany<'a, bool>),
     Float(OneOrMany<'a, f64>),
     Void,
+    String(OneOrMany<'a, String>),
 }
 
 impl<'a> Default for DynBranch<'a> {
@@ -78,6 +79,7 @@ fn read_next<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, is
         PrimitiveId::Boolean => DynBranch::Boolean(OneOrMany::new(bytes, offset, lens, is_array_context)?),
         PrimitiveId::Float => DynBranch::Float(OneOrMany::new(bytes, offset, lens, is_array_context)?),
         PrimitiveId::Void => DynBranch::Void,
+        PrimitiveId::String => DynBranch::String(OneOrMany::new(bytes, offset, lens, is_array_context)?),
     };
     Ok(branch)
 }

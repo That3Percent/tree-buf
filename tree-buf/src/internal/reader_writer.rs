@@ -1,17 +1,17 @@
 use crate::prelude::*;
 
-pub trait Writable: Sized {
-    type Writer: Writer<Write = Self>;
+pub trait Writable<'a>: Sized {
+    type Writer: Writer<'a, Write = Self>;
 }
 
 pub trait Readable: Sized {
     type Reader: Reader<Read = Self>;
 }
 
-pub trait Writer {
-    type Write: Writable;
+pub trait Writer<'a> {
+    type Write: Writable<'a>;
 
-    fn write(&mut self, value: &Self::Write);
+    fn write<'b : 'a>(&mut self, value: &'b Self::Write);
     fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>);
     fn new() -> Self;
 }

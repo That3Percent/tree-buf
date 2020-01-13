@@ -2,61 +2,16 @@
 
 use crate::prelude::*;
 
-// TODO: I don't know how to get this part in the macro because it would require 2 bindings with the same name given the pattern
-// that I usually use.
-#[inline(always)]
-fn write_two<T0: Writer, T1: Writer>(
-    writer: &mut (T0, T1),
-    value: &(T0::Write, T1::Write)) {
-    writer.0.write(&value.0);
-    writer.1.write(&value.1);
-}
 
-#[inline(always)]
-fn write_three<T0: Writer, T1: Writer, T2: Writer>(
-    writer: &mut (T0, T1, T2),
-    value: &(T0::Write, T1::Write, T2::Write)) {
-    writer.0.write(&value.0);
-    writer.1.write(&value.1);
-    writer.2.write(&value.2);
-}
-
-#[inline(always)]
-fn write_four<T0: Writer, T1: Writer, T2: Writer, T3: Writer> (
-        writer: &mut (T0, T1, T2, T3),
-        value: &(T0::Write, T1::Write, T2::Write, T3::Write)) {
-    writer.0.write(&value.0);
-    writer.1.write(&value.1);
-    writer.2.write(&value.2);
-    writer.3.write(&value.3);
-}
-
-#[inline(always)]
-fn write_five<T0: Writer, T1: Writer, T2: Writer, T3: Writer, T4: Writer> (
-        writer: &mut (T0, T1, T2, T3, T4),
-        value: &(T0::Write, T1::Write, T2::Write, T3::Write, T4::Write)) {
-    writer.0.write(&value.0);
-    writer.1.write(&value.1);
-    writer.2.write(&value.2);
-    writer.3.write(&value.3);
-    writer.4.write(&value.4);
-}
-
-#[inline(always)]
-fn write_six<T0: Writer, T1: Writer, T2: Writer, T3: Writer, T4: Writer, T5:Writer> (
-        writer: &mut (T0, T1, T2, T3, T4, T5),
-        value: &(T0::Write, T1::Write, T2::Write, T3::Write, T4::Write, T5::Write)) {
-    writer.0.write(&value.0);
-    writer.1.write(&value.1);
-    writer.2.write(&value.2);
-    writer.3.write(&value.3);
-    writer.4.write(&value.4);
-    writer.5.write(&value.5);
+// https://www.reddit.com/r/rust/comments/339yj3/tuple_indexing_in_a_macro/
+macro_rules! expr { ($x:expr) => ($x) } // HACK
+macro_rules! tuple_index {
+    ($tuple:expr, $idx:tt) => { expr!($tuple.$idx) }
 }
 
 macro_rules! impl_tuple {
-    ($count:expr, $write:ident, $($ts:ident),+) => {
-        impl <$($ts: Writable),+> Writable for ($($ts),+) {
+    ($count:expr, $($ts:ident, $ti:tt,)+) => {
+        impl <'a, $($ts: Writable<'a>),+> Writable<'a> for ($($ts),+) {
             type Writer=($($ts::Writer),+);
         }
 
@@ -64,11 +19,11 @@ macro_rules! impl_tuple {
             type Reader=($($ts::Reader),+);
         }
 
-        impl <$($ts: Writer),+> Writer for ($($ts),+) {
+        impl <'a, $($ts: Writer<'a>),+> Writer<'a> for ($($ts),+) {
             type Write=($($ts::Write),+);
         
-            fn write(&mut self, value: &Self::Write) {
-                $write(self, value);
+            fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
+                $(tuple_index!(self, $ti).write(&tuple_index!(value, $ti));)+
             }
             fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
                 PrimitiveId::Tuple { num_fields: $count}.write(bytes);
@@ -102,10 +57,8 @@ macro_rules! impl_tuple {
                 }
             }
             fn read(&mut self) -> ReadResult<Self::Read> {
-                let ($($ts),+) = self;
-
                 Ok((
-                    $($ts.read()?),+
+                    $(tuple_index!(self, $ti).read()?),+
                 ))
             }
         }
@@ -118,10 +71,10 @@ macro_rules! impl_tuple {
 // not use the tuple construct. The tuple construct isn't invalid
 // though, which opens considerations for matching either for a schema
 // which may not be trivial - like a recursive descent parser.
-impl_tuple!(2, write_two, T0, T1);
-impl_tuple!(3, write_three, T0, T1, T2);
-impl_tuple!(4, write_four, T0, T1, T2, T3);
-impl_tuple!(5, write_five, T0, T1, T2, T3, T4);
-impl_tuple!(6, write_six, T0, T1, T2, T3, T4, T5);
+impl_tuple!(2, T0, 0, T1, 1,);
+impl_tuple!(3, T0, 0, T1, 1, T2, 2,);
+impl_tuple!(4, T0, 0, T1, 1, T2, 2, T3, 3,);
+impl_tuple!(5, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4,);
+impl_tuple!(6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
 
 // TODO: Support tuple structs in the macro

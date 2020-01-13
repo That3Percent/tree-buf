@@ -27,7 +27,7 @@ pub use internal::error::ReadError;
 pub use internal::{Readable, Writable, NonArrayBranch};
 use internal::encodings::varint::{encode_suffix_varint};
 
-pub fn write<T: Writable>(value: &T) -> Vec<u8> {
+pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
     let mut writer = T::Writer::new();
     writer.write(value);
     let mut lens = Vec::new();

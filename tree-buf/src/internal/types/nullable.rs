@@ -35,9 +35,9 @@ impl Primitive for Nullable {
 }
 
 
-#[derive(Debug)]
-pub struct NullableWriter<V> {
-    opt: <Nullable as Writable>::Writer,
+//#[derive(Debug)]
+pub struct NullableWriter<'a, V> {
+    opt: <Nullable as Writable<'a>>::Writer,
     value: Option<V>,
 }
 
@@ -46,7 +46,7 @@ pub struct NullableReader<V> {
     value: V,
 }
 
-impl<V: Writer> Writer for NullableWriter<V> {
+impl<'a, V: Writer<'a>> Writer<'a> for NullableWriter<'a, V> {
     type Write = Option<V::Write>;
     fn new() -> Self {
         Self {
@@ -54,7 +54,7 @@ impl<V: Writer> Writer for NullableWriter<V> {
             value: None,
         }
     }
-    fn write(&mut self, value: &Self::Write) {
+    fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
         self.opt.write(&Nullable(value.is_some()));
         if let Some(value) = value {
             self.value
@@ -106,8 +106,8 @@ impl<V: Reader> Reader for Option<NullableReader<V>> {
     }
 }
 
-impl<T: Writable> Writable for Option<T> {
-    type Writer = NullableWriter<T::Writer>;
+impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
+    type Writer = NullableWriter<'a, T::Writer>;
 }
 
 impl<T: Readable> Readable for Option<T> {

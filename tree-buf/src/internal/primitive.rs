@@ -29,9 +29,9 @@ pub enum PrimitiveId {
     Float,
     Tuple { num_fields: usize },
     Void,
+    String,
 
     // TODO: Tuple,
-    // TODO: String,
     // TODO: Bytes = [u8]
     // TODO: Date
     // TODO: Void
@@ -69,6 +69,7 @@ impl PrimitiveId {
                     Boolean => 5,
                     Float => 6,
                     Void => 8,
+                    String => 9,
                 };
                 bytes.push(discriminant);
             }
@@ -87,6 +88,7 @@ impl PrimitiveId {
             6 => Float,
             7 => Tuple { num_fields: decode_prefix_varint(bytes, offset)? as usize },
             8 => Void,
+            9 => String,
             _ => Err(ReadError::InvalidFormat)?,
         })
     }
@@ -146,7 +148,7 @@ impl BatchData for usize {
 
 // TODO: String + &str will need their own special Writer implementation that blits bits immediately to a byte buffer
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PrimitiveBuffer<T> {
     values: Vec<T>,
 }
@@ -168,14 +170,14 @@ impl<T: BatchData> PrimitiveReader<T> {
 }
 
 
-impl<T: Primitive + Copy> Writer for PrimitiveBuffer<T> {
+impl<'a, T: Primitive + Copy> Writer<'a> for PrimitiveBuffer<T> {
     type Write = T;
     fn new() -> Self {
         Self {
             values: Vec::new(),
         }
     }
-    fn write(&mut self, value: &Self::Write) {
+    fn write<'b : 'a>(&mut self, value: &'a Self::Write) {
         self.values.push(*value);
     }
     fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
@@ -209,7 +211,7 @@ impl<T: Primitive> Reader for PrimitiveReader<T> {
 }
 
 
-impl<T: Primitive + Copy> Writable for T {
+impl<'a, T: Primitive + Copy> Writable<'a> for T {
     type Writer = PrimitiveBuffer<T>;
 }
 

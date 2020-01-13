@@ -59,8 +59,8 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
 
 fn impl_writable(name: &Ident, writer_name: &Ident) -> TokenStream {
     quote! {
-        impl tree_buf::internal::Writable for #name {
-            type Writer = #writer_name;
+        impl<'a> tree_buf::internal::Writable<'a> for #name {
+            type Writer = #writer_name<'a>;
         }
     }
 }
@@ -117,7 +117,7 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
 
     // TODO: Writing the struct probably isn't necessary, just flushing the struct.
     let write = quote! {
-        fn write(&mut self, value: &Self::Write) {
+        fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
             #(#writers)*
         }
     };
@@ -143,7 +143,7 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     };
     
     quote! {
-        impl tree_buf::internal::Writer for #writer_name {
+        impl<'a> tree_buf::internal::Writer<'a> for #writer_name<'a> {
             type Write = #name;
             #new
             #write
@@ -203,12 +203,12 @@ fn impl_writer_struct(writer_name: &Ident, fields: &NamedFields) -> TokenStream 
     let fields: Vec<_> =
         fields.iter().map(|(ident, ty)| {
             quote! {
-                #ident: <#ty as tree_buf::internal::Writable>::Writer,
+                #ident: <#ty as tree_buf::internal::Writable<'a>>::Writer,
             }
         }).collect();
 
     quote! {
-        pub struct #writer_name {
+        pub struct #writer_name<'a> {
             #(#fields)*
         }
     }
