@@ -44,7 +44,7 @@ impl BatchData for Array {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ArrayWriter<'a, T> {
     len: <Array as Writable<'a>>::Writer,
     values: T,
@@ -57,12 +57,6 @@ pub struct ArrayReader<T> {
 
 impl<'a, T: Writer<'a>> Writer<'a> for ArrayWriter<'a, T> {
     type Write = Vec<T::Write>;
-    fn new() -> Self {
-        Self {
-            len: Writer::new(),
-            values: T::new(),
-        }
-    }
     fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
         self.len.write(&Array(value.len()));
         for item in value.iter() {

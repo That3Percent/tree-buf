@@ -67,9 +67,6 @@ impl<'a> Writer<'a> for StringWriter<'a> {
             Str::write_one(value, bytes);
         }
     }
-    fn new() -> Self {
-        Default::default()
-    }
 }
 
 

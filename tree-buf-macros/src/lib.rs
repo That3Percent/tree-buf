@@ -93,21 +93,6 @@ fn get_named_fields(data: &Data) -> NamedFields {
 
 
 fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> TokenStream {
-    let init: Vec<_> =
-        fields.iter().map(|(ident, _)| {
-            quote! {
-                #ident: tree_buf::internal::Writer::new(),
-            }
-        }).collect();
-
-    let new = quote! {
-        fn new() -> Self {
-            Self {
-                #(#init)*
-            }
-        }
-    };
-
     let writers: Vec<_> =
         fields.iter().map(|(ident, _)| {
             quote! {
@@ -145,7 +130,6 @@ fn impl_writer(name: &Ident, writer_name: &Ident, fields: &NamedFields) -> Token
     quote! {
         impl<'a> tree_buf::internal::Writer<'a> for #writer_name<'a> {
             type Write = #name;
-            #new
             #write
             #flush
         }
@@ -208,6 +192,7 @@ fn impl_writer_struct(writer_name: &Ident, fields: &NamedFields) -> TokenStream 
         }).collect();
 
     quote! {
+        #[derive(Default)]
         pub struct #writer_name<'a> {
             #(#fields)*
         }

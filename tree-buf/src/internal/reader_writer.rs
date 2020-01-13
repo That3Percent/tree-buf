@@ -8,12 +8,11 @@ pub trait Readable: Sized {
     type Reader: Reader<Read = Self>;
 }
 
-pub trait Writer<'a> {
+pub trait Writer<'a> : Default {
     type Write: Writable<'a>;
 
     fn write<'b : 'a>(&mut self, value: &'b Self::Write);
     fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>);
-    fn new() -> Self;
 }
 
 pub trait Reader : Sized {

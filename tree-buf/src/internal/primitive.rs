@@ -172,11 +172,6 @@ impl<T: BatchData> PrimitiveReader<T> {
 
 impl<'a, T: Primitive + Copy> Writer<'a> for PrimitiveBuffer<T> {
     type Write = T;
-    fn new() -> Self {
-        Self {
-            values: Vec::new(),
-        }
-    }
     fn write<'b : 'a>(&mut self, value: &'a Self::Write) {
         self.values.push(*value);
     }

@@ -30,11 +30,6 @@ macro_rules! impl_tuple {
                 let ($($ts,)+) = self;
                 $($ts.flush(branch, bytes, lens);)+
             }
-            fn new() -> Self {
-                (
-                    $($ts::new()),+
-                )
-            }
         }
 
         
