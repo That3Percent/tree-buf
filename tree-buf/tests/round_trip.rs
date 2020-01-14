@@ -9,7 +9,6 @@ mod hide_namespace {
     use tree_buf::{Read, Write};
     use serde::{Serialize, Deserialize};
 
-
     #[derive(Serialize, Deserialize)]
     #[derive(Read, Write, PartialEq, Debug, Clone)]
     pub struct Bits {
@@ -66,7 +65,7 @@ fn round_trip<'a, 'b : 'a, T: Readable + Writable<'a> + Debug + PartialEq>(value
     let result = read(&bytes);
     match result {
         Ok(parsed) => assert_eq!(value, &parsed),
-        _ => assert!(false),
+        Err(e) => assert!(false, "{}", e),
     }
 }
 
@@ -143,7 +142,7 @@ fn size_check() {
 
     // Assert a specific size. If we get a number above this size, that's a fail.
     // If we add compression and achieve lower, we can ratchet the number down.
-    assert_eq!(bytes.len(), 157);
+    assert_eq!(bytes.len(), 152);
 }
 
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
@@ -161,4 +160,90 @@ fn various_types() {
     round_trip_default::<Option<u32>>();
     round_trip_default::<Vec<Option<u32>>>();
     round_trip_default::<String>();
+}
+
+#[test]
+fn large_structs() {
+    #[derive(Read, Write, Default, Debug, PartialEq)]
+    pub struct _14 {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        g: f64,
+        h: f64,
+        i: f64,
+        j: f64,
+        k: f64,
+        l: f64,
+        m: f64,
+        n: f64,
+    }
+
+    #[derive(Read, Write, Default, Debug, PartialEq)]
+    pub struct _15 {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        g: f64,
+        h: f64,
+        i: f64,
+        j: f64,
+        k: f64,
+        l: f64,
+        m: f64,
+        n: f64,
+        o: f64,
+    }
+
+    #[derive(Read, Write, Default, Debug, PartialEq)]
+    pub struct _16 {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        g: f64,
+        h: f64,
+        i: f64,
+        j: f64,
+        k: f64,
+        l: f64,
+        m: f64,
+        n: f64,
+        o: f64,
+        p: f64,
+    }
+    // TODO: Match privacy in derive macro from struct deriving to writer impls
+    #[derive(Read, Write, Default, Debug, PartialEq)]
+    pub struct _17 {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        g: f64,
+        h: f64,
+        i: f64,
+        j: f64,
+        k: f64,
+        l: f64,
+        m: f64,
+        n: f64,
+        o: f64,
+        p: f64,
+        q: f64,
+    }
+
+    round_trip_default::<_14>();
+    round_trip_default::<_15>();
+    round_trip_default::<_16>();
+    round_trip_default::<_17>();
 }

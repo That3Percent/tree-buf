@@ -11,6 +11,9 @@ pub trait Readable: Sized {
 pub trait Writer<'a> : Default {
     type Write: Writable<'a>;
 
+    // TODO: There are some cases where it may be possible to write and flush sections independently.
+    // This should be true for all paths up to the point where arrays become involved. In doing so, there may be
+    // significant memory savings in not buffering multiple sections of the document simultaneously.
     fn write<'b : 'a>(&mut self, value: &'b Self::Write);
     fn flush<ParentBranch: StaticBranch>(self, branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>);
 }
