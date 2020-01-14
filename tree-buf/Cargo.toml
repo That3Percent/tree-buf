@@ -5,7 +5,6 @@ authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
 description = "A prototype binary serialization protocol"
 repository = "https://github.com/That3Percent/tree-buf"
-readme = "README.md"
 keywords = ["serialization", "protocol", "binary", "buffers"]
 categories = ["compression", "parser-implementations"]
 license = "MIT"
