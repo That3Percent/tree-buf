@@ -47,7 +47,7 @@ pub fn round_trip() {
         id: 1,
         vertices: vec! [
             (10., 10., 10.),
-            (20., 20. 20.)
+            (20., 20., 20.)
         ],
         extra: String::from("Fast"),
     };
