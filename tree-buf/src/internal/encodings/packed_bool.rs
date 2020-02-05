@@ -1,15 +1,14 @@
 pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     let mut offset = 0;
     while offset + 7 < items.len() {
-        let b = 
-            (items[offset + 0] as u8) << 0 |
-            (items[offset + 1] as u8) << 1 |
-            (items[offset + 2] as u8) << 2 |
-            (items[offset + 3] as u8) << 3 |
-            (items[offset + 4] as u8) << 4 |
-            (items[offset + 5] as u8) << 5 |
-            (items[offset + 6] as u8) << 6 |
-            (items[offset + 7] as u8) << 7;
+        let b = (items[offset + 0] as u8) << 0
+            | (items[offset + 1] as u8) << 1
+            | (items[offset + 2] as u8) << 2
+            | (items[offset + 3] as u8) << 3
+            | (items[offset + 4] as u8) << 4
+            | (items[offset + 5] as u8) << 5
+            | (items[offset + 6] as u8) << 6
+            | (items[offset + 7] as u8) << 7;
         bytes.push(b);
         offset += 8;
     }
@@ -50,24 +49,26 @@ mod tests {
 
     #[test]
     fn round_trip_packed_bool() {
-        let cases = vec! [
-            vec! [],
-            vec! [true],
-            vec! [false],
-            vec! [true, true, true, true, true, true, true],
-            vec! [true, true, true, true, true, true, true, true],
-            vec! [true, true, true, true, true, true, true, true, true],
-            vec! [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
-            vec! [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true],
-            vec! [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, true, true],
-            vec! [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, false, false],
+        let cases = vec![
+            vec![],
+            vec![true],
+            vec![false],
+            vec![true, true, true, true, true, true, true],
+            vec![true, true, true, true, true, true, true, true],
+            vec![true, true, true, true, true, true, true, true, true],
+            vec![true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+            vec![false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true],
+            vec![true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, true, true],
+            vec![
+                false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, false, false,
+            ],
         ];
 
         for case in cases {
             let mut bytes = Vec::new();
             encode_packed_bool(&case, &mut bytes);
             let result = decode_packed_bool(&bytes);
-            
+
             // Can't simply assert_eq, because the decoder will pad with false at the end.
             for i in 0..case.len() {
                 assert_eq!(case[i], result[i]);

@@ -1,26 +1,36 @@
 use crate::prelude::*;
 
+pub fn size_for_varint(value: u64) -> usize {
+    if value < (1 << 7) {
+        1
+    } else if value < (1 << 14) {
+        2
+    } else if value < (1 << 21) {
+        3
+    } else if value < (1 << 28) {
+        4
+    } else if value < (1 << 35) {
+        5
+    } else if value < (1 << 42) {
+        6
+    } else if value < (1 << 49) {
+        7
+    } else if value < (1 << 56) {
+        8
+    } else {
+        9
+    }
+}
+
 pub fn encode_prefix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
         into.push((value << 1) as u8 | 1);
     } else if value < (1 << 14) {
-        into.extend_from_slice(&[
-            (value << 2) as u8 | (1 << 1),
-            (value >> 6) as u8,
-        ]);
+        into.extend_from_slice(&[(value << 2) as u8 | (1 << 1), (value >> 6) as u8]);
     } else if value < (1 << 21) {
-        into.extend_from_slice(&[
-            (value << 3) as u8 | (1 << 2),
-            (value >> 5) as u8,
-            (value >> 13) as u8,
-        ]);
+        into.extend_from_slice(&[(value << 3) as u8 | (1 << 2), (value >> 5) as u8, (value >> 13) as u8]);
     } else if value < (1 << 28) {
-        into.extend_from_slice(&[
-            (value << 4) as u8 | (1 << 3),
-            (value >> 4) as u8,
-            (value >> 12) as u8,
-            (value >> 20) as u8,
-        ]);
+        into.extend_from_slice(&[(value << 4) as u8 | (1 << 3), (value >> 4) as u8, (value >> 12) as u8, (value >> 20) as u8]);
     } else if value < (1 << 35) {
         into.extend_from_slice(&[
             (value << 5) as u8 | (1 << 4),
@@ -80,23 +90,11 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
         into.push((value << 1) as u8 | 1);
     } else if value < (1 << 14) {
-        into.extend_from_slice(&[
-            (value >> 6) as u8,
-            (value << 2) as u8 | (1 << 1),
-        ]);
+        into.extend_from_slice(&[(value >> 6) as u8, (value << 2) as u8 | (1 << 1)]);
     } else if value < (1 << 21) {
-        into.extend_from_slice(&[
-            (value >> 5) as u8,
-            (value >> 13) as u8,
-            (value << 3) as u8 | (1 << 2),
-        ]);
+        into.extend_from_slice(&[(value >> 5) as u8, (value >> 13) as u8, (value << 3) as u8 | (1 << 2)]);
     } else if value < (1 << 28) {
-        into.extend_from_slice(&[
-            (value >> 4) as u8,
-            (value >> 12) as u8,
-            (value >> 20) as u8,
-            (value << 4) as u8 | (1 << 3),
-        ]);
+        into.extend_from_slice(&[(value >> 4) as u8, (value >> 12) as u8, (value >> 20) as u8, (value << 4) as u8 | (1 << 3)]);
     } else if value < (1 << 35) {
         into.extend_from_slice(&[
             (value >> 3) as u8,
@@ -151,77 +149,63 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
 }
 
 pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
     let shift = first.trailing_zeros();
 
     // TODO: Check that the compiler does unchecked indexing after this
     if (*offset + (shift as usize)) >= bytes.len() {
-        return Err(ReadError::InvalidFormat)
+        return Err(ReadError::InvalidFormat(InvalidFormat::EndOfFile));
     }
 
     let result = match shift {
-        0 => {
-            (first >> 1) as u64
-        },
-        1 => {
-            (first >> 2) as u64 |
-            ((bytes[*offset + 1] as u64) << 6)
-        },
-        2 => {
-            (first >> 3) as u64 |
-            ((bytes[*offset + 1] as u64) << 5) |
-            ((bytes[*offset + 2] as u64) << 13)
-        },
-        3 => {
-            (first >> 4) as u64 |
-            ((bytes[*offset + 1] as u64) << 4) |
-            ((bytes[*offset + 2] as u64) << 12) |
-            ((bytes[*offset + 3] as u64) << 20)
-        },
+        0 => (first >> 1) as u64,
+        1 => (first >> 2) as u64 | ((bytes[*offset + 1] as u64) << 6),
+        2 => (first >> 3) as u64 | ((bytes[*offset + 1] as u64) << 5) | ((bytes[*offset + 2] as u64) << 13),
+        3 => (first >> 4) as u64 | ((bytes[*offset + 1] as u64) << 4) | ((bytes[*offset + 2] as u64) << 12) | ((bytes[*offset + 3] as u64) << 20),
         4 => {
-            (first >> 5) as u64 |
-            ((bytes[*offset + 1] as u64) << 3) |
-            ((bytes[*offset + 2] as u64) << 11) |
-            ((bytes[*offset + 3] as u64) << 19) |
-            ((bytes[*offset + 4] as u64) << 27)
-        },
+            (first >> 5) as u64
+                | ((bytes[*offset + 1] as u64) << 3)
+                | ((bytes[*offset + 2] as u64) << 11)
+                | ((bytes[*offset + 3] as u64) << 19)
+                | ((bytes[*offset + 4] as u64) << 27)
+        }
         5 => {
-            (first >> 6) as u64 |
-            ((bytes[*offset + 1] as u64) << 2) |
-            ((bytes[*offset + 2] as u64) << 10) |
-            ((bytes[*offset + 3] as u64) << 18) |
-            ((bytes[*offset + 4] as u64) << 26) |
-            ((bytes[*offset + 5] as u64) << 34)
-        },
+            (first >> 6) as u64
+                | ((bytes[*offset + 1] as u64) << 2)
+                | ((bytes[*offset + 2] as u64) << 10)
+                | ((bytes[*offset + 3] as u64) << 18)
+                | ((bytes[*offset + 4] as u64) << 26)
+                | ((bytes[*offset + 5] as u64) << 34)
+        }
         6 => {
-            (first >> 7) as u64 |
-            ((bytes[*offset + 1] as u64) << 1) |
-            ((bytes[*offset + 2] as u64) << 9) |
-            ((bytes[*offset + 3] as u64) << 17) |
-            ((bytes[*offset + 4] as u64) << 25) |
-            ((bytes[*offset + 5] as u64) << 33) |
-            ((bytes[*offset + 6] as u64) << 41)
-        },
+            (first >> 7) as u64
+                | ((bytes[*offset + 1] as u64) << 1)
+                | ((bytes[*offset + 2] as u64) << 9)
+                | ((bytes[*offset + 3] as u64) << 17)
+                | ((bytes[*offset + 4] as u64) << 25)
+                | ((bytes[*offset + 5] as u64) << 33)
+                | ((bytes[*offset + 6] as u64) << 41)
+        }
         7 => {
-            ((bytes[*offset + 1] as u64)) |
-            ((bytes[*offset + 2] as u64) << 8) |
-            ((bytes[*offset + 3] as u64) << 16) |
-            ((bytes[*offset + 4] as u64) << 24) |
-            ((bytes[*offset + 5] as u64) << 32) |
-            ((bytes[*offset + 6] as u64) << 40) |
-            ((bytes[*offset + 7] as u64) << 48)
-        },
+            (bytes[*offset + 1] as u64)
+                | ((bytes[*offset + 2] as u64) << 8)
+                | ((bytes[*offset + 3] as u64) << 16)
+                | ((bytes[*offset + 4] as u64) << 24)
+                | ((bytes[*offset + 5] as u64) << 32)
+                | ((bytes[*offset + 6] as u64) << 40)
+                | ((bytes[*offset + 7] as u64) << 48)
+        }
         8 => {
-            ((bytes[*offset + 1] as u64)) |
-            ((bytes[*offset + 2] as u64) << 8) |
-            ((bytes[*offset + 3] as u64) << 16) |
-            ((bytes[*offset + 4] as u64) << 24) |
-            ((bytes[*offset + 5] as u64) << 32) |
-            ((bytes[*offset + 6] as u64) << 40) |
-            ((bytes[*offset + 7] as u64) << 48) |
-            ((bytes[*offset + 8] as u64) << 56)
-        },
-        _ => unreachable!()
+            (bytes[*offset + 1] as u64)
+                | ((bytes[*offset + 2] as u64) << 8)
+                | ((bytes[*offset + 3] as u64) << 16)
+                | ((bytes[*offset + 4] as u64) << 24)
+                | ((bytes[*offset + 5] as u64) << 32)
+                | ((bytes[*offset + 6] as u64) << 40)
+                | ((bytes[*offset + 7] as u64) << 48)
+                | ((bytes[*offset + 8] as u64) << 56)
+        }
+        _ => unreachable!(),
     };
     *offset += (shift + 1) as usize;
     Ok(result)
@@ -229,77 +213,63 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64>
 
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
 pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
     let shift = first.trailing_zeros();
-    
+
     // TODO: Ensure unchecked indexing follows.
     if *offset < (shift as usize) {
-        return Err(ReadError::InvalidFormat);
+        return Err(ReadError::InvalidFormat(InvalidFormat::EndOfFile));
     }
 
     let result = match shift {
-        0 => {
-            (first >> 1) as u64
-        },
-        1 => {
-            (first >> 2) as u64 |
-            ((bytes[*offset - 1] as u64) << 6)
-        },
-        2 => {
-            (first >> 3) as u64 |
-            ((bytes[*offset - 2] as u64) << 5) |
-            ((bytes[*offset - 1] as u64) << 13)
-        },
-        3 => {
-            (first >> 4) as u64 |
-            ((bytes[*offset - 3] as u64) << 4) |
-            ((bytes[*offset - 2] as u64) << 12) |
-            ((bytes[*offset - 1] as u64) << 20)
-        },
+        0 => (first >> 1) as u64,
+        1 => (first >> 2) as u64 | ((bytes[*offset - 1] as u64) << 6),
+        2 => (first >> 3) as u64 | ((bytes[*offset - 2] as u64) << 5) | ((bytes[*offset - 1] as u64) << 13),
+        3 => (first >> 4) as u64 | ((bytes[*offset - 3] as u64) << 4) | ((bytes[*offset - 2] as u64) << 12) | ((bytes[*offset - 1] as u64) << 20),
         4 => {
-            (first >> 5) as u64 |
-            ((bytes[*offset - 4] as u64) << 3) |
-            ((bytes[*offset - 3] as u64) << 11) |
-            ((bytes[*offset - 2] as u64) << 19) |
-            ((bytes[*offset - 1] as u64) << 27)
-        },
+            (first >> 5) as u64
+                | ((bytes[*offset - 4] as u64) << 3)
+                | ((bytes[*offset - 3] as u64) << 11)
+                | ((bytes[*offset - 2] as u64) << 19)
+                | ((bytes[*offset - 1] as u64) << 27)
+        }
         5 => {
-            (first >> 6) as u64 |
-            ((bytes[*offset - 5] as u64) << 2) |
-            ((bytes[*offset - 4] as u64) << 10) |
-            ((bytes[*offset - 3] as u64) << 18) |
-            ((bytes[*offset - 2] as u64) << 26) |
-            ((bytes[*offset - 1] as u64) << 34)
-        },
+            (first >> 6) as u64
+                | ((bytes[*offset - 5] as u64) << 2)
+                | ((bytes[*offset - 4] as u64) << 10)
+                | ((bytes[*offset - 3] as u64) << 18)
+                | ((bytes[*offset - 2] as u64) << 26)
+                | ((bytes[*offset - 1] as u64) << 34)
+        }
         6 => {
-            (first >> 7) as u64 |
-            ((bytes[*offset - 6] as u64) << 1) |
-            ((bytes[*offset - 5] as u64) << 9) |
-            ((bytes[*offset - 4] as u64) << 17) |
-            ((bytes[*offset - 3] as u64) << 25) |
-            ((bytes[*offset - 2] as u64) << 33) |
-            ((bytes[*offset - 1] as u64) << 41)
-        },
+            (first >> 7) as u64
+                | ((bytes[*offset - 6] as u64) << 1)
+                | ((bytes[*offset - 5] as u64) << 9)
+                | ((bytes[*offset - 4] as u64) << 17)
+                | ((bytes[*offset - 3] as u64) << 25)
+                | ((bytes[*offset - 2] as u64) << 33)
+                | ((bytes[*offset - 1] as u64) << 41)
+        }
         7 => {
-            ((bytes[*offset - 7] as u64)) |
-            ((bytes[*offset - 6] as u64) << 8) |
-            ((bytes[*offset - 5] as u64) << 16) |
-            ((bytes[*offset - 4] as u64) << 24) |
-            ((bytes[*offset - 3] as u64) << 32) |
-            ((bytes[*offset - 2] as u64) << 40) |
-            ((bytes[*offset - 1] as u64) << 48)
-        },
+            (bytes[*offset - 7] as u64)
+                | ((bytes[*offset - 6] as u64) << 8)
+                | ((bytes[*offset - 5] as u64) << 16)
+                | ((bytes[*offset - 4] as u64) << 24)
+                | ((bytes[*offset - 3] as u64) << 32)
+                | ((bytes[*offset - 2] as u64) << 40)
+                | ((bytes[*offset - 1] as u64) << 48)
+        }
         8 => {
-            ((bytes[*offset - 8] as u64)) |
-            ((bytes[*offset - 7] as u64) << 8) |
-            ((bytes[*offset - 6] as u64) << 16) |
-            ((bytes[*offset - 5] as u64) << 24) |
-            ((bytes[*offset - 4] as u64) << 32) |
-            ((bytes[*offset - 3] as u64) << 40) |
-            ((bytes[*offset - 2] as u64) << 48) |
-            ((bytes[*offset - 1] as u64) << 56)
-        },
-        _ => unreachable!()
+            (bytes[*offset - 8] as u64)
+                | ((bytes[*offset - 7] as u64) << 8)
+                | ((bytes[*offset - 6] as u64) << 16)
+                | ((bytes[*offset - 5] as u64) << 24)
+                | ((bytes[*offset - 4] as u64) << 32)
+                | ((bytes[*offset - 3] as u64) << 40)
+                | ((bytes[*offset - 2] as u64) << 48)
+                | ((bytes[*offset - 1] as u64) << 56)
+        }
+        _ => unreachable!(),
     };
     *offset = offset.wrapping_sub((shift + 1) as usize);
     Ok(result)
@@ -307,9 +277,9 @@ pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64>
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
-    use super::*;
     use super::super::tests::round_trip;
+    use super::*;
+    use crate::prelude::*;
 
     fn round_trip_prefix(values: &[u64]) -> ReadResult<()> {
         round_trip(values, encode_prefix_varint, decode_prefix_varint)
@@ -328,16 +298,14 @@ mod tests {
             result.push(next);
         }
         result.reverse();
-        
+
         assert_eq!(&result, &values);
         Ok(())
     }
 
     #[test]
     fn test_prefix() -> ReadResult<()> {
-        let vecs = vec! {
-            vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
-        };
+        let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
         for vec in vecs.iter() {
             round_trip_prefix(vec)?;
         }
@@ -359,9 +327,7 @@ mod tests {
     }
     #[test]
     fn test_suffix() -> ReadResult<()> {
-        let vecs = vec! {
-            vec! {99, 127, 128, 0, 1, 2, 3, std::u64::MAX },
-        };
+        let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
         for vec in vecs.iter() {
             round_trip_suffix(vec)?;
         }

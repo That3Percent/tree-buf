@@ -1,110 +1,96 @@
+use crate::encodings::varint::{decode_prefix_varint, encode_prefix_varint};
 use crate::prelude::*;
-use crate::encodings::varint::{encode_prefix_varint, decode_prefix_varint};
 use std::vec::IntoIter;
 
-pub struct Str;
+// TODO: Consider compressed unicode (SCSU?) for String in general,
+// but in particular for schema strings. As schema strings need only
+// be compared and usually not displayed we can do bit-for-bit comparisons
+// (Make sure that's true for SCSU, which may allow multiple encodings!)
 
 // TODO: Move this to BatchData
-impl Str {
-    pub fn write_one(value: &str, bytes: &mut Vec<u8>) {
-        encode_prefix_varint(value.len() as u64, bytes);
-        bytes.extend_from_slice(value.as_bytes());
-    }
-    pub fn read_one<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
-        let len = decode_prefix_varint(bytes, offset)? as usize;
-        let utf8 = read_bytes(bytes, len, offset)?;
-        Ok(std::str::from_utf8(utf8)?)
-    }
+pub fn write_str(value: &str, bytes: &mut Vec<u8>) {
+    encode_prefix_varint(value.len() as u64, bytes);
+    bytes.extend_from_slice(value.as_bytes());
 }
 
-impl BatchData for String {
-    fn read_batch(_bytes: &[u8]) -> ReadResult<Vec<Self>> {
-        unreachable!();
-    }
-    fn write_batch(_items: &[Self], _bytes: &mut Vec<u8>) {
-        unreachable!();
-    }
-    fn write_one(_item: Self, _bytes: &mut Vec<u8>) {
-        unreachable!();
-    }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
-        Ok(Str::read_one(bytes, offset)?.to_owned())
-    }
+fn read_str_len<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
+    let utf8 = read_bytes(len, bytes, offset)?;
+    Ok(std::str::from_utf8(utf8)?)
 }
-
-
-#[derive(Default)]
-pub struct StringWriter<'a> {
-    values: Vec<&'a str>
+pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
+    let len = decode_prefix_varint(bytes, offset)? as usize;
+    read_str_len(len, bytes, offset)
 }
 
 impl<'a> Writable<'a> for String {
-    type Writer = StringWriter<'a>;
-} 
-
-impl<'a> Writer<'a> for StringWriter<'a> {
-    type Write=String;
-
-    fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
-        self.values.push(value.as_str());
-    }
-    fn flush<ParentBranch: StaticBranch>(self, _branch: ParentBranch, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
-        // See also {2d1e8f90-c77d-488c-a41f-ce0fe3368712}
-        PrimitiveId::String.write(bytes);
-
-        if ParentBranch::in_array_context() {
-            let start = bytes.len();
-            for s in self.values {
-                Str::write_one(s, bytes)
+    type WriterArray = Vec<&'a str>;
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+        let value = value.as_str();
+        match value.len() {
+            0 => RootTypeId::Str0,
+            1 => {
+                bytes.push(value.as_bytes()[0]);
+                RootTypeId::Str1
             }
-            let len = bytes.len() - start;
-            lens.push(len);
-        } else {
-            let Self { mut values, .. } = self;
-            // TODO: This may be 0 for Object
-            assert_eq!(values.len(), 1);
-            let value = values.pop().unwrap();
-            Str::write_one(value, bytes);
+            2 => {
+                bytes.extend_from_slice(value.as_bytes());
+                RootTypeId::Str2
+            }
+            3 => {
+                bytes.extend_from_slice(value.as_bytes());
+                RootTypeId::Str3
+            }
+            _ => {
+                let b = value.as_bytes();
+                encode_prefix_varint(b.len() as u64, bytes);
+                bytes.extend_from_slice(b);
+                RootTypeId::Str
+            }
         }
     }
 }
 
+impl<'a> WriterArray<'a> for Vec<&'a str> {
+    type Write = String;
 
-pub struct StringReader {
-    values: IntoIter<String>
+    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        self.push(value.as_str());
+    }
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+        let start = bytes.len();
+        for s in self.iter() {
+            write_str(s, bytes)
+        }
+        let len = bytes.len() - start;
+        lens.push(len);
+
+        ArrayTypeId::Utf8
+    }
 }
 
 impl Readable for String {
-    type Reader=StringReader;
-}
-
-impl Reader for StringReader {
-    type Read=String;
-    // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
-    // I think that may require GAT though the way things are setup so come back to this later.
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch<'_>, _branch: ParentBranch) -> ReadResult<Self> {
+    // TODO: Use lifetimes to make this read lazy rather than IntoIter
+    type ReaderArray = IntoIter<String>;
+    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
         match sticks {
-            DynBranch::String(items) => {
-                let values = match items {
-                    OneOrMany::One(one) => vec![one],
-                    OneOrMany::Many(bytes) => {
-                        let mut offset = 0;
-                        let mut result = Vec::new();
-                        while offset < bytes.len() {
-                            result.push(Str::read_one(bytes, &mut offset)?.to_owned())
-                        };
-                        result
-                    }
-                };
-                Ok(Self {
-                    values: values.into_iter(),
-                })
-            },
+            DynRootBranch::String(s) => Ok(s.to_owned()),
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read(&mut self) -> ReadResult<Self::Read> {
-        self.values.next().ok_or(ReadError::InvalidFormat)
-    }
 }
 
+impl ReaderArray for IntoIter<String> {
+    type Read = String;
+    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+        match sticks {
+            DynArrayBranch::String(bytes) => {
+                let strs = read_all(bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
+                Ok(strs.into_iter())
+            }
+            _ => Err(ReadError::SchemaMismatch),
+        }
+    }
+    fn read_next(&mut self) -> ReadResult<Self::Read> {
+        self.next().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::ShortArray))
+    }
+}

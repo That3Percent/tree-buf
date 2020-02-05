@@ -2,21 +2,13 @@
 ///! and traits necessary for reading/writing that must be public to
 ///! be used to be found somehow, but hiding it behind a namespace so that
 ///! the implementation details cannot be relied upon.
-
 pub mod branch;
 #[macro_use]
 pub mod primitive;
-pub mod reader_writer;
+pub mod encodings;
 pub mod error;
-pub(crate) mod encodings;
-pub mod types;
+pub mod reader_writer;
 pub mod rust_std;
+pub mod types;
 
-pub use {
-    reader_writer::{Readable, Reader, Writable, Writer},
-    primitive::*,
-    branch::*,
-    encodings::*,
-    types::*,
-    rust_std::*,
-};
+pub use {branch::*, encodings::*, primitive::*, reader_writer::*, rust_std::*, types::*};

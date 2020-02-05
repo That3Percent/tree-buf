@@ -1,110 +1,83 @@
+use crate::internal::encodings::packed_bool::decode_packed_bool;
 use crate::prelude::*;
 
-// The Default derive enabled DefaultOnMissing to have None
-#[derive(Copy, Clone, Default, Debug)]
-#[repr(transparent)]
-pub struct Nullable(bool);
-
-unsafe impl Wrapper for Nullable {
-    type Inner = bool;
-}
-
-impl BatchData for Nullable {
-    // TODO: This is boilerplate, want blanket implementation to cover this and Array
-    fn write_batch(items: &[Self], bytes: &mut Vec<u8>) {
-        Wrapper::write_batch(items, bytes)
-    }
-    fn read_batch(bytes: &[u8]) -> ReadResult<Vec<Self>> {
-        Wrapper::read_batch(bytes)
-    }
-    fn read_one(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
-        Ok(unsafe { std::mem::transmute(bool::read_one(bytes, offset)?) })
-    }
-    fn write_one(value: Self, bytes: &mut Vec<u8>) {
-        unsafe { bool::write_one(std::mem::transmute(value), bytes) }
-    }
-}
-
-impl Primitive for Nullable {
-    fn id() -> PrimitiveId {
-        PrimitiveId::Nullable
-    }
-    fn from_dyn_branch(_branch: DynBranch) -> ReadResult<OneOrMany<Self>> {
-        unreachable!();
-    }
-}
-
-impl_primitive_reader_writer!(Nullable);
-
-#[derive(Default)]
-pub struct NullableWriter<'a, V> {
-    opt: <Nullable as Writable<'a>>::Writer,
-    value: Option<V>,
-}
-
-pub struct NullableReader<V> {
-    opt: <Nullable as Readable>::Reader,
-    value: V,
-}
-
-impl<'a, V: Writer<'a>> Writer<'a> for NullableWriter<'a, V> {
-    type Write = Option<V::Write>;
-    fn write<'b : 'a>(&mut self, value: &'b Self::Write) {
-        self.opt.write(&Nullable(value.is_some()));
-        if let Some(value) = value {
-            self.value
-                .get_or_insert_with(|| V::default())
-                .write(value);
-        }
-    }
-    fn flush<B: StaticBranch>(self, branch: B, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) {
-        if let Some(value) = self.value {
-            self.opt.flush(branch, bytes, lens);
-            value.flush(branch, bytes, lens);
-        } else {
-            // TODO: Since Option can react to no branch, we can
-            // save some bytes here by returning a value which (possibly) rolls back the outer value.
-            // Eg: in struct this would simply remove the field name string that was written,
-            // tuple is a bit more nuanced as it must write the void if there is a non-void that follows.
-            PrimitiveId::Void.write(bytes);
-        }
-        
-    }
-}
-
-impl<V: Reader> Reader for Option<NullableReader<V>> {
-    type Read = Option<V::Read>;
-    fn new<ParentBranch: StaticBranch>(sticks: DynBranch, branch: ParentBranch) -> ReadResult<Self> {
-        match sticks {
-            DynBranch::Nullable { opt, values } => {
-                let values = *values;
-                Ok(Some(NullableReader {
-                    opt: PrimitiveReader::read_from(opt)?,
-                    value: Reader::new(values, branch)?,
-                }))
-            },
-            DynBranch::Void => Ok(None),
-            _ => Err(ReadError::SchemaMismatch)?,
-        }
-    }
-    fn read(&mut self) -> ReadResult<Self::Read> {
-        let value = if let Some(inner) = self {
-            if inner.opt.read()?.0 {
-                Some(inner.value.read()?)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        Ok(value)
-    }
-}
-
 impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
-    type Writer = NullableWriter<'a, T::Writer>;
+    type WriterArray = NullableWriter<'a, T::WriterArray>;
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
+        if let Some(value) = value {
+            T::write_root(value, bytes, lens)
+        } else {
+            RootTypeId::Void
+        }
+    }
 }
 
 impl<T: Readable> Readable for Option<T> {
-    type Reader = Option<NullableReader<T::Reader>>;
+    type ReaderArray = Option<NullableReader<T::ReaderArray>>;
+    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+        match sticks {
+            DynRootBranch::Void => Ok(None),
+            _ => Ok(Some(T::read(sticks)?)),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct NullableWriter<'a, V> {
+    opt: <bool as Writable<'a>>::WriterArray,
+    value: Option<V>,
+}
+
+impl<'a, T: WriterArray<'a>> WriterArray<'a> for NullableWriter<'a, T> {
+    type Write = Option<T::Write>;
+    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        self.opt.buffer(&value.is_some());
+        if let Some(value) = value {
+            self.value.get_or_insert_with(T::default).buffer(value);
+        }
+    }
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+        if let Some(value) = self.value {
+            let opts_id = self.opt.flush(bytes, lens);
+            debug_assert_eq!(opts_id, ArrayTypeId::Boolean);
+            let type_index = bytes.len();
+            bytes.push(0);
+            let type_id = value.flush(bytes, lens);
+            bytes[type_index] = type_id.into();
+            ArrayTypeId::Nullable
+        } else {
+            ArrayTypeId::Void
+        }
+    }
+}
+
+pub struct NullableReader<T> {
+    opts: <bool as Readable>::ReaderArray,
+    values: T,
+}
+
+impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
+    type Read = Option<T::Read>;
+    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+        match sticks {
+            DynArrayBranch::Nullable { opt, values } => {
+                let opts = decode_packed_bool(opt).into_iter();
+                let values = T::new(*values)?;
+                Ok(Some(NullableReader { opts, values }))
+            }
+            DynArrayBranch::Void => Ok(None),
+            _ => Err(ReadError::SchemaMismatch),
+        }
+    }
+    fn read_next(&mut self) -> ReadResult<Self::Read> {
+        if let Some(inner) = self {
+            if inner.opts.read_next()? {
+                Ok(Some(inner.values.read_next()?))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }

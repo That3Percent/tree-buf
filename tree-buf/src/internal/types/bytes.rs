@@ -1,10 +1,11 @@
 use crate::prelude::*;
 
-pub fn read_bytes<'a>(bytes: &'a [u8], len: usize, offset: &'_ mut usize) -> ReadResult<&'a [u8]> {
+pub fn read_bytes<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a [u8]> {
     let start = *offset;
+    // TODO: Check for overflow
     let end = start + len;
-    if start > bytes.len() || end > bytes.len() {
-        return Err(ReadError::InvalidFormat);
+    if end > bytes.len() {
+        return Err(ReadError::InvalidFormat(InvalidFormat::EndOfFile));
     }
     *offset = end;
     Ok(&bytes[start..end])

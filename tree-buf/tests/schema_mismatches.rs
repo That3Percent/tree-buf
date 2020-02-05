@@ -1,7 +1,7 @@
+use std::fmt::Debug;
 use tree_buf::prelude::*;
 use tree_buf::ReadError;
 use tree_buf::{Readable, Writable};
-use std::fmt::Debug;
 
 fn expect_schema_mismatch<TIn: for<'a> Writable<'a> + Default, TOut: Debug + Readable>() {
     let data = TIn::default();
@@ -15,20 +15,24 @@ fn expect_schema_mismatch<TIn: for<'a> Writable<'a> + Default, TOut: Debug + Rea
 
 #[test]
 fn mismatched_root() {
-    expect_schema_mismatch::<u32, f64>();
+    expect_schema_mismatch::<u64, String>();
 }
 
 #[test]
 fn missnamed_obj_field() {
     #[derive(Default, Write)]
-    pub struct X { x: u32 }
+    pub struct X {
+        x: u64,
+    }
     #[derive(Read, Debug)]
-    pub struct Y { y: u32 }
+    pub struct Y {
+        y: u64,
+    }
 
     expect_schema_mismatch::<X, Y>();
 }
 
 #[test]
 fn wrong_tuple_length() {
-    expect_schema_mismatch::<(u32, u32), (u32, u32, u32)>();
+    expect_schema_mismatch::<(u64, u64), (u64, u64, u64)>();
 }

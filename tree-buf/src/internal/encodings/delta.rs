@@ -2,7 +2,7 @@ use std::ops::{Add, Sub};
 
 // FIXME: This may not be what is needed. Zigzag may be.
 
-pub fn delta_encode_in_place<T: Sub<Output=T> + Copy>(data: &mut [T]) {
+pub fn delta_encode_in_place<T: Sub<Output = T> + Copy>(data: &mut [T]) {
     if data.len() == 0 {
         return;
     }
@@ -14,9 +14,9 @@ pub fn delta_encode_in_place<T: Sub<Output=T> + Copy>(data: &mut [T]) {
     }
 }
 
-pub fn delta_decode_in_place<T: Add<Output=T> + Copy>(data: &mut [T]) {
+pub fn delta_decode_in_place<T: Add<Output = T> + Copy>(data: &mut [T]) {
     for i in 1..data.len() {
-        data[i] = data[i] + data[i-1];
+        data[i] = data[i] + data[i - 1];
     }
 }
 
@@ -25,13 +25,7 @@ mod tests {
     use super::*;
     #[test]
     pub fn round_trip() {
-        let tests = vec! [
-            vec![],
-            vec![10],
-            vec![0, 1, ]
-        ];
-        for test in tests {
-
-        }
+        let tests = vec![vec![], vec![10], vec![0, 1]];
+        for test in tests {}
     }
 }
