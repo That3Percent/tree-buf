@@ -25,6 +25,7 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let span = name.span();
     let fields = get_named_fields(&ast.data);
+    let vis = &ast.vis;
 
     let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
 
@@ -76,7 +77,7 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
     // TODO: pub/private needs to match outer type.
     let tokens = quote! {
         #[derive(Default)]
-        pub struct #array_writer_name<'a> {
+        #vis struct #array_writer_name<'a> {
             #(#array_fields)*
         }
 
@@ -115,6 +116,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let array_reader_name = Ident::new(format!("{}TreeBufArrayReader", name).as_str(), ast.ident.span());
     let fields = get_named_fields(&ast.data);
+    let vis = &ast.vis;
 
     let reads = fields.iter().map(|NamedField {ident, ty, canon_str}| {
         quote! {
@@ -156,8 +158,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
                 })
             }
         }
-        // TODO: pub/private needs to match outer type.
-        pub struct #array_reader_name {
+        #vis struct #array_reader_name {
             #(#array_fields)*
         }
 

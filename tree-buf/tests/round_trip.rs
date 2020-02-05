@@ -171,6 +171,28 @@ fn better_than_message_pack() {
     })
 }
 
+#[test]
+fn visibility_modifiers() {
+    #[derive(Default, Read, Write, Debug, PartialEq)]
+    struct Inherited {
+        a: u64
+    }
+
+    #[derive(Default, Read, Write, Debug, PartialEq)]
+    pub(crate) struct Crate {
+        a: u64
+    }
+
+    #[derive(Default, Read, Write, Debug, PartialEq)]
+    pub struct Public {
+        a: u64
+    }
+
+    round_trip_default::<Inherited>(4);
+    round_trip_default::<Crate>(4);
+    round_trip_default::<Public>(4);
+}
+
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {

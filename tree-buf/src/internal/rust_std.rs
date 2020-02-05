@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+// TODO: impl Writable for () {
+
 #[derive(Default)]
 pub struct BoxWriterArray<T> {
     inner: T,
