@@ -2,11 +2,17 @@ extern crate proc_macro;
 extern crate syn;
 #[macro_use]
 extern crate quote;
+use inflector::cases::camelcase::to_camel_case;
 
 use proc_macro2::{Ident, TokenStream};
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
 
-type NamedFields<'a> = Vec<(&'a Ident, &'a Type)>;
+struct NamedField<'a> {
+    ident: &'a Ident,
+    ty: &'a Type,
+    canon_str: String,
+}
+type NamedFields<'a> = Vec<NamedField<'a>>;
 
 #[proc_macro_derive(Write)]
 pub fn write_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -19,12 +25,12 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let span = name.span();
     let fields = get_named_fields(&ast.data);
-    let array_writer_name = Ident::new(format!("{}ArrayWriter", name).as_str(), span.clone());
 
-    let writers = fields.iter().map(|(ident, ty)| {
-        let ident_str = format!("{}", ident);
+    let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
+
+    let writers = fields.iter().map(|NamedField {ident, ty, canon_str}| {
         quote! {
-            tree_buf::internal::write_str(#ident_str, bytes);
+            tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
             bytes.push(0);
             let type_id = <#ty as tree_buf::internal::Writable>::write_root(&value.#ident, bytes, lens);
@@ -32,22 +38,21 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    let array_fields = fields.iter().map(|(ident, ty)| {
+    let array_fields = fields.iter().map(|NamedField {ident, ty, ..}| {
         quote! {
             #ident: <#ty as tree_buf::internal::Writable<'a>>::WriterArray,
         }
     });
 
-    let buffers = fields.iter().map(|(ident, _)| {
+    let buffers = fields.iter().map(|NamedField {ident, ..}| {
         quote! {
             self.#ident.buffer(&value.#ident);
         }
     });
 
-    let flushers = fields.iter().map(|(ident, _)| {
-        let ident_str = format!("{}", ident);
+    let flushers = fields.iter().map(|NamedField {ident, canon_str, ..}| {
         quote! {
-            tree_buf::internal::write_str(#ident_str, bytes);
+            tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
             bytes.push(0);
             let type_id = self.#ident.flush(bytes, lens);
@@ -108,32 +113,30 @@ pub fn read_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStr
 
 fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    let array_reader_name = Ident::new(format!("{}ArrayReader", name).as_str(), ast.ident.span());
+    let array_reader_name = Ident::new(format!("{}TreeBufArrayReader", name).as_str(), ast.ident.span());
     let fields = get_named_fields(&ast.data);
 
-    let reads = fields.iter().map(|(ident, ty)| {
-        let ident_str = format!("{}", ident);
+    let reads = fields.iter().map(|NamedField {ident, ty, canon_str}| {
         quote! {
             #ident: <#ty as tree_buf::internal::Readable>::read(
-                children.remove(#ident_str).unwrap_or_default()
+                children.remove(#canon_str).unwrap_or_default()
             )?,
         }
     });
 
-    let news = fields.iter().map(|(ident, _)| {
-        let ident_str = format!("{}", ident);
+    let news = fields.iter().map(|NamedField {ident, canon_str, ..}| {
         quote! {
-            #ident: tree_buf::internal::ReaderArray::new(children.remove(#ident_str).unwrap_or_default())?,
+            #ident: tree_buf::internal::ReaderArray::new(children.remove(#canon_str).unwrap_or_default())?,
         }
     });
 
-    let array_fields = fields.iter().map(|(ident, ty)| {
+    let array_fields = fields.iter().map(|NamedField {ident, ty, ..}| {
         quote! {
             #ident: <#ty as tree_buf::internal::Readable>::ReaderArray,
         }
     });
 
-    let read_nexts = fields.iter().map(|(ident, _)| {
+    let read_nexts = fields.iter().map(|NamedField {ident, ..}| {
         quote! {
             #ident: self.#ident.read_next()?,
         }
@@ -194,5 +197,19 @@ fn get_named_fields(data: &Data) -> NamedFields {
         _ => panic!("The struct must have named fields"),
     };
 
-    fields_named.named.iter().map(|field| (field.ident.as_ref().unwrap(), &field.ty)).collect()
+    fields_named.named.iter().map(|field| {
+        let ident = field.ident.as_ref().unwrap();
+        NamedField {
+            ident: field.ident.as_ref().unwrap(),
+            ty: &field.ty,
+            canon_str: canonical_ident(&ident),
+        }
+    }).collect()
+}
+
+// TODO: Document this
+// TODO: Ensure that leading separators are preserved?
+fn canonical_ident(ident: &Ident) -> String {
+    let ident_str = format!("{}", ident);
+    to_camel_case(&ident_str)
 }

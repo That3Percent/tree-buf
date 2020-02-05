@@ -50,6 +50,31 @@ fn make_item() -> Bits {
     }
 }
 
+
+#[test]
+fn bools_root() {
+    round_trip(&true, 1);
+    round_trip(&false, 1);
+}
+
+#[test]
+fn opts_root() {
+    round_trip(&Some(true), 1);
+    round_trip(&Option::<bool>::None, 1);
+}
+
+#[test]
+fn ints_root() {
+    round_trip(&0, 1);
+    round_trip(&1, 1);
+    for i in 2..=255 {
+        round_trip(&i, 2);
+    }
+    for i in 256..1024 {
+        round_trip(&i, 3);
+    }
+}
+
 // Special case for 1 element array encodes root object
 #[test]
 fn array1() {
@@ -80,14 +105,14 @@ fn array_tuple() {
 #[test]
 fn round_trip_item() {
     let item = make_item();
-    round_trip(&item, 147);
+    round_trip(&item, 146);
 }
 
 #[test]
 fn round_trip_item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 533);
+    round_trip(&item, 532);
 }
 
 #[test]

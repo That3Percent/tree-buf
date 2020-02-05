@@ -20,3 +20,24 @@ fn add_option_defaults_to_none() {
 
     serialize_eq(&Before { x: 1 }, &After { x: 1, y: None }, 4);
 }
+
+#[test]
+fn canonical_idents_compatible() {
+    #![allow(non_snake_case)]
+
+    #[derive(Read, Write, PartialEq, Debug)]
+    pub struct JavaScript {
+        myName: u64,
+    }
+
+    #[derive(Read, Write, PartialEq, Debug)]
+    pub struct Rust {
+        my_name: u64,
+    }
+
+    let js = &JavaScript { myName: 1 };
+    let rust = &Rust { my_name: 1 };
+
+    serialize_eq(js, rust, 9);
+    serialize_eq(rust, js, 9);
+}

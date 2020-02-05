@@ -19,3 +19,4 @@ proc-macro = true
 syn = "1.0.11"
 quote = "1.0.2"
 proc-macro2 = "1.0.6"
+Inflector = "0.11.4"
