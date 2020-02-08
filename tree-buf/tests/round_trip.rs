@@ -227,7 +227,7 @@ fn conversions() {
 #[test]
 fn small_structs() {
     #[derive(Read, Write, Default, Debug, PartialEq)]
-    pub struct _1 {
+    struct _1 {
         a: u64,
     }
 
@@ -237,7 +237,7 @@ fn small_structs() {
 #[test]
 fn large_structs() {
     #[derive(Read, Write, Default, Debug, PartialEq)]
-    pub struct _14 {
+    struct _14 {
         a: f64,
         b: f64,
         c: f64,
@@ -255,7 +255,7 @@ fn large_structs() {
     }
 
     #[derive(Read, Write, Default, Debug, PartialEq)]
-    pub struct _15 {
+    struct _15 {
         a: f64,
         b: f64,
         c: f64,
@@ -274,7 +274,7 @@ fn large_structs() {
     }
 
     #[derive(Read, Write, Default, Debug, PartialEq)]
-    pub struct _16 {
+    struct _16 {
         a: f64,
         b: f64,
         c: f64,
@@ -294,7 +294,7 @@ fn large_structs() {
     }
     // TODO: Match privacy in derive macro from struct deriving to writer impls
     #[derive(Read, Write, Default, Debug, PartialEq)]
-    pub struct _17 {
+    struct _17 {
         a: f64,
         b: f64,
         c: f64,
