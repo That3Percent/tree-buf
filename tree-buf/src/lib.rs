@@ -3,26 +3,42 @@ pub mod internal;
 
 pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
-    pub use {
-        crate::{read, write},
-        tree_buf_macros::{Read, Write},
-    };
+    
+    #[cfg(feature = "macros")]
+    pub use tree_buf_macros::{Read, Write};
+
+    #[cfg(feature = "read")]
+    pub use crate::read;
+
+    #[cfg(feature = "write")]
+    pub use crate::write;
 
     // This section makes everything interesting available to the rest of the crate
     // without bothering to manage imports.
-    pub(crate) use crate::{error::*, internal::*, primitive::*};
+    pub(crate) use crate::{internal::error::*, internal::*, };
 
+    #[cfg(feature = "read")]
     pub(crate) type ReadResult<T> = Result<T, ReadError>;
 }
 
+#[cfg(feature = "read")]
 pub use internal::error::ReadError;
-pub use prelude::*;
+
 // TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
 // That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
-use internal::encodings::varint::encode_suffix_varint;
-pub use internal::{Readable, Writable};
 
+#[cfg(feature = "read")]
+pub use internal::Readable;
+
+#[cfg(feature = "write")]
+pub use internal::Writable;
+
+pub use crate::prelude::*;
+
+#[cfg(feature = "write")]
 pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
+    use internal::encodings::varint::encode_suffix_varint;
+
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
     bytes.push(0);
@@ -37,6 +53,7 @@ pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
     bytes
 }
 
+#[cfg(feature = "read")]
 pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
     let sticks = read_root(bytes)?;
     T::read(sticks)

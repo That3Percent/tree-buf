@@ -1,9 +1,11 @@
 pub mod delta;
 pub mod packed_bool;
 pub mod varint;
-use crate::encodings::varint::size_for_varint;
+#[cfg(feature = "write")]
+use crate::internal::encodings::varint::size_for_varint;
 use crate::prelude::*;
 
+#[cfg(feature = "write")]
 fn compress<'a, 'b: 'a, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b [&'b dyn Compressor<'a, Data = T>]) -> usize {
     // Skip the whole bit about approximating the cost if there's just one.
     if compressors.len() == 1 {
@@ -47,6 +49,7 @@ fn compress<'a, 'b: 'a, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b 
     panic!("Missing infallable compressor for type");
 }
 
+#[cfg(feature = "write")]
 pub(crate) trait Compressor<'a> {
     type Data;
     /// If it's possible to figure out how big the data will be without
@@ -57,7 +60,10 @@ pub(crate) trait Compressor<'a> {
     fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<(), ()>;
 }
 
+#[cfg(feature = "write")]
 pub(crate) struct Utf8Compressor;
+
+#[cfg(feature = "write")]
 impl<'a> Compressor<'a> for Utf8Compressor {
     type Data = &'a str;
     fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
@@ -73,6 +79,7 @@ impl<'a> Compressor<'a> for Utf8Compressor {
     }
 }
 
+#[cfg(feature = "read")]
 /// Reads all items from some byte aligned encoding
 pub fn read_all<T>(bytes: &[u8], f: impl Fn(&[u8], &mut usize) -> ReadResult<T>) -> ReadResult<Vec<T>> {
     let mut offset = 0;
@@ -90,6 +97,7 @@ pub fn read_all<T>(bytes: &[u8], f: impl Fn(&[u8], &mut usize) -> ReadResult<T>)
 mod tests {
     use super::*;
     use std::fmt::Debug;
+    #[cfg(all(feature = "read", feature = "write"))]
     pub fn round_trip<T: Copy + PartialEq + Debug>(data: &[T], encoder: impl Fn(T, &mut Vec<u8>), decoder: impl Fn(&[u8], &mut usize) -> ReadResult<T>) -> ReadResult<()> {
         let mut bytes = Vec::new();
         for value in data.iter() {

@@ -3,11 +3,13 @@ use std::convert::TryInto;
 use std::mem::size_of;
 use std::vec::IntoIter;
 
+#[cfg(feature = "write")]
 fn write_64(item: f64, bytes: &mut Vec<u8>) {
     let b = item.to_le_bytes();
     bytes.extend_from_slice(&b);
 }
 
+#[cfg(feature = "read")]
 fn read_64(bytes: &[u8], offset: &mut usize) -> ReadResult<f64> {
     let bytes = read_bytes(size_of::<f64>(), bytes, offset)?;
     // This unwrap is ok, because we just read exactly size_of::<f64> bytes on the line above.
@@ -18,7 +20,7 @@ fn read_64(bytes: &[u8], offset: &mut usize) -> ReadResult<f64> {
 // A useful starting point is that all possible down-cast through up-cast round trips
 // must preserve bit-for-bit the original value. That's not quite enough though, since this
 // is true for some values due to saturating rounding that one wouldn't want to downcast.
-
+#[cfg(feature = "write")]
 impl<'a> Writable<'a> for f64 {
     type WriterArray = Vec<f64>;
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
@@ -45,6 +47,7 @@ impl<'a> Writable<'a> for f64 {
     }
 }
 
+#[cfg(feature = "read")]
 impl Readable for f64 {
     type ReaderArray = IntoIter<f64>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -86,6 +89,7 @@ impl Readable for f64 {
     }
 }
 
+#[cfg(feature = "read")]
 impl ReaderArray for IntoIter<f64> {
     type Read = f64;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
@@ -110,6 +114,7 @@ impl ReaderArray for IntoIter<f64> {
     }
 }
 
+#[cfg(feature = "write")]
 impl<'a> WriterArray<'a> for Vec<f64> {
     type Write = f64;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {

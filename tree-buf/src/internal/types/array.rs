@@ -1,7 +1,9 @@
-use crate::encodings::varint::encode_prefix_varint;
+#[cfg(feature = "write")]
+use crate::internal::encodings::varint::encode_prefix_varint;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
+#[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
     type WriterArray = VecArrayWriter<'a, T::WriterArray>;
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
@@ -42,6 +44,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
     }
 }
 
+#[cfg(feature = "read")]
 impl<T: Readable> Readable for Vec<T> {
     type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -71,6 +74,7 @@ impl<T: Readable> Readable for Vec<T> {
     }
 }
 
+#[cfg(feature = "write")]
 #[derive(Debug, Default)]
 pub struct VecArrayWriter<'a, T> {
     // TODO: usize
@@ -79,11 +83,13 @@ pub struct VecArrayWriter<'a, T> {
     values: Option<T>,
 }
 
+#[cfg(feature = "read")]
 pub struct VecArrayReader<T> {
     len: IntoIter<usize>,
     values: T,
 }
 
+#[cfg(feature = "write")]
 impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     type Write = Vec<T::Write>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
@@ -119,6 +125,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     }
 }
 
+#[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     type Read = Vec<T::Read>;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

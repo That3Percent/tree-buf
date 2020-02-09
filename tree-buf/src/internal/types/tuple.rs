@@ -16,6 +16,7 @@ macro_rules! tuple_index {
 
 macro_rules! impl_tuple {
     ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+) => {
+        #[cfg(feature = "write")]
         impl <'a, $($ts: Writable<'a>),+> Writable<'a> for ($($ts),+) {
             type WriterArray=($($ts::WriterArray),+);
             fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
@@ -29,6 +30,7 @@ macro_rules! impl_tuple {
             }
         }
 
+        #[cfg(feature = "write")]
         impl<'a, $($ts: WriterArray<'a>),+> WriterArray<'a> for ($($ts),+) {
             type Write=($($ts::Write),+);
             fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
@@ -48,6 +50,7 @@ macro_rules! impl_tuple {
             }
         }
 
+        #[cfg(feature = "read")]
         impl <$($ts: Readable),+> Readable for ($($ts),+) {
             type ReaderArray=($($ts::ReaderArray),+);
             fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -68,6 +71,7 @@ macro_rules! impl_tuple {
             }
         }
 
+        #[cfg(feature = "read")]
         impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+) {
             type Read=($($ts::Read),+);
             fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

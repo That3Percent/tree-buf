@@ -2,6 +2,7 @@ use crate::internal::encodings::packed_bool::*;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
+#[cfg(feature = "write")]
 impl<'a> Writable<'a> for bool {
     type WriterArray = Vec<bool>;
     fn write_root<'b: 'a>(value: &'b Self, _bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
@@ -13,6 +14,7 @@ impl<'a> Writable<'a> for bool {
     }
 }
 
+#[cfg(feature = "read")]
 impl Readable for bool {
     type ReaderArray = IntoIter<bool>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -23,6 +25,7 @@ impl Readable for bool {
     }
 }
 
+#[cfg(feature = "write")]
 impl<'a> WriterArray<'a> for Vec<bool> {
     type Write = bool;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
@@ -36,6 +39,7 @@ impl<'a> WriterArray<'a> for Vec<bool> {
     }
 }
 
+#[cfg(feature = "read")]
 impl ReaderArray for IntoIter<bool> {
     type Read = bool;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

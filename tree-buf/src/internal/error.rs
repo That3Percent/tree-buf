@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 // These are mainly useful for debugging when writing the format
 // and probably isn't useful to the public API.
+#[cfg(feature = "read")]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InvalidFormat {
     UnrecognizedTypeId,
@@ -10,12 +11,14 @@ pub enum InvalidFormat {
     EndOfFile,
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReadError {
     SchemaMismatch,
     InvalidFormat(InvalidFormat),
 }
 
+#[cfg(feature = "read")]
 impl Display for ReadError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -33,8 +36,10 @@ impl Display for ReadError {
     }
 }
 
+#[cfg(feature = "read")]
 impl std::error::Error for ReadError {}
 
+#[cfg(feature = "read")]
 impl From<std::str::Utf8Error> for ReadError {
     fn from(value: std::str::Utf8Error) -> Self {
         ReadError::InvalidFormat(InvalidFormat::Utf8Error(value))

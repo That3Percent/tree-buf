@@ -1,3 +1,4 @@
+#[cfg(feature = "write")]
 pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     let mut offset = 0;
     while offset + 7 < items.len() {
@@ -22,6 +23,7 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     }
 }
 
+#[cfg(feature = "read")]
 pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
     // TODO: This actually may get the wrong length, taking more bools then necessary.
     // This doesn't currently present a problem though.
@@ -47,6 +49,7 @@ pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
 mod tests {
     use super::*;
 
+    #[cfg(all(read,write))]
     #[test]
     fn round_trip_packed_bool() {
         let cases = vec![

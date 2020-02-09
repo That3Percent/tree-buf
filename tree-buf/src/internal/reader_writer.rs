@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+#[cfg(feature = "write")]
 pub trait Writable<'a>: Sized {
     type WriterArray: WriterArray<'a, Write = Self>;
     // At the root level, there is no need to buffer/flush, just write. By not buffering, we may
@@ -9,17 +10,20 @@ pub trait Writable<'a>: Sized {
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId;
 }
 
+#[cfg(feature = "read")]
 pub trait Readable: Sized {
     type ReaderArray: ReaderArray<Read = Self>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self>;
 }
 
+#[cfg(feature = "write")]
 pub trait WriterArray<'a>: Default {
     type Write: Writable<'a>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write);
     fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId;
 }
 
+#[cfg(feature = "read")]
 pub trait ReaderArray: Sized {
     type Read;
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.

@@ -23,6 +23,7 @@ pub use array_branch::*;
 //
 // Note that the object model may be just defined in terms of eg: Number, where Number is the sum type of F64, u64, and i64 with downcasts.
 
+#[cfg(feature = "read")]
 pub fn read_root(bytes: &[u8]) -> ReadResult<DynRootBranch<'_>> {
     if bytes.len() == 0 {
         return Ok(DynRootBranch::Void);
@@ -45,11 +46,13 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "read")]
     #[test]
     fn all_root_type_ids() {
         convert_all::<RootTypeId>();
     }
 
+    #[cfg(feature = "read")]
     #[test]
     fn all_array_type_ids() {
         convert_all::<ArrayTypeId>();

@@ -1,6 +1,8 @@
+#[cfg(feature = "read")]
 use crate::internal::encodings::packed_bool::decode_packed_bool;
 use crate::prelude::*;
 
+#[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
     type WriterArray = NullableWriter<'a, T::WriterArray>;
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
@@ -12,6 +14,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
     }
 }
 
+#[cfg(feature = "read")]
 impl<T: Readable> Readable for Option<T> {
     type ReaderArray = Option<NullableReader<T::ReaderArray>>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -22,12 +25,14 @@ impl<T: Readable> Readable for Option<T> {
     }
 }
 
+#[cfg(feature = "write")]
 #[derive(Default)]
 pub struct NullableWriter<'a, V> {
     opt: <bool as Writable<'a>>::WriterArray,
     value: Option<V>,
 }
 
+#[cfg(feature = "write")]
 impl<'a, T: WriterArray<'a>> WriterArray<'a> for NullableWriter<'a, T> {
     type Write = Option<T::Write>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
@@ -51,11 +56,13 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for NullableWriter<'a, T> {
     }
 }
 
+#[cfg(feature = "read")]
 pub struct NullableReader<T> {
     opts: <bool as Readable>::ReaderArray,
     values: T,
 }
 
+#[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
     type Read = Option<T::Read>;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

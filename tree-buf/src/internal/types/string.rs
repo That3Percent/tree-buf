@@ -1,4 +1,4 @@
-use crate::encodings::varint::{decode_prefix_varint, encode_prefix_varint};
+use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
@@ -7,21 +7,25 @@ use std::vec::IntoIter;
 // be compared and usually not displayed we can do bit-for-bit comparisons
 // (Make sure that's true for SCSU, which may allow multiple encodings!)
 
-// TODO: Move this to BatchData
+#[cfg(feature = "write")]
 pub fn write_str(value: &str, bytes: &mut Vec<u8>) {
     encode_prefix_varint(value.len() as u64, bytes);
     bytes.extend_from_slice(value.as_bytes());
 }
 
+#[cfg(feature = "read")]
 fn read_str_len<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
     let utf8 = read_bytes(len, bytes, offset)?;
     Ok(std::str::from_utf8(utf8)?)
 }
+
+#[cfg(feature = "read")]
 pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
     let len = decode_prefix_varint(bytes, offset)? as usize;
     read_str_len(len, bytes, offset)
 }
 
+#[cfg(feature = "write")]
 impl<'a> Writable<'a> for String {
     type WriterArray = Vec<&'a str>;
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
@@ -50,6 +54,7 @@ impl<'a> Writable<'a> for String {
     }
 }
 
+#[cfg(feature = "write")]
 impl<'a> WriterArray<'a> for Vec<&'a str> {
     type Write = String;
 
@@ -68,6 +73,7 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
     }
 }
 
+#[cfg(feature = "read")]
 impl Readable for String {
     // TODO: Use lifetimes to make this read lazy rather than IntoIter
     type ReaderArray = IntoIter<String>;
@@ -79,6 +85,7 @@ impl Readable for String {
     }
 }
 
+#[cfg(feature = "read")]
 impl ReaderArray for IntoIter<String> {
     type Read = String;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

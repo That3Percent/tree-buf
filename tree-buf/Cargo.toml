@@ -13,9 +13,16 @@ license = "MIT"
 maintenance = { status = "experimental"}
 
 [dependencies]
-tree-buf-macros = {version = "0.5.0", path="../tree-buf-macros" }
+tree-buf-macros = {version = "0.5.0", path="../tree-buf-macros", optional = true }
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rmp-serde = "0.14.0"
+
+[features]
+default = ["read", "write", "macros"]
+
+read = []
+write = []
+macros = ["tree-buf-macros"]

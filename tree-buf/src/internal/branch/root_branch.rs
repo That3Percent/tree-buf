@@ -1,8 +1,52 @@
+#[cfg(feature = "read")]
 use crate::internal::encodings::varint::decode_prefix_varint;
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
+// TODO: Most of these comments are likely out of date.
+// TODO: The idea for int is to always encode up to 64 bit values,
+// but for any data store the min value and offset first, then use
+// that to select an optimal encoding. When deserializing, the min and
+// offset can be used to find if the data type required by the schema
+// matches.
+// Consider something like this - https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
+
+// TODO: Bytes = [u8]
+// TODO: Date
+// TODO: Enum - Something like this... needs to simmer.
+//              The enum primitive id contains 1 number which is the discriminant count.
+//              The enum discriminant as int is contained in the enum branch
+//              Each sub-branch contains the discriminant name (string)
+//              Each branch may have a sub-branch for data belonging to the variant for that discriminant in each entry.
+//              In many cases, this data will be Void, which may be wasteful to have a branch for.
+//              ..
+//              Because enum is so flexible, it's possible to wrap some dynamic data into it. Eg: EnumValue<T>.
+//              This would create some number of sub-branches 'dynamically'.
+
+// Total slots: 256
+// TODO: Try each compression on a sample of the data (first 1024 or so?) in turn to decide which to use.
+// 1-Reserved for adding features
+// 16-Object & Fields
+// 16-Tuple & Fields
+// 8-Array & different fixed/variable sizes - 0,1,2,128,custom(follows). Fixed 0 necessarily has Void child
+// ? Integer - Different for array context or not? Min/Max? Different encoding options? (uncompressed option) signed, unsigned, 8,16,32,64
+// ?-Enum - String,Int, or other discriminant, whether or not there is data for sub-branches, and whether
+// 1-Nullable
+// 1-Boolean
+// 4-Float (32/64, compresssed/not) Consider:
+//      dfcm - https://userweb.cs.txstate.edu/~mb92/papers/dcc06.pdf
+//      https://www.cs.unc.edu/~isenburg/lcpfpv/
+//      https://akumuli.org/akumuli/2017/02/05/compression_part2/
+//      Consider an 'allow-lossy' flag (per field) or input trait
+// 1-Void
+// 2-String - compressed, uncompressed
+// 1-128 bits
+// 2-Blob - compressed, uncompressed
+// 1-magic number (preamble)
+
+
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
     Object { children: HashMap<&'a str, DynRootBranch<'a>> },
@@ -17,6 +61,7 @@ pub enum DynRootBranch<'a> {
     String(&'a str),
 }
 
+#[cfg(feature = "read")]
 pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
     let id = RootTypeId::read_next(bytes, offset)?;
 
@@ -124,19 +169,21 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
     Ok(branch)
 }
 
+#[cfg(feature = "read")]
 impl<'a> Default for DynRootBranch<'a> {
     fn default() -> Self {
         DynRootBranch::Void
     }
 }
 
-// TODO: For RootInteger just have 3 bits for 8 possibilities.
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum RootInteger {
     S(i64),
     U(u64),
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum RootTypeId {
     // Constructions
@@ -203,6 +250,7 @@ pub enum RootTypeId {
     Str, // Str0 = Empty string, Str1-Str3 get unit abbreviations, like ft or ft²
 }
 
+#[cfg(feature = "read")]
 impl RootTypeId {
     // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
     fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
@@ -212,6 +260,7 @@ impl RootTypeId {
     }
 }
 
+#[cfg(feature = "read")]
 impl TryFrom<u8> for RootTypeId {
     type Error = ReadError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -274,6 +323,7 @@ impl TryFrom<u8> for RootTypeId {
     }
 }
 
+#[cfg(feature = "read")]
 impl From<RootTypeId> for u8 {
     fn from(value: RootTypeId) -> Self {
         use RootTypeId::*;
@@ -332,6 +382,7 @@ impl From<RootTypeId> for u8 {
     }
 }
 
+#[cfg(feature = "read")]
 impl RootInteger {
     #[inline(always)]
     pub fn new(bytes: &[u8], offset: &mut usize, len: usize, signed: bool) -> ReadResult<Self> {
@@ -351,6 +402,7 @@ impl RootInteger {
     }
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum RootFloat {
     F64(f64),

@@ -1,7 +1,8 @@
-use crate::encodings::varint::*;
+use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
+#[cfg(feature = "write")]
 fn write_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     let le = value.to_le_bytes();
     match value {
@@ -42,6 +43,7 @@ fn write_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
+#[cfg(feature = "write")]
 impl<'a> Writable<'a> for u64 {
     type WriterArray = Vec<u64>;
     fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
@@ -49,6 +51,7 @@ impl<'a> Writable<'a> for u64 {
     }
 }
 
+#[cfg(feature = "read")]
 impl Readable for u64 {
     type ReaderArray = IntoIter<u64>;
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
@@ -65,6 +68,7 @@ impl Readable for u64 {
     }
 }
 
+#[cfg(feature = "write")]
 impl<'a> WriterArray<'a> for Vec<u64> {
     type Write = u64;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
@@ -80,6 +84,7 @@ impl<'a> WriterArray<'a> for Vec<u64> {
     }
 }
 
+#[cfg(feature = "read")]
 impl ReaderArray for IntoIter<u64> {
     type Read = u64;
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {

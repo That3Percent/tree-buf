@@ -1,14 +1,16 @@
-use crate::encodings::varint::{decode_prefix_varint, decode_suffix_varint};
+use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum ArrayFloat<'a> {
     F64(&'a [u8]),
     F32(&'a [u8]),
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum DynArrayBranch<'a> {
     Object { children: HashMap<&'a str, DynArrayBranch<'a>> },
@@ -28,6 +30,7 @@ pub enum DynArrayBranch<'a> {
     // Dynamic(&'a [u8]),
 }
 
+#[cfg(feature = "read")]
 pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
     let id = ArrayTypeId::read_next(bytes, offset)?;
 
@@ -120,12 +123,14 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
     Ok(branch)
 }
 
+#[cfg(feature = "read")]
 impl<'a> Default for DynArrayBranch<'a> {
     fn default() -> Self {
         DynArrayBranch::Void
     }
 }
 
+#[cfg(feature = "read")]
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum ArrayTypeId {
     // Constructions
@@ -165,6 +170,7 @@ pub enum ArrayTypeId {
     Utf8,
 }
 
+#[cfg(feature = "read")]
 impl ArrayTypeId {
     // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
     fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<ArrayTypeId> {
@@ -174,6 +180,7 @@ impl ArrayTypeId {
     }
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub struct ArrayInteger<'a> {
     pub bytes: &'a [u8],
@@ -182,12 +189,14 @@ pub struct ArrayInteger<'a> {
     pub encoding: ArrayIntegerEncoding,
 }
 
+#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum ArrayIntegerEncoding {
     PrefixVarInt,
     Simple16,
 }
 
+#[cfg(feature = "read")]
 impl TryFrom<u8> for ArrayTypeId {
     type Error = ReadError;
     fn try_from(value: u8) -> ReadResult<Self> {
@@ -226,6 +235,7 @@ impl TryFrom<u8> for ArrayTypeId {
     }
 }
 
+#[cfg(feature = "read")]
 impl From<ArrayTypeId> for u8 {
     fn from(value: ArrayTypeId) -> Self {
         use ArrayTypeId::*;
