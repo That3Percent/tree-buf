@@ -1,6 +1,9 @@
 use crate::internal::encodings::varint::*;
+use crate::internal::encodings::compress;
 use crate::prelude::*;
 use std::vec::IntoIter;
+use std::convert::TryInto;
+use simple_16::compress as compress_simple_16;
 
 #[cfg(feature = "write")]
 fn write_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -43,30 +46,99 @@ fn write_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
-#[cfg(feature = "write")]
-impl<'a> Writable<'a> for u64 {
-    type WriterArray = Vec<u64>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
-        write_uint(*value, bytes)
-    }
-}
+// ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+)
 
-#[cfg(feature = "read")]
-impl Readable for u64 {
-    type ReaderArray = IntoIter<u64>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
-        match sticks {
-            DynRootBranch::Integer(root_int) => {
-                match root_int {
-                    RootInteger::U(v) => Ok(v),
-                    // TODO: Try to convert if allowed
+macro_rules! impl_uint {
+    ($t:ty) => {
+        #[cfg(feature = "write")]
+        impl<'a> Writable<'a> for $t {
+            type WriterArray = Vec<$t>;
+            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+                write_uint(*value as u64, bytes)
+            }
+        }
+
+        #[cfg(feature = "read")]
+        impl Readable for $t {
+            type ReaderArray = IntoIter<$t>;
+            fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+                match sticks {
+                    DynRootBranch::Integer(root_int) => {
+                        match root_int {
+                            RootInteger::U(v) => v.try_into().map_err(|_| ReadError::SchemaMismatch),
+                            _ => Err(ReadError::SchemaMismatch),
+                        }
+                    }
                     _ => Err(ReadError::SchemaMismatch),
                 }
             }
-            _ => Err(ReadError::SchemaMismatch),
+        }
+    };
+}
+
+
+impl_uint!(u64);
+
+struct PrefixVarIntCompressor<T> {
+    _marker: std::marker::PhantomData<*const T>
+}
+
+impl<T: Into<u64> + Copy> PrefixVarIntCompressor<T> {
+    pub fn new() -> Self {
+        Self {
+            _marker: Default::default(),
         }
     }
 }
+
+impl<T: Into<u64> + Copy> Compressor<'_> for PrefixVarIntCompressor<T> {
+    type Data = T;
+    fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+        let mut size = 0;
+        for item in data {
+            size += size_for_varint((*item).into());
+        }
+        Some(size)
+    }
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        for item in data {
+            encode_prefix_varint((*item).into(), bytes);
+        }
+        Ok(ArrayTypeId::IntPrefixVar)
+    }
+}
+
+struct Simple16Compressor<T> {
+    _marker: std::marker::PhantomData<*const T>
+}
+
+impl<T: TryInto<u64> + Copy> Simple16Compressor<T> {
+    pub fn new() -> Self {
+        Self {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T: TryInto<u32> + Copy> Compressor<'_> for Simple16Compressor<T> {
+    type Data = T;
+    
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        // TODO: Use second-stack.
+        // TODO: This just copies to another Vec in the case where T is u64
+        let mut v = Vec::new();
+        for item in data {
+            let item = *item;
+            let item = item.try_into().map_err(|_| ())?;
+            v.push(item);
+        }
+
+        compress_simple_16(&v, bytes).map_err(|_| ())?;
+
+        Ok(ArrayTypeId::IntSimple16)
+    }
+}
+
 
 #[cfg(feature = "write")]
 impl<'a> WriterArray<'a> for Vec<u64> {
@@ -76,11 +148,14 @@ impl<'a> WriterArray<'a> for Vec<u64> {
     }
     fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
         let start = bytes.len();
-        for item in self {
-            encode_prefix_varint(item, bytes);
-        }
+        // TODO: Remove allocations
+        let compressors: Vec<Box<dyn Compressor<Data=u64>>> = vec![
+            Box::new(PrefixVarIntCompressor::new()),
+            Box::new(Simple16Compressor::new()),
+        ];
+        let type_id = compress(&self, bytes, &compressors);
         lens.push(bytes.len() - start);
-        ArrayTypeId::IntPrefixVar
+        type_id
     }
 }
 
@@ -97,7 +172,12 @@ impl ReaderArray for IntoIter<u64> {
                         let v = read_all(bytes, decode_prefix_varint)?;
                         Ok(v.into_iter())
                     }
-                    _ => todo!(),
+                    ArrayIntegerEncoding::Simple16 => {
+                        let mut v = Vec::new();
+                        simple_16::decompress(bytes, &mut v).map_err(|_| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
+                        let v: Vec<_> = v.into_iter().map(Into::<u64>::into).collect();
+                        Ok(v.into_iter())
+                    }
                 }
             }
             // TODO: Simple16 is infallable.
@@ -108,3 +188,7 @@ impl ReaderArray for IntoIter<u64> {
         self.next().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::ShortArray))
     }
 }
+
+
+// TODO: Bitpacking https://crates.io/crates/bitpacking
+// TODO: Mayda https://crates.io/crates/mayda

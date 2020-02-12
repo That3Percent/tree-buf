@@ -6,21 +6,19 @@ use crate::internal::encodings::varint::size_for_varint;
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
-fn compress<'a, 'b: 'a, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b [&'b dyn Compressor<'a, Data = T>]) -> usize {
-    // Skip the whole bit about approximating the cost if there's just one.
-    if compressors.len() == 1 {
-        (&compressors[0]).compress(data, bytes).unwrap();
-        return 0;
-    }
+pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b [Box<dyn Compressor<'a, Data = T>>]) -> ArrayTypeId {
+    // If there aren't multiple compressors, no need to be dynamic
+    debug_assert!(compressors.len() > 1);
+
     let restore_point = bytes.len();
-    let sample_size = bytes.len().min(512);
+    let sample_size = data.len().min(512);
     let sample = &data[..sample_size];
 
     // Rank compressors by how well they do on a sample of the data
-    // TODO: Use second_stack
+    // TODO: Use second-stack
     let mut by_size = Vec::new();
     for i in 0..compressors.len() {
-        let compressor = compressors[i];
+        let compressor = &compressors[i];
         if let Some(size) = compressor.fast_size_for(sample) {
             by_size.push((i, size));
         } else {
@@ -37,9 +35,9 @@ fn compress<'a, 'b: 'a, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b 
 
     // Return the first compressor that succeeds
     for ranked in by_size.iter() {
-        let compressor = compressors[ranked.0];
-        if compressor.compress(data, bytes).is_ok() {
-            return ranked.0;
+        let compressor = &compressors[ranked.0];
+        if let Ok(ok) = compressor.compress(data, bytes) {
+            return ok;
         }
         // If the compressor failed, clear out whatever it wrote to try again.
         bytes.truncate(restore_point);
@@ -57,7 +55,7 @@ pub(crate) trait Compressor<'a> {
     fn fast_size_for(&self, _data: &[Self::Data]) -> Option<usize> {
         None
     }
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<(), ()>;
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()>;
 }
 
 #[cfg(feature = "write")]
@@ -74,7 +72,7 @@ impl<'a> Compressor<'a> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<(), ()> {
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         todo!();
     }
 }

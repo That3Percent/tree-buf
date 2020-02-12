@@ -16,6 +16,12 @@ pub trait Readable: Sized {
     fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self>;
 }
 
+// TODO: Introduce a separate "Scratch" type to make eg: WriterArray re-usable.
+// The scratch type would be passed to write, so it needs to be for Writable (root)
+// Since not all root types have array children, some of these structs will be empty.
+// To some degree it is possible to know about re-use for fields of the same type, reducing
+// allocations further.
+
 #[cfg(feature = "write")]
 pub trait WriterArray<'a>: Default {
     type Write: Writable<'a>;

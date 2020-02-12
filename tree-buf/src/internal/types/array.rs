@@ -85,7 +85,8 @@ pub struct VecArrayWriter<'a, T> {
 
 #[cfg(feature = "read")]
 pub struct VecArrayReader<T> {
-    len: IntoIter<usize>,
+    // TODO: usize
+    len: IntoIter<u64>,
     values: T,
 }
 
@@ -114,9 +115,13 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
             let type_id = values.flush(bytes, lens);
             debug_assert_ne!(type_id, ArrayTypeId::Void); // If this is Void, it's ambigous
             bytes[type_index] = type_id.into();
-            // Array knows it's own type id, so drop it.
+
+            // TODO: Maybe combine the permutations of valid int compressors here with ArrayVar to save a byte
+            // here every time. Eg: ArrayVarSimple16 ArrayVarIntPrefixVar
+            let type_index = bytes.len();
+            bytes.push(0);
             let len_type_id = len.flush(bytes, lens);
-            debug_assert_eq!(len_type_id, ArrayTypeId::IntPrefixVar);
+            bytes[type_index] = len_type_id.into();
         } else {
             bytes.push(ArrayTypeId::Void.into())
         }
@@ -133,7 +138,7 @@ impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {
                 let values = T::new(*values)?;
-                let len = read_all(len, read_usize)?.into_iter();
+                let len = <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len)?;
                 Ok(Some(VecArrayReader { len, values }))
             }
             _ => Err(ReadError::SchemaMismatch),
@@ -142,7 +147,7 @@ impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     fn read_next(&mut self) -> ReadResult<Self::Read> {
         if let Some(inner) = self {
             let len = inner.len.read_next()?;
-            let mut result = Vec::with_capacity(len);
+            let mut result = Vec::with_capacity(len as usize);
             for _ in 0..len {
                 result.push(inner.values.read_next()?);
             }

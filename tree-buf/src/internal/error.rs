@@ -9,6 +9,7 @@ pub enum InvalidFormat {
     ShortArray,
     Utf8Error(std::str::Utf8Error),
     EndOfFile,
+    DecompressionError,
 }
 
 #[cfg(feature = "read")]
@@ -30,6 +31,7 @@ impl Display for ReadError {
                     InvalidFormat::ShortArray => f.write_str("The array did not contain enough elements"),
                     InvalidFormat::EndOfFile => f.write_str("Attempted to read beyond the end of the file"),
                     InvalidFormat::Utf8Error(inner) => std::fmt::Display::fmt(inner, f),
+                    InvalidFormat::DecompressionError => f.write_str("A decompression failed"),
                 }
             }
         }

@@ -208,8 +208,13 @@ fn get_named_fields(data: &Data) -> NamedFields {
     }).collect()
 }
 
-// TODO: Document this
+// TODO: Semantically this is a sequence of case-folded canonically encoded utf-8 words (though, this is not quite implemented as such here)
+// This is prime for some kind of dictionary compression. Most applications won't ever need to ship the dictionary since it only
+// would happen in the proc-macro, except when introspection is required. (Reader for example just compares byte arrays)
+// or compression, and that can just happen in the proc-macro.
 // TODO: Ensure that leading separators are preserved?
+// TODO: Unfortunately, the current method is quite inadequate. Consider a language with no case. Consider a letter 'q' having
+// neither uppercase nor lowercase. qq vs q_q is different. But, in this encoding they are the same.
 fn canonical_ident(ident: &Ident) -> String {
     let ident_str = format!("{}", ident);
     to_camel_case(&ident_str)
