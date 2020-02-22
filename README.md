@@ -168,9 +168,9 @@ Comparison of compression results to other formats
 
 Let's compare these results to another popular binary format, Protobuf 3, to see the difference caused by this accumulation of many small wins. For now, let's only consider the moves vector since that's the largest portion of the data. Each move in Protobuf is a message. Each message in Protobuf is length delimited, requiring 1 byte. After the first 2 minutes and 7 seconds of the game clock, each `time_seconds` requires 2 bytes for the LEB128 encoded value and 1 byte for the field id - 3 bytes. For the coordinate field, we can cheat and implement this using a packed array. That doesn't exactly match the data model, but would require fewer bytes than an embedded message. A packed array requires 1 byte for the field id, 1 byte for the length prefix, and 1 byte each for the two values. Add these together, and you get 7 bytes per move, or 56 bits.
 
-Depending on the game, Tree-buf may require on average only 14 bits per move. ~3 bits each for the coordinate deltas, plus ~8 bits or less for time deltas of up to 2 minutes, 7 seconds. That is to say, the moves list requires about 4 times as much space in Protobuf 3 as compared to Tree-buf (14 bits * 4 = 56 bits).
+Depending on the game, Tree-buf may require on average only 17 bits per move. ~4.5 bits each for the coordinate deltas, plus ~8 bits or less for time deltas of up to 2 minutes, 7 seconds. That is to say, the moves list requires about 3.3 times as much space in Protobuf 3 as compared to Tree-buf (17 bits * 3.3 = 56 bits).
 
-As compared to JSON? With 14 bits per move we can get... `"t`. Actually that went over budget a bit and took 16 bits. Didn't quite make it as far as `"time_seconds":`. The complete, minified move requires a whopping 336 bits, 24 times as much as Tree-buf.
+As compared to JSON? With 17 bits per move we can get... `"t` - Not quite `"time_seconds":`. The complete, minified move requires a whopping 336 bits, 19 times as much as Tree-buf.
 
 # Other tricks
 
