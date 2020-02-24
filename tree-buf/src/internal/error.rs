@@ -6,6 +6,9 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InvalidFormat {
     UnrecognizedTypeId,
+    // TODO: Consider removing this. Without it, non-default values on the tail
+    // end of the array need not be serialized. It also may require less branching
+    // so that the code run faster if a caller to read() can always expect a value.
     ShortArray,
     Utf8Error(std::str::Utf8Error),
     EndOfFile,

@@ -15,6 +15,7 @@ maintenance = { status = "experimental"}
 [dependencies]
 tree-buf-macros = {version = "0.5.0", path="../tree-buf-macros", optional = true }
 simple-16 = { path="../../simple-16" }
+num-traits = "0.2.11"
 
 [features]
 default = ["read", "write", "macros"]

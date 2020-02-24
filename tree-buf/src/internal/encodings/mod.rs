@@ -7,8 +7,11 @@ use crate::prelude::*;
 
 #[cfg(feature = "write")]
 pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b [Box<dyn Compressor<'a, Data = T>>]) -> ArrayTypeId {
-    // If there aren't multiple compressors, no need to be dynamic
-    debug_assert!(compressors.len() > 1);
+    // TODO: If there aren't multiple compressors, no need to be dynamic
+    // debug_assert!(compressors.len() > 1);
+    if compressors.len() == 1 {
+        return compressors[0].compress(data, bytes).unwrap();
+    }
 
     let restore_point = bytes.len();
     let sample_size = data.len().min(512);

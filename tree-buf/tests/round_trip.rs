@@ -49,7 +49,6 @@ fn make_item() -> Bits {
     }
 }
 
-
 #[test]
 fn bools_root() {
     round_trip(&true, 1);
@@ -64,12 +63,12 @@ fn opts_root() {
 
 #[test]
 fn ints_root() {
-    round_trip(&0, 1);
-    round_trip(&1, 1);
-    for i in 2..=255 {
+    round_trip(&0u32, 1);
+    round_trip(&1u32, 1);
+    for i in 2..=255u32 {
         round_trip(&i, 2);
     }
-    for i in 256..1024 {
+    for i in 256..1024u32 {
         round_trip(&i, 3);
     }
 }
@@ -98,7 +97,7 @@ fn nested_float_vec() {
 
 #[test]
 fn array_tuple() {
-    round_trip(&vec![vec![(1, 2), (3, 4), (5, 6)]], 14);
+    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14);
 }
 
 #[test]
@@ -116,25 +115,24 @@ fn round_trip_item_vec() {
 
 #[test]
 fn nullable_array() {
-    round_trip(&vec![Some(1), Some(2)], 9);
+    round_trip(&vec![Some(1u32), Some(2)], 9);
 }
-
 
 #[test]
 fn visibility_modifiers() {
     #[derive(Default, Read, Write, Debug, PartialEq)]
     struct Inherited {
-        a: u64
+        a: u64,
     }
 
     #[derive(Default, Read, Write, Debug, PartialEq)]
     pub(crate) struct Crate {
-        a: u64
+        a: u64,
     }
 
     #[derive(Default, Read, Write, Debug, PartialEq)]
     pub struct Public {
-        a: u64
+        a: u64,
     }
 
     round_trip_default::<Inherited>(4);
