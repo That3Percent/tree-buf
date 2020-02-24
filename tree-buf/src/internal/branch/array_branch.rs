@@ -36,13 +36,9 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
 
     use ArrayTypeId::*;
 
-
     fn read_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> ReadResult<DynArrayBranch<'a>> {
         let bytes = read_bytes_from_len(bytes, offset, lens)?;
-        Ok(DynArrayBranch::Integer(ArrayInteger {
-            bytes,
-            encoding
-        }))
+        Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 
     fn read_bytes_from_len<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<&'a [u8]> {
@@ -113,12 +109,8 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         Obj8 => read_obj(8, bytes, offset, lens)?,
         ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         Boolean => todo!(),
-        IntSimple16 => {
-            read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?
-        },
-        IntPrefixVar => {
-            read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?
-        }
+        IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
+        IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
         F32 => todo!(),
         F64 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;

@@ -45,7 +45,6 @@ use std::convert::{TryFrom, TryInto};
 // 2-Blob - compressed, uncompressed
 // 1-magic number (preamble)
 
-
 #[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {

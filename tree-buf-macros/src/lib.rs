@@ -29,7 +29,7 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
 
     let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
 
-    let writers = fields.iter().map(|NamedField {ident, ty, canon_str}| {
+    let writers = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
             tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
@@ -39,19 +39,19 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    let array_fields = fields.iter().map(|NamedField {ident, ty, ..}| {
+    let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
             #ident: <#ty as tree_buf::internal::Writable<'a>>::WriterArray,
         }
     });
 
-    let buffers = fields.iter().map(|NamedField {ident, ..}| {
+    let buffers = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
             self.#ident.buffer(&value.#ident);
         }
     });
 
-    let flushers = fields.iter().map(|NamedField {ident, canon_str, ..}| {
+    let flushers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
             tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
@@ -118,7 +118,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     let fields = get_named_fields(&ast.data);
     let vis = &ast.vis;
 
-    let reads = fields.iter().map(|NamedField {ident, ty, canon_str}| {
+    let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
             #ident: <#ty as tree_buf::internal::Readable>::read(
                 children.remove(#canon_str).unwrap_or_default()
@@ -126,19 +126,19 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    let news = fields.iter().map(|NamedField {ident, canon_str, ..}| {
+    let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
             #ident: tree_buf::internal::ReaderArray::new(children.remove(#canon_str).unwrap_or_default())?,
         }
     });
 
-    let array_fields = fields.iter().map(|NamedField {ident, ty, ..}| {
+    let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
             #ident: <#ty as tree_buf::internal::Readable>::ReaderArray,
         }
     });
 
-    let read_nexts = fields.iter().map(|NamedField {ident, ..}| {
+    let read_nexts = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
             #ident: self.#ident.read_next()?,
         }
@@ -198,14 +198,18 @@ fn get_named_fields(data: &Data) -> NamedFields {
         _ => panic!("The struct must have named fields"),
     };
 
-    fields_named.named.iter().map(|field| {
-        let ident = field.ident.as_ref().unwrap();
-        NamedField {
-            ident: field.ident.as_ref().unwrap(),
-            ty: &field.ty,
-            canon_str: canonical_ident(&ident),
-        }
-    }).collect()
+    fields_named
+        .named
+        .iter()
+        .map(|field| {
+            let ident = field.ident.as_ref().unwrap();
+            NamedField {
+                ident: field.ident.as_ref().unwrap(),
+                ty: &field.ty,
+                canon_str: canonical_ident(&ident),
+            }
+        })
+        .collect()
 }
 
 // TODO: Semantically this is a sequence of case-folded canonically encoded utf-8 words (though, this is not quite implemented as such here)

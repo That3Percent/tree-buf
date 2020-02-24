@@ -1,9 +1,8 @@
-
 pub mod internal;
 
 pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
-    
+
     #[cfg(feature = "macros")]
     pub use tree_buf_macros::{Read, Write};
 
@@ -15,7 +14,7 @@ pub mod prelude {
 
     // This section makes everything interesting available to the rest of the crate
     // without bothering to manage imports.
-    pub(crate) use crate::{internal::error::*, internal::*, };
+    pub(crate) use crate::{internal::error::*, internal::*};
 
     #[cfg(feature = "read")]
     pub(crate) type ReadResult<T> = Result<T, ReadError>;

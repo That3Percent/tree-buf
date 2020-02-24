@@ -1,9 +1,7 @@
-use crate::prelude::*;
 #[cfg(feature = "read")]
 use crate::internal::encodings::varint::decode_prefix_varint;
+use crate::prelude::*;
 use std::vec::IntoIter;
-
-
 
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<usize> {
@@ -16,14 +14,12 @@ impl ReaderArray for IntoIter<usize> {
     }
 }
 
-
 // TODO: Come back to usize
 // TODO: Error check that the result fits in the platform size
 #[cfg(feature = "read")]
 pub fn read_usize(bytes: &[u8], offset: &mut usize) -> ReadResult<usize> {
     Ok(decode_prefix_varint(bytes, offset)? as usize)
 }
-
 
 /*
 impl Readable for usize {
@@ -33,4 +29,3 @@ impl Readable for usize {
     }
 }
 */
-
