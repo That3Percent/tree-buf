@@ -61,6 +61,15 @@ pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
 // TODO: Figure out recursion, at least enough to handle this: https://docs.rs/serde_json/1.0.44/serde_json/value/enum.Value.html
 // TODO: Nullable should be able to handle recursion as well, even if Option doesn't. (Option<Box<T>> could though)
 
+// See also: c94adae3-9778-4a42-a454-650a97a87483
+// TODO: (Performance) When recursion is not involved, there is a maximum to the amount of schema info needed to write
+//       In order to do a 1 pass write on the data yet keep all the schema at the beginning of the file one could reserve
+//       the maximum amount of buffer necessary for the schema, then write the data to the primary buffer, write the schema
+//       to the beginning of the primary buffer and move it to be flush with the data. Technically, the schema will be 2-pass
+//       but this may be much less than the data.
+//       If we add a special sort of Recursion(depth) RootTypeId and ArrayTypeId then the schema may have a max size even
+//       with recursion. This may have the added benefit of requiring less redundancy in the schema when recursinon is involved.
+
 // TODO: When deriving, use the assert implements check that eg: Clone does, to give good compiler errors
 //       If this is not possible because it's an internal API, use static_assert
 

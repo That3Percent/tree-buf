@@ -285,7 +285,6 @@ mod tests {
     #[cfg(all(feature = "read", feature = "write"))]
     use super::super::tests::round_trip;
     use super::*;
-    use crate::prelude::*;
 
     #[cfg(all(feature = "read", feature = "write"))]
     fn round_trip_prefix(values: &[u64]) -> ReadResult<()> {

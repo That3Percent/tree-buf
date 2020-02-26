@@ -1,9 +1,9 @@
 [package]
 name = "tree-buf"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
-description = "A prototype binary serialization protocol"
+description = "A prototype binary serialization protocol for data"
 repository = "https://github.com/That3Percent/tree-buf"
 keywords = ["serialization", "protocol", "binary", "buffers"]
 categories = ["compression", "parser-implementations"]
@@ -14,7 +14,7 @@ maintenance = { status = "experimental"}
 
 [dependencies]
 tree-buf-macros = {version = "0.5.0", path="../tree-buf-macros", optional = true }
-simple-16 = { path="../../simple-16" }
+simple-16 = "0.1.0"
 num-traits = "0.2.11"
 
 [features]
