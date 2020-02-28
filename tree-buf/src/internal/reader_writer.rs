@@ -34,7 +34,6 @@ pub trait ReaderArray: Sized {
     type Read;
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
     // I think that may require GAT though the way things are setup so come back to this later.
-    // TODO: This needs to be split up into 2 steps to support schema matching before deserialization.
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self>;
     fn read_next(&mut self) -> ReadResult<Self::Read>;
 }

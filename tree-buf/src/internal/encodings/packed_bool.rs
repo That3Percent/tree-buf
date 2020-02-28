@@ -25,8 +25,6 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
 
 #[cfg(feature = "read")]
 pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
-    // TODO: This actually may get the wrong length, taking more bools then necessary.
-    // This doesn't currently present a problem though.
     let capacity = bytes.len() * 8;
     let mut result = Vec::with_capacity(capacity);
     for byte in bytes {

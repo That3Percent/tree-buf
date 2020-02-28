@@ -12,6 +12,7 @@ use std::convert::{TryFrom, TryInto};
 // matches.
 // Consider something like this - https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
 
+// TODO: GUID
 // TODO: Bytes = [u8]
 // TODO: Date
 // TODO: Enum - Something like this... needs to simmer.
@@ -24,26 +25,17 @@ use std::convert::{TryFrom, TryInto};
 //              Because enum is so flexible, it's possible to wrap some dynamic data into it. Eg: EnumValue<T>.
 //              This would create some number of sub-branches 'dynamically'.
 
-// Total slots: 256
 // TODO: Try each compression on a sample of the data (first 1024 or so?) in turn to decide which to use.
-// 1-Reserved for adding features
-// 16-Object & Fields
-// 16-Tuple & Fields
 // 8-Array & different fixed/variable sizes - 0,1,2,128,custom(follows). Fixed 0 necessarily has Void child
 // ? Integer - Different for array context or not? Min/Max? Different encoding options? (uncompressed option) signed, unsigned, 8,16,32,64
 // ?-Enum - String,Int, or other discriminant, whether or not there is data for sub-branches, and whether
-// 1-Nullable
-// 1-Boolean
 // 4-Float (32/64, compresssed/not) Consider:
 //      dfcm - https://userweb.cs.txstate.edu/~mb92/papers/dcc06.pdf
 //      https://www.cs.unc.edu/~isenburg/lcpfpv/
 //      https://akumuli.org/akumuli/2017/02/05/compression_part2/
 //      Consider an 'allow-lossy' flag (per field) or input trait
-// 1-Void
-// 2-String - compressed, uncompressed
 // 1-128 bits
 // 2-Blob - compressed, uncompressed
-// 1-magic number (preamble)
 
 #[cfg(feature = "read")]
 #[derive(Debug)]
@@ -131,7 +123,7 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
         True => DynRootBranch::Boolean(true),
         False => DynRootBranch::Boolean(false),
 
-        // Int // TODO: For root level, consider other numbers of bytes. Like 3 bytes.
+        // Int
         IntU64 => DynRootBranch::Integer(RootInteger::new(bytes, offset, 8, false)?),
         IntU56 => DynRootBranch::Integer(RootInteger::new(bytes, offset, 7, false)?),
         IntU48 => DynRootBranch::Integer(RootInteger::new(bytes, offset, 6, false)?),

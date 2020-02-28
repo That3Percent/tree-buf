@@ -19,7 +19,8 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
             _ => {
                 // TODO: Seems kind of redundant to have both the array len,
                 // and the bytes len. Though, it's not for obvious reasons.
-                // Maybe sometimes we can infer from context. Eg: bool
+                // Maybe sometimes we can infer from context. Eg: bool always
+                // requires the same number of bits per item
                 encode_prefix_varint(value.len() as u64, bytes);
 
                 let type_index = bytes.len();
@@ -58,7 +59,7 @@ impl<T: Readable> Readable for Vec<T> {
                 let mut v = Vec::with_capacity(len);
                 // TODO: Some of what the code is actually doing here is silly.
                 // Actual ReaderArray's may be IntoIter, which moved out of a Vec
-                // that we wanted in the first place. An overload here would be nice.
+                // that we wanted in the first place. Specialization here would be nice.
                 let mut reader = T::ReaderArray::new(values)?;
                 for _ in 0..len {
                     v.push(reader.read_next()?);

@@ -23,9 +23,6 @@ pub mod prelude {
 #[cfg(feature = "read")]
 pub use internal::error::ReadError;
 
-// TODO: Create another Readable/Writable trait that would be public, without the associated type. Then impl Readable for the internal type.
-// That would turn Readable into a tag that one could use as a constraint, without exposing any internal details
-
 #[cfg(feature = "read")]
 pub use internal::Readable;
 
@@ -41,7 +38,6 @@ pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
     bytes.push(0);
-    // TODO: The pre-amble could come back as optional as a DynRootBranch
     let type_id = T::write_root(value, &mut bytes, &mut lens);
     bytes[0] = type_id.into();
 
@@ -67,11 +63,17 @@ pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
 //       the maximum amount of buffer necessary for the schema, then write the data to the primary buffer, write the schema
 //       to the beginning of the primary buffer and move it to be flush with the data. Technically, the schema will be 2-pass
 //       but this may be much less than the data.
+//
 //       If we add a special sort of Recursion(depth) RootTypeId and ArrayTypeId then the schema may have a max size even
-//       with recursion. This may have the added benefit of requiring less redundancy in the schema when recursinon is involved.
+//       with recursion. This may have the added benefit of requiring less redundancy in the schema when recursion is involved.
+//       One tricky part is that each array per recursion depth requires its own length. This could be dealt with by having the
+//       Recursion Branch be it's own data set with it's own schema information? Not ideal.
+//
+//       The crux of the matter comes down to whether we want to have each depth and path for recursion be it's own branch.
+//       If the branch is shared, then this may come at a loss for clustering and schemas. Data is needed to make a decision.
+//       What is recursion typically used for? There's the generic JavaScript "Value" type case. Trees. What else? How do these cluster?
+//       In the generic JavaScript value case, much of the clustering info seems lost anyway.
 
-// TODO: When deriving, use the assert implements check that eg: Clone does, to give good compiler errors
-//       If this is not possible because it's an internal API, use static_assert
 
 // TODO: Evaluate TurboPFor https://github.com/powturbo/TurboPFor
 // or consider the best parts of it. The core differentiator here

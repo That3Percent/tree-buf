@@ -143,21 +143,17 @@ fn visibility_modifiers() {
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {
-    // TODO: u32 - u8
-
     round_trip_default::<u64>(1);
-    //round_trip_default::<u32>(1);
-    //round_trip_default::<u16>(1);
-    //round_trip_default::<u8>(1);
+    round_trip_default::<u32>(1);
+    round_trip_default::<u16>(1);
+    round_trip_default::<u8>(1);
     round_trip_default::<(u64, u64)>(3);
-    //round_trip_default::<(u64, u32)>(3);
+    round_trip_default::<(u64, u32)>(3);
     round_trip_default::<f64>(1);
-    //round_trip_default::<Vec<u32>>(3);
-    //round_trip_default::<Option<Vec<u32>>>(3);
-    // TODO: u32
-    //round_trip_default::<Option<u32>>(2);
-    // TODO: u32
-    //round_trip_default::<Vec<Option<u32>>>(2);
+    round_trip_default::<Vec<u32>>(1);
+    round_trip_default::<Option<Vec<u32>>>(1);
+    round_trip_default::<Option<u32>>(1);
+    round_trip_default::<Vec<Option<u32>>>(1);
     round_trip_default::<String>(1);
 }
 
@@ -239,7 +235,6 @@ fn large_structs() {
         o: f64,
         p: f64,
     }
-    // TODO: Match privacy in derive macro from struct deriving to writer impls
     #[derive(Read, Write, Default, Debug, PartialEq)]
     struct _17 {
         a: f64,

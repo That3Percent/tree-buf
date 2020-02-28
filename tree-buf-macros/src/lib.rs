@@ -74,7 +74,6 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
         ),
     };
 
-    // TODO: pub/private needs to match outer type.
     let tokens = quote! {
         #[derive(Default)]
         #vis struct #array_writer_name<'a> {
