@@ -62,6 +62,12 @@ fn opts_root() {
 }
 
 #[test]
+fn bool_array() {
+    round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6);
+}
+
+
+#[test]
 fn ints_root() {
     round_trip(&0u32, 1);
     round_trip(&1u32, 1);

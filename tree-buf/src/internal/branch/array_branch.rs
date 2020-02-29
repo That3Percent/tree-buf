@@ -108,7 +108,10 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         Obj7 => read_obj(7, bytes, offset, lens)?,
         Obj8 => read_obj(8, bytes, offset, lens)?,
         ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
-        Boolean => todo!(),
+        Boolean => {
+            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            DynArrayBranch::Boolean(bytes)
+        },
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
         F32 => todo!(),

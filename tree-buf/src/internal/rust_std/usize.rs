@@ -3,6 +3,7 @@ use crate::internal::encodings::varint::decode_prefix_varint;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
+
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<usize> {
     type Read = usize;
