@@ -1,4 +1,3 @@
-#[cfg(feature = "read")]
 use crate::internal::encodings::varint::decode_prefix_varint;
 use crate::prelude::*;
 use std::collections::HashMap;
@@ -37,7 +36,6 @@ use std::convert::{TryFrom, TryInto};
 // 1-128 bits
 // 2-Blob - compressed, uncompressed
 
-#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
     Object { children: HashMap<&'a str, DynRootBranch<'a>> },
@@ -52,7 +50,6 @@ pub enum DynRootBranch<'a> {
     String(&'a str),
 }
 
-#[cfg(feature = "read")]
 pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
     let id = RootTypeId::read_next(bytes, offset)?;
 
@@ -160,21 +157,18 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
     Ok(branch)
 }
 
-#[cfg(feature = "read")]
 impl<'a> Default for DynRootBranch<'a> {
     fn default() -> Self {
         DynRootBranch::Void
     }
 }
 
-#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum RootInteger {
     S(i64),
     U(u64),
 }
 
-#[cfg(feature = "read")]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum RootTypeId {
     // Constructions
@@ -241,7 +235,6 @@ pub enum RootTypeId {
     Str, // Str0 = Empty string, Str1-Str3 get unit abbreviations, like ft or ft²
 }
 
-#[cfg(feature = "read")]
 impl RootTypeId {
     // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
     fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
@@ -251,7 +244,6 @@ impl RootTypeId {
     }
 }
 
-#[cfg(feature = "read")]
 impl TryFrom<u8> for RootTypeId {
     type Error = ReadError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -314,7 +306,6 @@ impl TryFrom<u8> for RootTypeId {
     }
 }
 
-#[cfg(feature = "read")]
 impl From<RootTypeId> for u8 {
     fn from(value: RootTypeId) -> Self {
         use RootTypeId::*;
@@ -373,7 +364,6 @@ impl From<RootTypeId> for u8 {
     }
 }
 
-#[cfg(feature = "read")]
 impl RootInteger {
     #[inline(always)]
     pub fn new(bytes: &[u8], offset: &mut usize, len: usize, signed: bool) -> ReadResult<Self> {
@@ -393,7 +383,6 @@ impl RootInteger {
     }
 }
 
-#[cfg(feature = "read")]
 #[derive(Debug)]
 pub enum RootFloat {
     F64(f64),

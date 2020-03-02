@@ -2,6 +2,7 @@
 ///! and traits necessary for reading/writing that must be public to
 ///! be used to be found somehow, but hiding it behind a namespace so that
 ///! the implementation details cannot be relied upon.
+#[cfg(feature = "read")]
 pub mod branch;
 #[macro_use]
 pub mod encodings;
