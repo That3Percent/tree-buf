@@ -111,7 +111,10 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         },
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
-        F32 => todo!(),
+        F32 => {
+            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            DynArrayBranch::Float(ArrayFloat::F32(bytes))
+        },
         F64 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F64(bytes))

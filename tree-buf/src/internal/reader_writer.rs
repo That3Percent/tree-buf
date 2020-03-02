@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 #[cfg(feature = "write")]
 pub trait Writable<'a>: Sized {
+    // TODO: What happens if we get rid of the Write = Self trait bound?
     type WriterArray: WriterArray<'a, Write = Self>;
     // At the root level, there is no need to buffer/flush, just write. By not buffering, we may
     // significantly decrease total memory usage when there are multiple arrays at the root level,

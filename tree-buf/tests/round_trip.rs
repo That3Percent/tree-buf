@@ -92,8 +92,15 @@ fn int_vec() {
 }
 
 #[test]
-fn float_vec() {
+fn float64_vec() {
     round_trip(&vec![0.99], 10);
+    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36);
+}
+
+#[test]
+fn float32_vec() {
+    round_trip(&vec![0.99f32], 6);
+    round_trip(&vec![0.01f32, 0.02, 0.03, 0.04], 20);
 }
 
 #[test]
