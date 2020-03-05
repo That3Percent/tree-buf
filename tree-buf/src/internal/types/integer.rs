@@ -47,7 +47,7 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "write")]
         impl<'a> Writable<'a> for $Ty {
             type WriterArray = Vec<$Ty>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
                 write_root_uint(*value as u64, bytes)
             }
         }
@@ -58,7 +58,7 @@ macro_rules! impl_lowerable {
             fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
                 self.push(*value);
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
                 let max = self.iter().max();
                 if let Some(max) = max {
                     $fn(&self, *max, bytes, lens)

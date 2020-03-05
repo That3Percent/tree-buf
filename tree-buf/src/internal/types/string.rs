@@ -28,7 +28,7 @@ pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a st
 #[cfg(feature = "write")]
 impl<'a> Writable<'a> for String {
     type WriterArray = Vec<&'a str>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
         let value = value.as_str();
         match value.len() {
             0 => RootTypeId::Str0,
@@ -61,7 +61,7 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
         self.push(value.as_str());
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
         let start = bytes.len();
         for s in self.iter() {
             write_str(s, bytes)

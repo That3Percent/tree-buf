@@ -31,17 +31,17 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
 
     let writers = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
-            tree_buf::internal::write_str(#canon_str, bytes);
+            ::tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
             bytes.push(0);
-            let type_id = <#ty as tree_buf::internal::Writable>::write_root(&value.#ident, bytes, lens);
+            let type_id = <#ty as ::tree_buf::internal::Writable>::write_root(&value.#ident, bytes, lens, options);
             bytes[type_index] = type_id.into();
         }
     });
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as tree_buf::internal::Writable<'a>>::WriterArray,
+            #ident: <#ty as ::tree_buf::internal::Writable<'a>>::WriterArray,
         }
     });
 
@@ -53,10 +53,10 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
 
     let flushers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            tree_buf::internal::write_str(#canon_str, bytes);
+            ::tree_buf::internal::write_str(#canon_str, bytes);
             let type_index = bytes.len();
             bytes.push(0);
-            let type_id = self.#ident.flush(bytes, lens);
+            let type_id = self.#ident.flush(bytes, lens, options);
             bytes[type_index] = type_id.into();
         }
     });
@@ -68,7 +68,7 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
         0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), span.clone())),
         _ => (
             quote! {
-                tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, bytes);
+                ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, bytes);
             },
             Ident::new("ObjN", span.clone()),
         ),
@@ -80,24 +80,24 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
             #(#array_fields)*
         }
 
-        impl<'a> tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
+        impl<'a> ::tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
             type Write=#name;
             fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
                 #(#buffers)*
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> tree_buf::internal::ArrayTypeId {
+            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> ::tree_buf::internal::ArrayTypeId {
                 #prefix
                 #(#flushers)*
-                tree_buf::internal::ArrayTypeId::#suffix
+                ::tree_buf::internal::ArrayTypeId::#suffix
             }
         }
 
-        impl<'a> tree_buf::internal::Writable<'a> for #name {
+        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
             type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> tree_buf::internal::RootTypeId {
+            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> tree_buf::internal::RootTypeId {
                 #prefix
                 #(#writers)*
-                tree_buf::internal::RootTypeId::#suffix
+                ::tree_buf::internal::RootTypeId::#suffix
             }
         }
     };
@@ -119,7 +119,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
 
     let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
-            #ident: <#ty as tree_buf::internal::Readable>::read(
+            #ident: <#ty as ::tree_buf::internal::Readable>::read(
                 children.remove(#canon_str).unwrap_or_default()
             )?,
         }
@@ -127,13 +127,13 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
 
     let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            #ident: tree_buf::internal::ReaderArray::new(children.remove(#canon_str).unwrap_or_default())?,
+            #ident: ::tree_buf::internal::ReaderArray::new(children.remove(#canon_str).unwrap_or_default())?,
         }
     });
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as tree_buf::internal::Readable>::ReaderArray,
+            #ident: <#ty as ::tree_buf::internal::Readable>::ReaderArray,
         }
     });
 
@@ -144,12 +144,12 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     });
 
     let tokens = quote! {
-        impl tree_buf::internal::Readable for #name {
+        impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
-            fn read(sticks: tree_buf::internal::DynRootBranch<'_>) -> Result<Self, tree_buf::ReadError> {
+            fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
                 let mut children = match sticks {
-                    tree_buf::internal::DynRootBranch::Object { children } => children,
-                    _ => return Err(tree_buf::ReadError::SchemaMismatch),
+                    ::tree_buf::internal::DynRootBranch::Object { children } => children,
+                    _ => return Err(::tree_buf::ReadError::SchemaMismatch),
                 };
 
                 Ok(Self {
@@ -161,19 +161,19 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
             #(#array_fields)*
         }
 
-        impl tree_buf::internal::ReaderArray for #array_reader_name {
+        impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
-            fn new(sticks: tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, tree_buf::ReadError> {
+            fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
                 let mut children = match sticks {
-                    tree_buf::internal::DynArrayBranch::Object { children } => children,
-                    _ => return Err(tree_buf::ReadError::SchemaMismatch),
+                    ::tree_buf::internal::DynArrayBranch::Object { children } => children,
+                    _ => return Err(::tree_buf::ReadError::SchemaMismatch),
                 };
 
                 Ok(Self {
                     #(#news)*
                 })
             }
-            fn read_next(&mut self) -> Result<Self::Read, tree_buf::ReadError> {
+            fn read_next(&mut self) -> Result<Self::Read, ::tree_buf::ReadError> {
                 Ok(#name {
                     #(#read_nexts)*
                 })

@@ -29,16 +29,24 @@ pub use internal::Readable;
 #[cfg(feature = "write")]
 pub use internal::Writable;
 
+#[cfg(feature = "write")]
+pub use internal::options;
+
 pub use crate::prelude::*;
 
-#[cfg(feature = "write")]
 pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
+    let options = DefaultEncodeOptions;
+    write_with_options(value, &options)
+}
+
+#[cfg(feature = "write")]
+pub fn write_with_options<'a, 'b: 'a, T: Writable<'a>>(value: &'b T, options: &impl EncodeOptions) -> Vec<u8> {
     use internal::encodings::varint::encode_suffix_varint;
 
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
     bytes.push(0);
-    let type_id = T::write_root(value, &mut bytes, &mut lens);
+    let type_id = T::write_root(value, &mut bytes, &mut lens, options);
     bytes[0] = type_id.into();
 
     for len in lens.iter().rev() {

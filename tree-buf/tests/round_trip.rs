@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use tree_buf::prelude::*;
 mod common;
 use common::*;
+use tree_buf::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
@@ -104,8 +105,25 @@ fn float32_vec() {
 }
 
 #[test]
+fn lossy_f64_vec() {
+    let mut data = Vec::new();
+    for i in 0..50 {
+        data.push(0.01 * i as f64);
+    } 
+    let tolerance = 0.05;
+    let options = options::override_encode_options(options::DefaultEncodeOptions, options::LossyFloatTolerance(tolerance));
+    let binary = tree_buf::write_with_options(&data, &options);
+    assert_eq!(binary.len(), 382);
+    let decoded = read::<Vec<f64>>(&binary).unwrap();
+    assert_eq!(data.len(), decoded.len());
+    for (e, d) in data.iter().zip(decoded.iter()) {
+        assert!((e - d).abs() <= tolerance);
+    }
+}
+
+#[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 34);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 27);
 }
 
 #[test]
@@ -123,7 +141,7 @@ fn round_trip_item() {
 fn round_trip_item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 511);
+    round_trip(&item, 427);
 }
 
 #[test]

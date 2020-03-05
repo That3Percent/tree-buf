@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 #[cfg(feature = "write")]
 impl<'a> Writable<'a> for bool {
     type WriterArray = Vec<bool>;
-    fn write_root<'b: 'a>(value: &'b Self, _bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+    fn write_root<'b: 'a>(value: &'b Self, _bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
         if *value {
             RootTypeId::True
         } else {
@@ -31,7 +31,7 @@ impl<'a> WriterArray<'a> for Vec<bool> {
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
         self.push(*value);
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
         let start = bytes.len();
         encode_packed_bool(&self, bytes);
         lens.push(bytes.len() - start);

@@ -3,6 +3,14 @@ use std::convert::TryInto;
 use std::mem::size_of;
 use std::vec::IntoIter;
 use num_traits::AsPrimitive as _;
+// TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
+//use ndarray_zfp_rs::Zfp;
+
+// Promising Compressors:
+// Gorilla - https://crates.io/crates/tsz   http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
+// FPC
+// Akamuli - https://akumuli.org/akumuli/2017/02/05/compression_part2/
+
 
 // TODO: Lowerings
 // Interesting reading: https://internals.rust-lang.org/t/tryfrom-for-f64/9793/35
@@ -14,8 +22,10 @@ use num_traits::AsPrimitive as _;
 // f64 -> f32
 // f32 -> u32
 
+// TODO: More compressors
+
 macro_rules! impl_float {
-    ($T:ident, $write_item:ident, $read_item:ident, $id:ident) => {
+    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $zfp:ident, $($rest:ident),*) => {
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "write")]
         fn $write_item(item: $T, bytes: &mut Vec<u8>) {
@@ -34,7 +44,7 @@ macro_rules! impl_float {
         #[cfg(feature = "write")]
         impl<'a> Writable<'a> for $T {
             type WriterArray = Vec<$T>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> RootTypeId {
+            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
                 let value = *value;
 
                 // Check for positive sign so that -0.0 goes through
@@ -117,6 +127,27 @@ macro_rules! impl_float {
                                 let values = read_all(bytes, |bytes, offset| Ok(read_32(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             },
+                            ArrayFloat::DoubleGorilla(bytes) => {
+                                // FIXME: Should do schema mismatch for f32 -> f64
+                                let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
+                                let bytes = &bytes[..bytes.len()-1];
+                                if bytes.len() % size_of::<u64>() != 0 {
+                                    return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                                }
+                                // TODO: (Performance) The following can use unchecked, since we just verified the size is valid.
+                                let data = read_all(bytes, |bytes, offset| {
+                                    let start = *offset;
+                                    let end = start + size_of::<u64>();
+                                    let le_bytes = &bytes[start..end];
+                                    *offset = end;
+                                    let result = u64::from_le_bytes(le_bytes.try_into().unwrap());
+                                    Ok(result)
+                                })?;
+                                let reader = gibbon::vec_stream::VecReader::new(&data, *num_bits_last_elm);
+                                let iterator = gibbon::DoubleStreamIterator::new(reader);
+                                let values: Vec<_> = iterator.map(|v| v.as_()).collect();
+                                Ok(values.into_iter())
+                            }
                         }
                     }
                     // TODO: There are some conversions that are infallable.
@@ -135,18 +166,90 @@ macro_rules! impl_float {
             fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
                 self.push(*value);
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
                 let start = bytes.len();
-                for item in self {
-                    $write_item(item, bytes);
+                let compressors: Vec<Box<dyn Compressor<Data=$T>>> = vec![
+                    Box::new($fixed),
+                    $(Box::new($rest)),*
+                ];
+                // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
+                /*
+                if let Some(tolerance) = options.lossy_float_tolerance() {
+                    compressors.push(Box::new($zfp { tolerance }));
                 }
+                */
+                let type_id = compress(&self, bytes, &compressors[..]);
                 lens.push(bytes.len() - start);
-                ArrayTypeId::$id
+                type_id
             }
         }
+
+        struct $fixed;
+        impl Compressor<'_> for $fixed {
+            type Data=$T;
+            fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+                Some(size_of::<$T>() * data.len())
+            }
+            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                for item in data {
+                    $write_item(*item, bytes);
+                }
+                Ok(ArrayTypeId::$id)
+            }
+        }
+
+        // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
+        /*
+        struct $zfp {
+            tolerance: f64,
+        }
+        
+        impl Compressor<'_> for $zfp {
+            type Data=$T;
+            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                // FIXME: This is terrible. Consider using zfp-sys directly
+                // Problems are needing copy of the data, needing to copy bytes again,
+                // the header storing redundant information.
+                let copy: Vec<_> = data.iter().copied().collect();
+                let arr = ndarray::Array1::from(copy);
+                let bin = arr.zfp_compress_with_header(self.tolerance);
+                let bin = if let Ok(bin) = bin { bin } else { return Err(()) };
+                bytes.extend_from_slice(&bin);
+                Ok(ArrayTypeId::Void) // FIXME
+            }
+        }
+        */
+        
     };
 }
 
-impl_float!(f64, write_64, read_64, F64);
-impl_float!(f32, write_32, read_32, F32);
+impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, ZfpCompressor64, GorillaCompressor);
+impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, ZfpCompressor32,);
+
+
+
+// FIXME: Not clear if this is canon. The source for gibbon is a bit shaky.
+// Alternatively, there is the tsz crate, but that doesn't offer a separate
+// double-stream (just joined time+double stream). Both of the implementations
+// aren't perfect for our API.
+struct GorillaCompressor;
+impl Compressor<'_> for GorillaCompressor {
+    type Data=f64;
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        use gibbon::{DoubleStream, vec_stream::VecWriter};
+
+        let mut writer = VecWriter::new();
+        let mut stream = DoubleStream::new();
+        for value in data {
+            stream.push(*value, &mut writer);
+        }
+        let VecWriter { bit_vector, used_bits_last_elm } = writer;
+        // TODO: It should be safe to do 1 extend and a transmute on le platforms
+        for value in bit_vector {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.push(used_bits_last_elm);
+        Ok(ArrayTypeId::DoubleGorilla)
+    }
+}
 

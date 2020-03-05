@@ -8,7 +8,7 @@ pub trait Writable<'a>: Sized {
     // significantly decrease total memory usage when there are multiple arrays at the root level,
     // by not requiring that both be fully buffered simultaneously.
     #[must_use]
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId;
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId;
 }
 
 #[cfg(feature = "read")]
@@ -27,7 +27,7 @@ pub trait Readable: Sized {
 pub trait WriterArray<'a>: Default {
     type Write: Writable<'a>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write);
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId;
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId;
 }
 
 #[cfg(feature = "read")]

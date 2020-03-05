@@ -16,6 +16,10 @@ maintenance = { status = "experimental"}
 tree-buf-macros = {version = "0.6.0", path="../tree-buf-macros", optional = true }
 simple-16 = "0.1.0"
 num-traits = "0.2.11"
+# TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
+#ndarray-zfp-rs = "0.1.0"
+#ndarray = "0.13.0"
+gibbon = "0.1.1"
 
 [features]
 default = ["read", "write", "macros"]

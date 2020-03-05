@@ -10,8 +10,8 @@ pub struct BoxWriterArray<T> {
 #[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Box<T> {
     type WriterArray = BoxWriterArray<T::WriterArray>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
-        T::write_root(&value, bytes, lens)
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId {
+        T::write_root(&value, bytes, lens, options)
     }
 }
 
@@ -34,8 +34,8 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for BoxWriterArray<T> {
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
         self.inner.buffer(&value)
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
-        self.inner.flush(bytes, lens)
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId {
+        self.inner.flush(bytes, lens, options)
     }
 }
 

@@ -7,6 +7,7 @@ use std::convert::{TryFrom, TryInto};
 pub enum ArrayFloat<'a> {
     F64(&'a [u8]),
     F32(&'a [u8]),
+    DoubleGorilla(&'a [u8])
 }
 
 #[derive(Debug)]
@@ -118,11 +119,15 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         F64 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F64(bytes))
-        }
+        },
         Utf8 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::String(bytes)
-        }
+        },
+        DoubleGorilla => {
+            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            DynArrayBranch::Float(ArrayFloat::DoubleGorilla(bytes))
+        },
     };
 
     Ok(branch)
@@ -168,6 +173,7 @@ pub enum ArrayTypeId {
     // Float,
     F32,
     F64,
+    DoubleGorilla,
 
     // Str
     Utf8,
@@ -227,6 +233,7 @@ impl TryFrom<u8> for ArrayTypeId {
             23 => F32,
             24 => F64,
             25 => Utf8,
+            26 => DoubleGorilla,
             _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
         };
         debug_assert_eq!(value, ok.into());
@@ -264,6 +271,7 @@ impl From<ArrayTypeId> for u8 {
             F32 => 23,
             F64 => 24,
             Utf8 => 25,
+            DoubleGorilla => 26,
         }
     }
 }

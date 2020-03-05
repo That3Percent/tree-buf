@@ -6,13 +6,13 @@ use std::vec::IntoIter;
 #[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
     type WriterArray = VecArrayWriter<'a, T::WriterArray>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> RootTypeId {
+    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId {
         match value.len() {
             0 => RootTypeId::Array0,
             1 => {
                 let type_index = bytes.len();
                 bytes.push(0);
-                let type_id = T::write_root(&value[0], bytes, lens);
+                let type_id = T::write_root(&value[0], bytes, lens, options);
                 bytes[type_index] = type_id.into();
                 RootTypeId::Array1
             }
@@ -37,7 +37,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
                 for item in value {
                     writer.buffer(item);
                 }
-                let type_id = writer.flush(bytes, lens);
+                let type_id = writer.flush(bytes, lens, options);
                 bytes[type_index] = type_id.into();
                 RootTypeId::ArrayN
             }
@@ -108,12 +108,12 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
             values.buffer(item);
         }
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
             let type_index = bytes.len();
             bytes.push(0);
-            let type_id = values.flush(bytes, lens);
+            let type_id = values.flush(bytes, lens, options);
             debug_assert_ne!(type_id, ArrayTypeId::Void); // If this is Void, it's ambigous
             bytes[type_index] = type_id.into();
 
@@ -121,7 +121,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
             // here every time. Eg: ArrayVarSimple16 ArrayVarIntPrefixVar
             let type_index = bytes.len();
             bytes.push(0);
-            let len_type_id = len.flush(bytes, lens);
+            let len_type_id = len.flush(bytes, lens, options);
             bytes[type_index] = len_type_id.into();
         } else {
             bytes.push(ArrayTypeId::Void.into())

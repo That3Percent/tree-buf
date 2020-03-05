@@ -10,5 +10,6 @@ pub mod error;
 pub mod reader_writer;
 pub mod rust_std;
 pub mod types;
+pub mod options;
 
-pub use {branch::*, encodings::*, reader_writer::*, rust_std::*, types::*};
+pub use {branch::*, encodings::*, reader_writer::*, rust_std::*, types::*, options::*};

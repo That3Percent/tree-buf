@@ -75,7 +75,7 @@ impl<'a> Compressor<'a> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, _data: &[Self::Data], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         todo!();
     }
 }
