@@ -113,7 +113,7 @@ fn lossy_f64_vec() {
     let tolerance = 0.05;
     let options = options::override_encode_options(options::DefaultEncodeOptions, options::LossyFloatTolerance(tolerance));
     let binary = tree_buf::write_with_options(&data, &options);
-    assert_eq!(binary.len(), 382);
+    assert_eq!(binary.len(), 376);
     let decoded = read::<Vec<f64>>(&binary).unwrap();
     assert_eq!(data.len(), decoded.len());
     for (e, d) in data.iter().zip(decoded.iter()) {
@@ -123,7 +123,7 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 27);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn round_trip_item() {
 fn round_trip_item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 427);
+    round_trip(&item, 405);
 }
 
 #[test]

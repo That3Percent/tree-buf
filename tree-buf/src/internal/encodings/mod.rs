@@ -19,6 +19,9 @@ pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compre
 
     // Rank compressors by how well they do on a sample of the data
     // TODO: Use second-stack
+    // TODO (Performance): This is silly how sometimes the sample size is the
+    // entire value, but we end up encoding twice. If the most likely best
+    // is at the end, then we can just keep it in the case where it wins
     let mut by_size = Vec::new();
     for i in 0..compressors.len() {
         let compressor = &compressors[i];

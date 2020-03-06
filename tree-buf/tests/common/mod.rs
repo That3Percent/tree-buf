@@ -14,12 +14,12 @@ pub fn round_trip<'a, 'b: 'a, T: Readable + Writable<'a> + Debug + PartialEq>(va
 
 pub fn serialize_eq<'a, I: Writable<'a>, O: Readable + Debug + PartialEq>(i: &'a I, o: &'a O, size: usize) {
     let bytes = write(i);
-    assert_eq!(bytes.len(), size);
     let result = read(&bytes);
     match result {
         Ok(parsed) => assert_eq!(o, &parsed),
         Err(e) => assert!(false, "{}", e),
     }
+    assert_eq!(bytes.len(), size);
 }
 
 pub fn round_trip_default<T: for<'a> Default + Readable + for<'a> Writable<'a> + Debug + PartialEq>(size: usize) {
