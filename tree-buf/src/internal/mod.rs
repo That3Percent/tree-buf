@@ -7,9 +7,9 @@ pub mod branch;
 #[macro_use]
 pub mod encodings;
 pub mod error;
+pub mod options;
 pub mod reader_writer;
 pub mod rust_std;
 pub mod types;
-pub mod options;
 
-pub use {branch::*, encodings::*, reader_writer::*, rust_std::*, types::*, options::*};
+pub use {branch::*, encodings::*, options::*, reader_writer::*, rust_std::*, types::*};

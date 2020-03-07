@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use num_traits::AsPrimitive as _;
 use std::convert::TryInto;
 use std::mem::size_of;
 use std::vec::IntoIter;
-use num_traits::AsPrimitive as _;
 // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
 //use ndarray_zfp_rs::Zfp;
 
@@ -11,7 +11,6 @@ use num_traits::AsPrimitive as _;
 // FPC
 // Akamuli - https://akumuli.org/akumuli/2017/02/05/compression_part2/
 // ? http://blog.omega-prime.co.uk/2016/01/25/compression-of-floating-point-timeseries/
-
 
 // TODO: Lowerings
 // Interesting reading: https://internals.rust-lang.org/t/tryfrom-for-f64/9793/35
@@ -41,7 +40,7 @@ macro_rules! impl_float {
             Ok(<$T>::from_le_bytes(bytes.try_into().unwrap()))
         }
 
-        
+
         #[cfg(feature = "write")]
         impl<'a> Writable<'a> for $T {
             type WriterArray = Vec<$T>;
@@ -67,7 +66,7 @@ macro_rules! impl_float {
             }
         }
 
-        
+
         #[cfg(feature = "read")]
         impl Readable for $T {
             type ReaderArray = IntoIter<$T>;
@@ -111,7 +110,7 @@ macro_rules! impl_float {
             }
         }
 
-        
+
         #[cfg(feature = "read")]
         impl ReaderArray for IntoIter<$T> {
             type Read = $T;
@@ -214,7 +213,7 @@ macro_rules! impl_float {
         struct $zfp {
             tolerance: f64,
         }
-        
+
         impl Compressor<'_> for $zfp {
             type Data=$T;
             fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
@@ -230,14 +229,12 @@ macro_rules! impl_float {
             }
         }
         */
-        
+
     };
 }
 
 impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, ZfpCompressor64, GorillaCompressor);
 impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, ZfpCompressor32,);
-
-
 
 // FIXME: Not clear if this is canon. The source for gibbon is a bit shaky.
 // Alternatively, there is the tsz crate, but that doesn't offer a separate
@@ -245,28 +242,34 @@ impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, ZfpCompressor32,);
 // aren't perfect for our API.
 struct GorillaCompressor;
 impl Compressor<'_> for GorillaCompressor {
-    type Data=f64;
+    type Data = f64;
     fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-        use gibbon::{DoubleStream, vec_stream::VecWriter};
-        if data.is_empty() { return Ok(ArrayTypeId::DoubleGorilla); }
+        use gibbon::{vec_stream::VecWriter, DoubleStream};
+        if data.is_empty() {
+            return Ok(ArrayTypeId::DoubleGorilla);
+        }
 
         let mut writer = VecWriter::new();
         let mut stream = DoubleStream::new();
         for value in data {
             stream.push(*value, &mut writer);
         }
-        let VecWriter { mut bit_vector, used_bits_last_elm } = writer;
+        let VecWriter {
+            mut bit_vector,
+            used_bits_last_elm,
+        } = writer;
         let last = bit_vector.pop().unwrap(); // Does not panic because of early out
-        // TODO: It should be safe to do 1 extend and a transmute on le platforms
+                                              // TODO: It should be safe to do 1 extend and a transmute on le platforms
         for value in bit_vector {
             bytes.extend_from_slice(&value.to_le_bytes());
         }
         let mut byte_count = used_bits_last_elm / 8;
-        if byte_count * 8 != used_bits_last_elm { byte_count += 1; }
-        let last = &(&last.to_le_bytes())[(8-byte_count) as usize..];
+        if byte_count * 8 != used_bits_last_elm {
+            byte_count += 1;
+        }
+        let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
         bytes.extend_from_slice(&last);
         bytes.push(used_bits_last_elm);
         Ok(ArrayTypeId::DoubleGorilla)
     }
 }
-

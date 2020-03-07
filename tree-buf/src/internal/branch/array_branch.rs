@@ -7,7 +7,7 @@ use std::convert::{TryFrom, TryInto};
 pub enum ArrayFloat<'a> {
     F64(&'a [u8]),
     F32(&'a [u8]),
-    DoubleGorilla(&'a [u8])
+    DoubleGorilla(&'a [u8]),
 }
 
 #[derive(Debug)]
@@ -109,25 +109,25 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         Boolean => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Boolean(bytes)
-        },
+        }
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
         F32 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F32(bytes))
-        },
+        }
         F64 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F64(bytes))
-        },
+        }
         Utf8 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::String(bytes)
-        },
+        }
         DoubleGorilla => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::DoubleGorilla(bytes))
-        },
+        }
     };
 
     Ok(branch)

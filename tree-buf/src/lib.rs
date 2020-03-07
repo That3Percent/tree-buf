@@ -82,7 +82,6 @@ pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
 //       What is recursion typically used for? There's the generic JavaScript "Value" type case. Trees. What else? How do these cluster?
 //       In the generic JavaScript value case, much of the clustering info seems lost anyway.
 
-
 // TODO: Evaluate TurboPFor https://github.com/powturbo/TurboPFor
 // or consider the best parts of it. The core differentiator here
 // is the ability to use this.

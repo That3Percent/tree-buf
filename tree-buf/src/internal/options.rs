@@ -1,6 +1,5 @@
 // https://docs.rs/ndarray-zfp-rs/0.1.0/ndarray_zfp_rs/trait.Zfp.htmls
 
-
 macro_rules! options {
     ($(($name:ident, $T:ty, $fallback:expr, $over:ident)),*) => {
         pub trait EncodeOptions {
@@ -31,9 +30,7 @@ macro_rules! options {
     };
 }
 
-options!(
-    (lossy_float_tolerance, Option<f64>, None, override_lossy_float_tolerance)
-);
+options!((lossy_float_tolerance, Option<f64>, None, override_lossy_float_tolerance));
 
 struct EncodeOptionsHierarchy<T0, T1> {
     fallback: T0,
@@ -42,18 +39,18 @@ struct EncodeOptionsHierarchy<T0, T1> {
 
 pub struct LosslessFloat;
 impl EncodeOptionsOverride for LosslessFloat {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> { Some(None) }
+    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> {
+        Some(None)
+    }
 }
 
 pub struct LossyFloatTolerance(pub f64);
 impl EncodeOptionsOverride for LossyFloatTolerance {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> { Some(Some(self.0)) }
-}
-
-pub fn override_encode_options(options: impl EncodeOptions, overrides: impl EncodeOptionsOverride) -> impl EncodeOptions {
-    EncodeOptionsHierarchy {
-        fallback: options,
-        overrides,
+    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> {
+        Some(Some(self.0))
     }
 }
 
+pub fn override_encode_options(options: impl EncodeOptions, overrides: impl EncodeOptionsOverride) -> impl EncodeOptions {
+    EncodeOptionsHierarchy { fallback: options, overrides }
+}

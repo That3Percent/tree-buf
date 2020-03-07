@@ -67,7 +67,6 @@ fn bool_array() {
     round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6);
 }
 
-
 #[test]
 fn ints_root() {
     round_trip(&0u32, 1);
@@ -109,7 +108,7 @@ fn lossy_f64_vec() {
     let mut data = Vec::new();
     for i in 0..50 {
         data.push(0.01 * i as f64);
-    } 
+    }
     let tolerance = 0.05;
     let options = options::override_encode_options(options::DefaultEncodeOptions, options::LossyFloatTolerance(tolerance));
     let binary = tree_buf::write_with_options(&data, &options);

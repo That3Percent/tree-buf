@@ -46,8 +46,8 @@ pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    #[cfg(all(feature="read", feature="write"))]
+
+    #[cfg(all(feature = "read", feature = "write"))]
     #[test]
     fn round_trip_packed_bool() {
         let cases = vec![
