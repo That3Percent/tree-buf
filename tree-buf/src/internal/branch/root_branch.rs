@@ -38,8 +38,9 @@ use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
-    Object { children: HashMap<&'a str, DynRootBranch<'a>> },
+    Object { children: HashMap<Ident<'a>, DynRootBranch<'a>> },
     Tuple { children: Vec<DynRootBranch<'a>> },
+    Enum { discriminant: Ident<'a>, value: Box<DynRootBranch<'a>> },
     Array0,                         // Separate from Array because it infers Void
     Array1(Box<DynRootBranch<'a>>), // Separate from Array because it does not need to enter an array context
     Array { len: usize, values: DynArrayBranch<'a> },
@@ -72,7 +73,7 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
     fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
         let mut children = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let name = crate::internal::read_str(bytes, offset)?;
+            let name = crate::internal::read_ident(bytes, offset)?;
             let child = read_next_root(bytes, offset, lens)?;
             children.insert(name, child);
         }
@@ -116,6 +117,16 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
         Obj7 => read_obj(7, bytes, offset, lens)?,
         Obj8 => read_obj(8, bytes, offset, lens)?,
         ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
+
+        Enum => {
+            // TODO: Consider having the enum be:
+            //    Root: static_data: RootBranch, instance_data: RootBranch
+            //    Array: static_data: RootBranch, instance_data: ArrayBranch, discriminant: ArrayBranch(int)
+            // This can be more powerful, but it's not always clear what the intent is.
+            let discriminant = read_ident(bytes, offset)?;
+            let value = read_next_root(bytes, offset, lens)?.into();
+            DynRootBranch::Enum { discriminant, value }
+        }
 
         True => DynRootBranch::Boolean(true),
         False => DynRootBranch::Boolean(false),
@@ -194,6 +205,7 @@ pub enum RootTypeId {
     Obj7,
     Obj8,
     ObjN, // Obj0 is just void.
+    Enum,
 
     // Bool
     True,
@@ -299,6 +311,7 @@ impl TryFrom<u8> for RootTypeId {
             47 => Str2,
             48 => Str3,
             49 => Str,
+            50 => Enum,
             _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
         };
         debug_assert_eq!(value, ok.into());
@@ -360,6 +373,7 @@ impl From<RootTypeId> for u8 {
             Str2 => 47,
             Str3 => 48,
             Str => 49,
+            Enum => 50,
         }
     }
 }

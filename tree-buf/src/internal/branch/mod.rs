@@ -6,6 +6,11 @@ pub use root_branch::*;
 mod array_branch;
 pub use array_branch::*;
 
+pub type Ident<'a> = &'a str;
+pub fn read_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> ReadResult<Ident<'a>> {
+    read_str(bytes, offset)
+}
+
 // TODO: Finish or get rid of this mod
 //mod visitor;
 

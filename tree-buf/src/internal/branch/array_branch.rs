@@ -12,7 +12,7 @@ pub enum ArrayFloat<'a> {
 
 #[derive(Debug)]
 pub enum DynArrayBranch<'a> {
-    Object { children: HashMap<&'a str, DynArrayBranch<'a>> },
+    Object { children: HashMap<Ident<'a>, DynArrayBranch<'a>> },
     Tuple { children: Vec<DynArrayBranch<'a>> },
     Array0,
     Array { len: Box<DynArrayBranch<'a>>, values: Box<DynArrayBranch<'a>> },
@@ -58,7 +58,7 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
     fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
         let mut children = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let name = crate::internal::read_str(bytes, offset)?;
+            let name = crate::internal::read_ident(bytes, offset)?;
             let child = read_next_array(bytes, offset, lens)?;
             children.insert(name, child);
         }

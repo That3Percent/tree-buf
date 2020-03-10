@@ -4,8 +4,8 @@ extern crate syn;
 extern crate quote;
 use inflector::cases::camelcase::to_camel_case;
 
-use proc_macro2::{Ident, TokenStream};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use proc_macro2::{Ident, TokenStream, Span};
+use syn::{parse_macro_input, Data, DataStruct, DataEnum, DeriveInput, Fields, Type, Visibility};
 
 struct NamedField<'a> {
     ident: &'a Ident,
@@ -24,10 +24,23 @@ pub fn write_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let span = name.span();
-    let fields = get_named_fields(&ast.data);
     let vis = &ast.vis;
-
     let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
+
+    match &ast.data {
+        Data::Struct(data_struct) => {
+            impl_struct_write(name, &span, vis, &array_writer_name, data_struct)
+        },
+        Data::Enum(data_enum) => {
+            impl_enum_write(name, &span, vis, &array_writer_name, data_enum)
+        },
+        Data::Union(_) => panic!("Unions are not supported by tree-buf"),
+    }
+}
+
+fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_struct: &DataStruct) -> TokenStream {
+    let fields = get_named_fields(data_struct);
+
 
     let writers = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
@@ -74,7 +87,7 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
         ),
     };
 
-    let tokens = quote! {
+    quote! {
         #[derive(Default)]
         #vis struct #array_writer_name<'a> {
             #(#array_fields)*
@@ -100,8 +113,34 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
                 ::tree_buf::internal::RootTypeId::#suffix
             }
         }
-    };
-    tokens.into()
+    }
+}
+
+fn impl_enum_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_enum: &DataEnum) -> TokenStream {
+    quote! {
+        #[derive(Default)]
+        #vis struct #array_writer_name<'a> {
+            // TODO: Add list for discriminants and values.
+            _todo_remove: ::std::marker::PhantomData<&'a ()>,
+        }
+
+        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
+            type WriterArray=#array_writer_name<'a>;
+            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> tree_buf::internal::RootTypeId {
+                todo!()
+            }
+        }
+
+        impl<'a> ::tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
+            type Write=#name;
+            fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
+                todo!()
+            }
+            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> ::tree_buf::internal::ArrayTypeId {
+                todo!()
+            }
+        }
+    }
 }
 
 #[proc_macro_derive(Read)]
@@ -114,8 +153,21 @@ pub fn read_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStr
 fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let array_reader_name = Ident::new(format!("{}TreeBufArrayReader", name).as_str(), ast.ident.span());
-    let fields = get_named_fields(&ast.data);
     let vis = &ast.vis;
+
+    match &ast.data {
+        Data::Struct(data_struct) => {
+            impl_struct_read(name, vis, &array_reader_name, data_struct)
+        },
+        Data::Enum(data_enum) => {
+            impl_enum_read(name, vis, &array_reader_name, data_enum)
+        },
+        Data::Union(_) => panic!("Unions are not supported by tree-buf"),
+    }
+}
+
+fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, data_struct: &DataStruct) -> TokenStream {
+    let fields = get_named_fields(data_struct);
 
     let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
@@ -143,7 +195,7 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    let tokens = quote! {
+    quote! {
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
             fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
@@ -179,18 +231,33 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
                 })
             }
         }
-    };
-
-    tokens.into()
+    }
 }
 
-fn get_named_fields(data: &Data) -> NamedFields {
-    // TODO: Lift restrictions
-    let data_struct = match data {
-        Data::Struct(data_struct) => data_struct,
-        _ => panic!("The struct must be a data struct, not an enum or union"),
-    };
+fn impl_enum_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, data_enum: &DataEnum) -> TokenStream {
+    quote! {
+        impl ::tree_buf::internal::Readable for #name {
+            type ReaderArray = #array_reader_name;
+            fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
+                todo!()
+            }
+        }
+        #vis struct #array_reader_name {
+        }
 
+        impl ::tree_buf::internal::ReaderArray for #array_reader_name {
+            type Read=#name;
+            fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
+                todo!()
+            }
+            fn read_next(&mut self) -> Result<Self::Read, ::tree_buf::ReadError> {
+                todo!()
+            }
+        }
+    }
+}
+
+fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
     // TODO: Lift restriction
     let fields_named = match &data_struct.fields {
         Fields::Named(fields_named) => fields_named,

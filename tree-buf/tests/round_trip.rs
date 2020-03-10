@@ -1,6 +1,4 @@
 use std::fmt::Debug;
-#[cfg(not(debug_assertions))]
-use std::time::{Duration, Instant};
 use tree_buf::prelude::*;
 mod common;
 use common::*;
