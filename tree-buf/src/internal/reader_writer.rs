@@ -1,6 +1,54 @@
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
+pub trait WriterStream {
+    type Options;
+    fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
+    fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
+    fn bytes(&mut self) -> &mut Vec<u8>;
+    fn options(&self) -> &Self::Options;
+}
+
+pub struct VecWriterStream<'a, O> {
+    bytes: &'a mut Vec<u8>,
+    lens: &'a mut Vec<usize>,
+    options: &'a O,
+}
+
+impl<'a, O: EncodeOptions> VecWriterStream<'a, O> {
+    pub fn new(bytes: &'a mut Vec<u8>, lens: &'a mut Vec<usize>, options: &'a O) -> Self {
+        Self { bytes, lens, options }
+    }
+}
+
+impl<'a, O> WriterStream for VecWriterStream<'a, O> {
+    type Options = O;
+    fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let type_index = self.bytes.len();
+        self.bytes.push(0);
+        let id = f(self);
+        debug_assert!(id != T::void() || (self.bytes.len() == type_index + 1), "Expecting Void to write no bytes to stream");
+        self.bytes[type_index] = id.into();
+        id
+    }
+    fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let start = self.bytes.len();
+        let result = f(self);
+        self.lens.push(self.bytes.len() - start);
+        result
+    }
+    // This is sort of a temporary patch while figuring out what the API of the WriterStream should be
+    #[inline]
+    fn bytes(&mut self) -> &mut Vec<u8> {
+        self.bytes
+    }
+    #[inline]
+    fn options(&self) -> &Self::Options {
+        self.options
+    }
+}
+
+#[cfg(feature = "write")]
 pub trait Writable<'a>: Sized {
     // TODO: What happens if we get rid of the Write = Self trait bound?
     type WriterArray: WriterArray<'a, Write = Self>;
@@ -8,7 +56,7 @@ pub trait Writable<'a>: Sized {
     // significantly decrease total memory usage when there are multiple arrays at the root level,
     // by not requiring that both be fully buffered simultaneously.
     #[must_use]
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId;
+    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId;
 }
 
 #[cfg(feature = "read")]
@@ -27,7 +75,7 @@ pub trait Readable: Sized {
 pub trait WriterArray<'a>: Default {
     type Write: Writable<'a>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write);
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId;
+    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId;
 }
 
 #[cfg(feature = "read")]

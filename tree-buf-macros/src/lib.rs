@@ -4,8 +4,8 @@ extern crate syn;
 extern crate quote;
 use inflector::cases::camelcase::to_camel_case;
 
-use proc_macro2::{Ident, TokenStream, Span};
-use syn::{parse_macro_input, Data, DataStruct, DataEnum, DeriveInput, Fields, Type, Visibility};
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, Type, Visibility};
 
 struct NamedField<'a> {
     ident: &'a Ident,
@@ -28,12 +28,8 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
     let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
 
     match &ast.data {
-        Data::Struct(data_struct) => {
-            impl_struct_write(name, &span, vis, &array_writer_name, data_struct)
-        },
-        Data::Enum(data_enum) => {
-            impl_enum_write(name, &span, vis, &array_writer_name, data_enum)
-        },
+        Data::Struct(data_struct) => impl_struct_write(name, &span, vis, &array_writer_name, data_struct),
+        Data::Enum(data_enum) => impl_enum_write(name, &span, vis, &array_writer_name, data_enum),
         Data::Union(_) => panic!("Unions are not supported by tree-buf"),
     }
 }
@@ -41,14 +37,10 @@ fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
 fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_struct: &DataStruct) -> TokenStream {
     let fields = get_named_fields(data_struct);
 
-
-    let writers = fields.iter().map(|NamedField { ident, ty, canon_str }| {
+    let writers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            ::tree_buf::internal::write_str(#canon_str, bytes);
-            let type_index = bytes.len();
-            bytes.push(0);
-            let type_id = <#ty as ::tree_buf::internal::Writable>::write_root(&value.#ident, bytes, lens, options);
-            bytes[type_index] = type_id.into();
+            ::tree_buf::internal::write_ident(#canon_str, stream.bytes());
+            stream.write_with_id(|stream| self.#ident.write_root(stream));
         }
     });
 
@@ -66,11 +58,9 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
 
     let flushers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            ::tree_buf::internal::write_str(#canon_str, bytes);
-            let type_index = bytes.len();
-            bytes.push(0);
-            let type_id = self.#ident.flush(bytes, lens, options);
-            bytes[type_index] = type_id.into();
+            ::tree_buf::internal::write_ident(#canon_str, stream.bytes());
+            let o = self.#ident;
+            stream.write_with_id(|stream| o.flush(stream));
         }
     });
 
@@ -81,7 +71,7 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
         0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), span.clone())),
         _ => (
             quote! {
-                ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, bytes);
+                ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes());
             },
             Ident::new("ObjN", span.clone()),
         ),
@@ -98,7 +88,7 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
             fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
                 #(#buffers)*
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush(self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
                 #prefix
                 #(#flushers)*
                 ::tree_buf::internal::ArrayTypeId::#suffix
@@ -107,7 +97,7 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
 
         impl<'a> ::tree_buf::internal::Writable<'a> for #name {
             type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> tree_buf::internal::RootTypeId {
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
                 #prefix
                 #(#writers)*
                 ::tree_buf::internal::RootTypeId::#suffix
@@ -117,6 +107,7 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
 }
 
 fn impl_enum_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_enum: &DataEnum) -> TokenStream {
+    // TODO: Move this part into some shared thing.
     quote! {
         #[derive(Default)]
         #vis struct #array_writer_name<'a> {
@@ -126,7 +117,7 @@ fn impl_enum_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_nam
 
         impl<'a> ::tree_buf::internal::Writable<'a> for #name {
             type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> tree_buf::internal::RootTypeId {
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
                 todo!()
             }
         }
@@ -136,7 +127,7 @@ fn impl_enum_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_nam
             fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
                 todo!()
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl ::tree_buf::options::EncodeOptions) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush(self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
                 todo!()
             }
         }
@@ -156,12 +147,8 @@ fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
     let vis = &ast.vis;
 
     match &ast.data {
-        Data::Struct(data_struct) => {
-            impl_struct_read(name, vis, &array_reader_name, data_struct)
-        },
-        Data::Enum(data_enum) => {
-            impl_enum_read(name, vis, &array_reader_name, data_enum)
-        },
+        Data::Struct(data_struct) => impl_struct_read(name, vis, &array_reader_name, data_struct),
+        Data::Enum(data_enum) => impl_enum_read(name, vis, &array_reader_name, data_enum),
         Data::Union(_) => panic!("Unions are not supported by tree-buf"),
     }
 }

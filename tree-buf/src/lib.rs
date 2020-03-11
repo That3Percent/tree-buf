@@ -45,9 +45,8 @@ pub fn write_with_options<'a, 'b: 'a, T: Writable<'a>>(value: &'b T, options: &i
 
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
-    bytes.push(0);
-    let type_id = T::write_root(value, &mut bytes, &mut lens, options);
-    bytes[0] = type_id.into();
+    let mut stream = VecWriterStream::new(&mut bytes, &mut lens, options);
+    stream.write_with_id(|stream| T::write_root(value, stream));
 
     for len in lens.iter().rev() {
         encode_suffix_varint(*len as u64, &mut bytes);

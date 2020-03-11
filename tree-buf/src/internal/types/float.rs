@@ -44,8 +44,8 @@ macro_rules! impl_float {
         #[cfg(feature = "write")]
         impl<'a> Writable<'a> for $T {
             type WriterArray = Vec<$T>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
-                let value = *value;
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+                let value = *self;
 
                 // Check for positive sign so that -0.0 goes through
                 // the unhappy path but round-trips bit-for-bit
@@ -60,7 +60,7 @@ macro_rules! impl_float {
                     // so that other NaN round trip bit-for-bit
                     RootTypeId::NaN
                 } else {
-                    $write_item(value, bytes);
+                    $write_item(value, stream.bytes());
                     RootTypeId::$id
                 }
             }
@@ -176,8 +176,7 @@ macro_rules! impl_float {
             fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
                 self.push(*value);
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
-                let start = bytes.len();
+            fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
                 let compressors: Vec<Box<dyn Compressor<Data=$T>>> = vec![
                     Box::new($fixed),
                     $(Box::new($rest)),*
@@ -188,9 +187,7 @@ macro_rules! impl_float {
                     compressors.push(Box::new($zfp { tolerance }));
                 }
                 */
-                let type_id = compress(&self, bytes, &compressors[..]);
-                lens.push(bytes.len() - start);
-                type_id
+                stream.write_with_len(|stream| compress(&self, stream.bytes(), &compressors[..]))
             }
         }
 

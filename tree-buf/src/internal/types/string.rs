@@ -28,26 +28,26 @@ pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a st
 #[cfg(feature = "write")]
 impl<'a> Writable<'a> for String {
     type WriterArray = Vec<&'a str>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
-        let value = value.as_str();
+    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        let value = self.as_str();
         match value.len() {
             0 => RootTypeId::Str0,
             1 => {
-                bytes.push(value.as_bytes()[0]);
+                stream.bytes().push(value.as_bytes()[0]);
                 RootTypeId::Str1
             }
             2 => {
-                bytes.extend_from_slice(value.as_bytes());
+                stream.bytes().extend_from_slice(value.as_bytes());
                 RootTypeId::Str2
             }
             3 => {
-                bytes.extend_from_slice(value.as_bytes());
+                stream.bytes().extend_from_slice(value.as_bytes());
                 RootTypeId::Str3
             }
             _ => {
                 let b = value.as_bytes();
-                encode_prefix_varint(b.len() as u64, bytes);
-                bytes.extend_from_slice(b);
+                encode_prefix_varint(b.len() as u64, stream.bytes());
+                stream.bytes().extend_from_slice(b);
                 RootTypeId::Str
             }
         }
@@ -61,13 +61,12 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
         self.push(value.as_str());
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
-        let start = bytes.len();
-        for s in self.iter() {
-            write_str(s, bytes)
-        }
-        let len = bytes.len() - start;
-        lens.push(len);
+    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+        stream.write_with_len(|stream| {
+            for s in self.iter() {
+                write_str(s, stream.bytes())
+            }
+        });
 
         ArrayTypeId::Utf8
     }

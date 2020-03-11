@@ -179,6 +179,12 @@ pub enum ArrayTypeId {
     Utf8,
 }
 
+impl TypeId for ArrayTypeId {
+    fn void() -> Self {
+        ArrayTypeId::Void
+    }
+}
+
 impl ArrayTypeId {
     // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
     fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<ArrayTypeId> {

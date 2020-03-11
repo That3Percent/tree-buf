@@ -6,14 +6,11 @@ use std::vec::IntoIter;
 #[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
     type WriterArray = VecArrayWriter<'a, T::WriterArray>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId {
-        match value.len() {
+    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        match self.len() {
             0 => RootTypeId::Array0,
             1 => {
-                let type_index = bytes.len();
-                bytes.push(0);
-                let type_id = T::write_root(&value[0], bytes, lens, options);
-                bytes[type_index] = type_id.into();
+                stream.write_with_id(|stream| (&self[0]).write_root(stream));
                 RootTypeId::Array1
             }
             _ => {
@@ -21,10 +18,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
                 // and the bytes len. Though, it's not for obvious reasons.
                 // Maybe sometimes we can infer from context. Eg: bool always
                 // requires the same number of bits per item
-                encode_prefix_varint(value.len() as u64, bytes);
-
-                let type_index = bytes.len();
-                bytes.push(0);
+                encode_prefix_varint(self.len() as u64, stream.bytes());
 
                 // TODO: When there are types that are already
                 // primitive (eg: Vec<f64>) it doesn't make sense
@@ -34,11 +28,12 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
                 // TODO: See below, and just call buffer on the vec
                 // and flush it!
                 let mut writer = T::WriterArray::default();
-                for item in value {
+                for item in self {
                     writer.buffer(item);
                 }
-                let type_id = writer.flush(bytes, lens, options);
-                bytes[type_index] = type_id.into();
+
+                stream.write_with_id(|stream| writer.flush(stream));
+
                 RootTypeId::ArrayN
             }
         }
@@ -108,23 +103,17 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
             values.buffer(item);
         }
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId {
+    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
-            let type_index = bytes.len();
-            bytes.push(0);
-            let type_id = values.flush(bytes, lens, options);
+            let type_id = stream.write_with_id(|stream| values.flush(stream));
             debug_assert_ne!(type_id, ArrayTypeId::Void); // If this is Void, it's ambigous
-            bytes[type_index] = type_id.into();
 
             // TODO: Maybe combine the permutations of valid int compressors here with ArrayVar to save a byte
             // here every time. Eg: ArrayVarSimple16 ArrayVarIntPrefixVar
-            let type_index = bytes.len();
-            bytes.push(0);
-            let len_type_id = len.flush(bytes, lens, options);
-            bytes[type_index] = len_type_id.into();
+            stream.write_with_id(|stream| len.flush(stream));
         } else {
-            bytes.push(ArrayTypeId::Void.into())
+            stream.write_with_id(|_| ArrayTypeId::Void);
         }
 
         ArrayTypeId::ArrayVar

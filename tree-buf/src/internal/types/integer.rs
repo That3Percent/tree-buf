@@ -20,7 +20,7 @@ impl Bounded for U0 {
     }
 }
 
-fn write_u0<T>(_data: &[T], _max: T, _bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> ArrayTypeId {
+fn write_u0<T>(_data: &[T], _max: T, _stream: &impl WriterStream) -> ArrayTypeId {
     unreachable!();
 }
 
@@ -47,8 +47,8 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "write")]
         impl<'a> Writable<'a> for $Ty {
             type WriterArray = Vec<$Ty>;
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, _lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> RootTypeId {
-                write_root_uint(*value as u64, bytes)
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+                write_root_uint(*self as u64, stream.bytes())
             }
         }
 
@@ -58,10 +58,10 @@ macro_rules! impl_lowerable {
             fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
                 self.push(*value);
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, _options: &impl EncodeOptions) -> ArrayTypeId {
+            fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
                 let max = self.iter().max();
                 if let Some(max) = max {
-                    $fn(&self, *max, bytes, lens)
+                    $fn(&self, *max, stream)
                 } else {
                     ArrayTypeId::Void
                 }
@@ -122,38 +122,37 @@ macro_rules! impl_lowerable {
 
         #[cfg(feature = "write")]
         fn $fn<T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>)*>
-            (data: &[T], max: T, bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
+            (data: &[T], max: T, stream: &mut impl WriterStream) -> ArrayTypeId {
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
 
             if let Ok(lower_max) = lower_max {
                 if lower_max >= max.as_() {
-                    return $lfn(data, max, bytes, lens)
+                    return $lfn(data, max, stream)
                 }
             }
 
-            fn write_inner(data: &[$Ty], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> ArrayTypeId {
-                let start = bytes.len();
+            fn write_inner(data: &[$Ty], stream: &mut impl WriterStream) -> ArrayTypeId {
                 // TODO: (Performance) Remove allocations
                 let compressors: Vec<Box<dyn Compressor<Data=$Ty>>> = vec![
                     $(Box::new(<$compressions>::new())),+
                 ];
-                let type_id = compress(data, bytes, &compressors[..]);
-                lens.push(bytes.len() - start);
-                type_id
+                stream.write_with_len(|stream|
+                    compress(data, stream.bytes(), &compressors[..])
+                )
             }
 
             // Convert data to as<T>, using a transmute if that's already correct
             if TypeId::of::<$Ty>() == TypeId::of::<T>() {
                 // Safety - this is a unit conversion.
                 let data = unsafe { transmute(data) };
-                write_inner(data, bytes, lens)
+                write_inner(data, stream)
             } else {
                 // TODO: Use second-stack
                 let mut v = Vec::new();
                 for item in data.iter() {
                     v.push(item.as_());
                 }
-                write_inner(&v, bytes, lens)
+                write_inner(&v, stream)
             }
         }
     };

@@ -19,12 +19,9 @@ macro_rules! impl_tuple {
         #[cfg(feature = "write")]
         impl <'a, $($ts: Writable<'a>),+> Writable<'a> for ($($ts),+) {
             type WriterArray=($($ts::WriterArray),+);
-            fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId {
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
                 $(
-                    let type_index = bytes.len();
-                    bytes.push(0);
-                    let type_id = $ts::write_root(&tuple_index!(value, $ti), bytes, lens, options);
-                    bytes[type_index] = type_id.into();
+                    stream.write_with_id(|stream| tuple_index!(self, $ti).write_root(stream));
                 )+
                 $trid
             }
@@ -38,13 +35,12 @@ macro_rules! impl_tuple {
                     tuple_index!(self, $ti).buffer(&tuple_index!(value, $ti));
                 )+
             }
-            fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId {
+            fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
                 let ($($ts,)+) = self;
                 $(
-                    let type_index = bytes.len();
-                    bytes.push(0);
-                    let type_id = $ts.flush(bytes, lens, options);
-                    bytes[type_index] = type_id.into();
+                    stream.write_with_id(|stream|
+                        $ts.flush(stream)
+                    );
                 )+
                 $taid
             }

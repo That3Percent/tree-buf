@@ -5,9 +5,9 @@ use crate::prelude::*;
 #[cfg(feature = "write")]
 impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
     type WriterArray = NullableWriter<'a, T::WriterArray>;
-    fn write_root<'b: 'a>(value: &'b Self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> RootTypeId {
-        if let Some(value) = value {
-            T::write_root(value, bytes, lens, options)
+    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        if let Some(value) = self {
+            T::write_root(value, stream)
         } else {
             RootTypeId::Void
         }
@@ -41,14 +41,11 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for NullableWriter<'a, T> {
             self.value.get_or_insert_with(T::default).buffer(value);
         }
     }
-    fn flush(self, bytes: &mut Vec<u8>, lens: &mut Vec<usize>, options: &impl EncodeOptions) -> ArrayTypeId {
+    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         if let Some(value) = self.value {
-            let opts_id = self.opt.flush(bytes, lens, options);
+            let opts_id = self.opt.flush(stream);
             debug_assert_eq!(opts_id, ArrayTypeId::Boolean);
-            let type_index = bytes.len();
-            bytes.push(0);
-            let type_id = value.flush(bytes, lens, options);
-            bytes[type_index] = type_id.into();
+            stream.write_with_id(|stream| value.flush(stream));
             ArrayTypeId::Nullable
         } else {
             ArrayTypeId::Void

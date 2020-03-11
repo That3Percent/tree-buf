@@ -7,8 +7,23 @@ mod array_branch;
 pub use array_branch::*;
 
 pub type Ident<'a> = &'a str;
+
+#[cfg(feature = "read")]
+#[inline]
 pub fn read_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> ReadResult<Ident<'a>> {
     read_str(bytes, offset)
+}
+
+#[cfg(feature = "write")]
+#[inline]
+pub fn write_ident(value: &str, bytes: &mut Vec<u8>) {
+    write_str(value, bytes)
+}
+
+pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
+    fn void() -> Self
+    where
+        Self: Sized;
 }
 
 // TODO: Finish or get rid of this mod

@@ -247,6 +247,15 @@ pub enum RootTypeId {
     Str, // Str0 = Empty string, Str1-Str3 get unit abbreviations, like ft or ft²
 }
 
+impl TypeId for RootTypeId {
+    fn void() -> Self
+    where
+        Self: Sized,
+    {
+        RootTypeId::Void
+    }
+}
+
 impl RootTypeId {
     // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
     fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
