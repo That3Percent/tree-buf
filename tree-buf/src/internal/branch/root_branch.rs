@@ -3,38 +3,22 @@ use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
-// TODO: Most of these comments are likely out of date.
+// TODO: Before there was an idea that Void should be lowered removed from eg: Object fields and the like. But,
+// it's less clear when considering this is data and not messages that doing so is useful.
+
 // TODO: The idea for int is to always encode up to 64 bit values,
 // but for any data store the min value and offset first, then use
 // that to select an optimal encoding. When deserializing, the min and
 // offset can be used to find if the data type required by the schema
 // matches.
-// Consider something like this - https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
 
-// TODO: GUID
-// TODO: Bytes = [u8]
-// TODO: Date
-// TODO: Enum - Something like this... needs to simmer.
-//              The enum primitive id contains 1 number which is the discriminant count.
-//              The enum discriminant as int is contained in the enum branch
-//              Each sub-branch contains the discriminant name (string)
-//              Each branch may have a sub-branch for data belonging to the variant for that discriminant in each entry.
-//              In many cases, this data will be Void, which may be wasteful to have a branch for.
-//              ..
-//              Because enum is so flexible, it's possible to wrap some dynamic data into it. Eg: EnumValue<T>.
-//              This would create some number of sub-branches 'dynamically'.
+// TODO: GUID. Consider having some sort of "semantic" flag to denote other kinds of values (like f64/u64 -> timestamp/date, 128 bit [u8] -> GUID)
+// TODO: Other kinds of self-description may also be interesting, since this is for data self-description is higher value
+// TODO: Bytes/Blog = [u8] compressed (eg: gzip), uncompressed
 
 // TODO: Try each compression on a sample of the data (first 1024 or so?) in turn to decide which to use.
 // 8-Array & different fixed/variable sizes - 0,1,2,128,custom(follows). Fixed 0 necessarily has Void child
-// ? Integer - Different for array context or not? Min/Max? Different encoding options? (uncompressed option) signed, unsigned, 8,16,32,64
-// ?-Enum - String,Int, or other discriminant, whether or not there is data for sub-branches, and whether
-// 4-Float (32/64, compresssed/not) Consider:
-//      dfcm - https://userweb.cs.txstate.edu/~mb92/papers/dcc06.pdf
-//      https://www.cs.unc.edu/~isenburg/lcpfpv/
-//      https://akumuli.org/akumuli/2017/02/05/compression_part2/
-//      Consider an 'allow-lossy' flag (per field) or input trait
 // 1-128 bits
-// 2-Blob - compressed, uncompressed
 
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
@@ -122,7 +106,15 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
             // TODO: Consider having the enum be:
             //    Root: static_data: RootBranch, instance_data: RootBranch
             //    Array: static_data: RootBranch, instance_data: ArrayBranch, discriminant: ArrayBranch(int)
-            // This can be more powerful, but it's not always clear what the intent is.
+            // The interesting idea here is that it can be more powerful in that it supports complex value de-duplication
+            // Eg: like a primary key. One could represent more information (eg: Like a politician having a name and party
+            // when having a table for primaries and delegates). That might be more interesting as some kind of pointer type.
+            // It also would support c-style enums, which could be good for eg: rendering.
+            //
+            // The downside is it's not always clear what the intent is, and how to merge static and instance data for particular
+            // languages. Eg: GeoJson could have { "type" : "..." } as static_data in an object here and merge that with another
+            // object in instance_data. So many questions though, like does static_data need to be the same type for each discriminant?
+            // If so, it would be an ArrayBranch with a fixed size.
             let discriminant = read_ident(bytes, offset)?;
             let value = read_next_root(bytes, offset, lens)?.into();
             DynRootBranch::Enum { discriminant, value }

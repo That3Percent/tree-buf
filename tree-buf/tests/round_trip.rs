@@ -129,13 +129,13 @@ fn array_tuple() {
 }
 
 #[test]
-fn round_trip_item() {
+fn item() {
     let item = make_item();
     round_trip(&item, 144);
 }
 
 #[test]
-fn round_trip_item_vec() {
+fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
     round_trip(&item, 405);

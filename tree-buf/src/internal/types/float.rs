@@ -11,6 +11,8 @@ use std::vec::IntoIter;
 // FPC
 // Akamuli - https://akumuli.org/akumuli/2017/02/05/compression_part2/
 // ? http://blog.omega-prime.co.uk/2016/01/25/compression-of-floating-point-timeseries/
+// https://www.cs.unc.edu/~isenburg/lcpfpv/
+// dfcm - https://userweb.cs.txstate.edu/~mb92/papers/dcc06.pdf
 
 // TODO: Lowerings
 // Interesting reading: https://internals.rust-lang.org/t/tryfrom-for-f64/9793/35

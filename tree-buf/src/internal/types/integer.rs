@@ -269,3 +269,4 @@ impl<T: Into<u32> + Copy> Compressor<'_> for Simple16Compressor<T> {
 
 // TODO: Bitpacking https://crates.io/crates/bitpacking
 // TODO: Mayda https://crates.io/crates/mayda
+// TODO: https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/

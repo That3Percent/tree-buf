@@ -4,6 +4,7 @@ extern crate syn;
 extern crate quote;
 use inflector::cases::camelcase::to_camel_case;
 
+use quote::ToTokens;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, Type, Visibility};
 
@@ -22,19 +23,15 @@ pub fn write_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 }
 
 fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
-    let name = &ast.ident;
-    let span = name.span();
-    let vis = &ast.vis;
-    let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
 
     match &ast.data {
-        Data::Struct(data_struct) => impl_struct_write(name, &span, vis, &array_writer_name, data_struct),
-        Data::Enum(data_enum) => impl_enum_write(name, &span, vis, &array_writer_name, data_enum),
+        Data::Struct(data_struct) => impl_struct_write(ast, data_struct),
+        Data::Enum(data_enum) => impl_enum_write(ast, data_enum),
         Data::Union(_) => panic!("Unions are not supported by tree-buf"),
     }
 }
 
-fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_struct: &DataStruct) -> TokenStream {
+fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
     let fields = get_named_fields(data_struct);
 
     let writers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
@@ -46,7 +43,7 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as ::tree_buf::internal::Writable<'a>>::WriterArray,
+            #ident: <#ty as ::tree_buf::internal::Writable<'a>>::WriterArray
         }
     });
 
@@ -68,70 +65,77 @@ fn impl_struct_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_n
 
     // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
     let (prefix, suffix) = match num_fields {
-        0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), span.clone())),
+        0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), ast.ident.span().clone())),
         _ => (
             quote! {
                 ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes());
             },
-            Ident::new("ObjN", span.clone()),
+            Ident::new("ObjN", ast.ident.span().clone()),
         ),
     };
 
-    quote! {
-        #[derive(Default)]
-        #vis struct #array_writer_name<'a> {
-            #(#array_fields)*
-        }
+    let flush = quote! {
+        #prefix
+        #(#flushers)*
+        ::tree_buf::internal::ArrayTypeId::#suffix
+    };
 
-        impl<'a> ::tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
-            type Write=#name;
-            fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
-                #(#buffers)*
-            }
-            fn flush(self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
-                #prefix
-                #(#flushers)*
-                ::tree_buf::internal::ArrayTypeId::#suffix
-            }
-        }
+    let buffer = quote! {
+        #(#buffers)*
+    };
 
-        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
-            type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
-                #prefix
-                #(#writers)*
-                ::tree_buf::internal::RootTypeId::#suffix
-            }
-        }
-    }
+    let write_root = quote! {
+        #prefix
+        #(#writers)*
+        ::tree_buf::internal::RootTypeId::#suffix
+    };
+
+   fill_write_skeleton(ast, array_fields, buffer, flush, write_root)
 }
 
-fn impl_enum_write(name: &Ident, span: &Span, vis: &Visibility, array_writer_name: &Ident, data_enum: &DataEnum) -> TokenStream {
-    // TODO: Move this part into some shared thing.
+fn fill_write_skeleton<A: ToTokens>(ast: &DeriveInput, array_fields: impl Iterator<Item=A>, buffer: impl ToTokens, flush: impl ToTokens, write_root: impl ToTokens) -> TokenStream {
+    let name = &ast.ident;
+    let vis = &ast.vis;
+    let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
+
     quote! {
         #[derive(Default)]
         #vis struct #array_writer_name<'a> {
-            // TODO: Add list for discriminants and values.
-            _todo_remove: ::std::marker::PhantomData<&'a ()>,
-        }
-
-        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
-            type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
-                todo!()
-            }
+            #(#array_fields,)*
         }
 
         impl<'a> ::tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
             type Write=#name;
             fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
-                todo!()
+                #buffer
             }
             fn flush(self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
-                todo!()
+                #flush
+            }
+        }
+
+        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
+            type WriterArray=#array_writer_name<'a>;
+            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
+               #write_root
             }
         }
     }
+
+}
+
+fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
+    /// What is needed:
+    /// An outer struct containing writers for each variant
+    /// For each variant, possibly it's own writer struct if it's a tuple or struct sort of DataEnum
+    /// A discriminant
+    
+    let write_root = quote! { todo!() };
+    let array_fields = vec![quote! { _todo_remove: ::std::marker::PhantomData<&'a ()> }];
+    let buffer = quote! { todo!() };
+    let flush = quote! { todo!() };
+
+    fill_write_skeleton(ast, array_fields.iter(), buffer, flush, write_root)
 }
 
 #[proc_macro_derive(Read)]
