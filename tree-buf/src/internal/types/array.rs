@@ -57,7 +57,7 @@ impl<T: Readable> Readable for Vec<T> {
                 // that we wanted in the first place. Specialization here would be nice.
                 let mut reader = T::ReaderArray::new(values)?;
                 for _ in 0..len {
-                    v.push(reader.read_next()?);
+                    v.push(reader.read_next());
                 }
                 Ok(v)
                 // We could try to verify the file here by trying
@@ -134,16 +134,16 @@ impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> ReadResult<Self::Read> {
+    fn read_next(&mut self) -> Self::Read {
         if let Some(inner) = self {
-            let len = inner.len.read_next()?;
+            let len = inner.len.read_next();
             let mut result = Vec::with_capacity(len as usize);
             for _ in 0..len {
-                result.push(inner.values.read_next()?);
+                result.push(inner.values.read_next());
             }
-            Ok(result)
+            result
         } else {
-            Ok(Vec::new())
+            Vec::new()
         }
     }
 }

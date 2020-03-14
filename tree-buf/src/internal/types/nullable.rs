@@ -73,15 +73,15 @@ impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> ReadResult<Self::Read> {
+    fn read_next(&mut self) -> Self::Read {
         if let Some(inner) = self {
-            if inner.opts.read_next()? {
-                Ok(Some(inner.values.read_next()?))
+            if inner.opts.read_next() {
+                Some(inner.values.read_next())
             } else {
-                Ok(None)
+                None
             }
         } else {
-            Ok(None)
+            None
         }
     }
 }

@@ -3,7 +3,7 @@
 // TODO: This would be the place to specify in-place padded/aligned encoding when desired.
 // I'm not sure that's as useful, since it moves out of where tree-buf competes into different
 // territory (eg: FlatBuffers). Though Flatbuffers by way of example doesn't allow for in-place encoding,
-// 
+//
 
 macro_rules! options {
     ($(($name:ident, $T:ty, $fallback:expr, $over:ident)),*) => {

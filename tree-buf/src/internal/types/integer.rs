@@ -115,8 +115,8 @@ macro_rules! impl_lowerable {
                     _ => Err(ReadError::SchemaMismatch),
                 }
             }
-            fn read_next(&mut self) -> ReadResult<Self::Read> {
-                self.next().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::ShortArray))
+            fn read_next(&mut self) -> Self::Read {
+                self.next().unwrap_or_default()
             }
         }
 

@@ -23,7 +23,6 @@ pub fn write_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 }
 
 fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
-
     match &ast.data {
         Data::Struct(data_struct) => impl_struct_write(ast, data_struct),
         Data::Enum(data_enum) => impl_enum_write(ast, data_enum),
@@ -182,7 +181,7 @@ fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, d
 
     let read_nexts = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
-            #ident: self.#ident.read_next()?,
+            #ident: self.#ident.read_next(),
         }
     });
 
@@ -216,10 +215,10 @@ fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, d
                     #(#news)*
                 })
             }
-            fn read_next(&mut self) -> Result<Self::Read, ::tree_buf::ReadError> {
-                Ok(#name {
+            fn read_next(&mut self) -> Self::Read {
+                #name {
                     #(#read_nexts)*
-                })
+                }
             }
         }
     }
@@ -241,7 +240,7 @@ fn impl_enum_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, dat
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
                 todo!()
             }
-            fn read_next(&mut self) -> Result<Self::Read, ::tree_buf::ReadError> {
+            fn read_next(&mut self) -> Self::Read {
                 todo!()
             }
         }

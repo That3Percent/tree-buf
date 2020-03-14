@@ -86,10 +86,10 @@ macro_rules! impl_tuple {
                     _ => Err(ReadError::SchemaMismatch)
                 }
             }
-            fn read_next(&mut self) -> ReadResult<Self::Read> {
-                Ok(($(
-                    tuple_index!(self, $ti).read_next()?,
-                )+))
+            fn read_next(&mut self) -> Self::Read {
+                ($(
+                    tuple_index!(self, $ti).read_next(),
+                )+)
             }
         }
     };

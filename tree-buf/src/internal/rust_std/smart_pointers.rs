@@ -46,7 +46,7 @@ impl<T: ReaderArray> ReaderArray for BoxReaderArray<T> {
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
         Ok(BoxReaderArray { inner: T::new(sticks)? })
     }
-    fn read_next(&mut self) -> ReadResult<Self::Read> {
-        Ok(Box::new(self.inner.read_next()?))
+    fn read_next(&mut self) -> Self::Read {
+        Box::new(self.inner.read_next())
     }
 }
