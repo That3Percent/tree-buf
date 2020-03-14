@@ -21,6 +21,13 @@ num-traits = "0.2.11"
 #ndarray = "0.13.0"
 gibbon = "0.1.1"
 
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "float_list"
+harness = false
+
 [features]
 default = ["read", "write", "macros"]
 
