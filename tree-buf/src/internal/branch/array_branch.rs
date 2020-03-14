@@ -97,6 +97,7 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         }
 
         // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
+        Obj0 => read_obj(0, bytes, offset, lens)?,
         Obj1 => read_obj(1, bytes, offset, lens)?,
         Obj2 => read_obj(2, bytes, offset, lens)?,
         Obj3 => read_obj(3, bytes, offset, lens)?,
@@ -139,60 +140,17 @@ impl<'a> Default for DynArrayBranch<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum ArrayTypeId {
-    // Constructions
-    Nullable,
-    Void,
-    Tuple2,
-    Tuple3,
-    Tuple4,
-    Tuple5,
-    Tuple6,
-    Tuple7,
-    Tuple8,
-    TupleN,
-    ArrayVar, // TODO: ArrayFixed
-    Obj1,
-    Obj2,
-    Obj3,
-    Obj4,
-    Obj5,
-    Obj6,
-    Obj7,
-    Obj8,
-    ObjN,
-
-    // Bool
-    Boolean,
-
-    // Int
-    IntSimple16,
-    IntPrefixVar,
-
-    // Float,
-    F32,
-    F64,
-    DoubleGorilla,
-
-    // Str
-    Utf8,
-}
-
-impl TypeId for ArrayTypeId {
-    fn void() -> Self {
-        ArrayTypeId::Void
-    }
-}
-
-impl ArrayTypeId {
-    // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
-    fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<ArrayTypeId> {
-        let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
-        *offset += 1;
-        (*next).try_into()
-    }
-}
+impl_type_id!(ArrayTypeId, [
+    Nullable: 1,
+    ArrayVar: 2,
+    Boolean: 3,
+    IntSimple16: 4,
+    IntPrefixVar: 5,
+    F32: 6,
+    F64: 7,
+    Utf8: 8,
+    DoubleGorilla: 9,
+]);
 
 #[derive(Debug)]
 pub struct ArrayInteger<'a> {
@@ -206,78 +164,4 @@ pub struct ArrayInteger<'a> {
 pub enum ArrayIntegerEncoding {
     PrefixVarInt,
     Simple16,
-}
-
-impl TryFrom<u8> for ArrayTypeId {
-    type Error = ReadError;
-    fn try_from(value: u8) -> ReadResult<Self> {
-        use ArrayTypeId::*;
-        let ok = match value {
-            0 => Nullable,
-            1 => Void,
-            2 => Tuple2,
-            3 => Tuple3,
-            4 => Tuple4,
-            5 => Tuple5,
-            6 => Tuple6,
-            7 => Tuple7,
-            8 => Tuple8,
-            9 => TupleN,
-            10 => ArrayVar,
-            11 => Obj1,
-            12 => Obj2,
-            13 => Obj3,
-            14 => Obj4,
-            15 => Obj5,
-            16 => Obj6,
-            17 => Obj7,
-            18 => Obj8,
-            19 => ObjN,
-            20 => Boolean,
-            21 => IntSimple16,
-            22 => IntPrefixVar,
-            23 => F32,
-            24 => F64,
-            25 => Utf8,
-            26 => DoubleGorilla,
-            _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
-        };
-        debug_assert_eq!(value, ok.into());
-        Ok(ok)
-    }
-}
-
-impl From<ArrayTypeId> for u8 {
-    fn from(value: ArrayTypeId) -> Self {
-        use ArrayTypeId::*;
-        match value {
-            Nullable => 0,
-            Void => 1,
-            Tuple2 => 2,
-            Tuple3 => 3,
-            Tuple4 => 4,
-            Tuple5 => 5,
-            Tuple6 => 6,
-            Tuple7 => 7,
-            Tuple8 => 8,
-            TupleN => 9,
-            ArrayVar => 10,
-            Obj1 => 11,
-            Obj2 => 12,
-            Obj3 => 13,
-            Obj4 => 14,
-            Obj5 => 15,
-            Obj6 => 16,
-            Obj7 => 17,
-            Obj8 => 18,
-            ObjN => 19,
-            Boolean => 20,
-            IntSimple16 => 21,
-            IntPrefixVar => 22,
-            F32 => 23,
-            F64 => 24,
-            Utf8 => 25,
-            DoubleGorilla => 26,
-        }
-    }
 }

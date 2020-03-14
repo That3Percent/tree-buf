@@ -92,6 +92,7 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
         ArrayN => read_array(read_usize(bytes, offset)?, bytes, offset, lens)?,
 
         // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
+        Obj0 => read_obj(0, bytes, offset, lens)?,
         Obj1 => read_obj(1, bytes, offset, lens)?,
         Obj2 => read_obj(2, bytes, offset, lens)?,
         Obj3 => read_obj(3, bytes, offset, lens)?,
@@ -172,212 +173,42 @@ pub enum RootInteger {
     U(u64),
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum RootTypeId {
-    // Constructions
+impl_type_id!(RootTypeId, [
     // No nullable at root. Some is always just the inner value, and None is just elided.
-    Void, // Void at root may be necessary. Eg: Tuple(?, Option<?>, ?) at root.
-    Tuple2,
-    Tuple3,
-    Tuple4,
-    Tuple5,
-    Tuple6,
-    Tuple7,
-    Tuple8,
-    TupleN,
-    Array0,
-    Array1,
-    ArrayN, // Array0 and Array1 don't count as entering an array context. // TODO: Special common sized arrays - eg: 16 for 4x4 matrix.
-    Obj1,
-    Obj2,
-    Obj3,
-    Obj4,
-    Obj5,
-    Obj6,
-    Obj7,
-    Obj8,
-    ObjN, // Obj0 is just void.
-    Enum,
-
-    // Bool
-    True,
-    False,
-
-    // Int
-    IntU64,
-    IntU56,
-    IntU48,
-    IntU40,
-    IntU32,
-    IntU24,
-    IntU16,
-    IntU8,
-    IntS64,
-    IntS56,
-    IntS48,
-    IntS40,
-    IntS32,
-    IntS24,
-    IntS16,
-    IntS8,
-
-    // Int Or Float
-    Zero,
-    One,
-    NegOne,
-
-    // Float,
-    F32,
-    F64,
-    NaN, // Works for either f64 or f32.
-
-    // Str
-    Str0,
-    Str1,
-    Str2,
-    Str3,
-    Str, // Str0 = Empty string, Str1-Str3 get unit abbreviations, like ft or ft²
-}
-
-impl TypeId for RootTypeId {
-    fn void() -> Self
-    where
-        Self: Sized,
-    {
-        RootTypeId::Void
-    }
-}
-
-impl RootTypeId {
-    // See also 582c63bc-851d-40d5-8ccc-caa05e8f3dc6
-    fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
-        let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
-        *offset += 1;
-        (*next).try_into()
-    }
-}
-
-impl TryFrom<u8> for RootTypeId {
-    type Error = ReadError;
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        use RootTypeId::*;
-        let ok = match value {
-            0 => Void,
-            1 => Tuple2,
-            2 => Tuple3,
-            3 => Tuple4,
-            4 => Tuple5,
-            5 => Tuple6,
-            6 => Tuple7,
-            7 => Tuple8,
-            8 => TupleN,
-            9 => Array0,
-            10 => Array1,
-            11 => ArrayN,
-            12 => Obj1,
-            13 => Obj2,
-            14 => Obj3,
-            15 => Obj4,
-            16 => Obj5,
-            17 => Obj6,
-            18 => Obj7,
-            19 => Obj8,
-            20 => ObjN,
-            21 => True,
-            22 => False,
-            23 => IntU64,
-            24 => IntU56,
-            25 => IntU48,
-            26 => IntU40,
-            27 => IntU32,
-            28 => IntU24,
-            29 => IntU16,
-            30 => IntU8,
-            31 => IntS64,
-            32 => IntS56,
-            33 => IntS48,
-            34 => IntS40,
-            35 => IntS32,
-            36 => IntS24,
-            37 => IntS16,
-            38 => IntS8,
-            39 => Zero,
-            40 => One,
-            41 => NegOne,
-            42 => F32,
-            43 => F64,
-            44 => NaN,
-            45 => Str0,
-            46 => Str1,
-            47 => Str2,
-            48 => Str3,
-            49 => Str,
-            50 => Enum,
-            _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
-        };
-        debug_assert_eq!(value, ok.into());
-        Ok(ok)
-    }
-}
-
-impl From<RootTypeId> for u8 {
-    fn from(value: RootTypeId) -> Self {
-        use RootTypeId::*;
-        match value {
-            Void => 0,
-            Tuple2 => 1,
-            Tuple3 => 2,
-            Tuple4 => 3,
-            Tuple5 => 4,
-            Tuple6 => 5,
-            Tuple7 => 6,
-            Tuple8 => 7,
-            TupleN => 8,
-            Array0 => 9,
-            Array1 => 10,
-            ArrayN => 11,
-            Obj1 => 12,
-            Obj2 => 13,
-            Obj3 => 14,
-            Obj4 => 15,
-            Obj5 => 16,
-            Obj6 => 17,
-            Obj7 => 18,
-            Obj8 => 19,
-            ObjN => 20,
-            True => 21,
-            False => 22,
-            IntU64 => 23,
-            IntU56 => 24,
-            IntU48 => 25,
-            IntU40 => 26,
-            IntU32 => 27,
-            IntU24 => 28,
-            IntU16 => 29,
-            IntU8 => 30,
-            IntS64 => 31,
-            IntS56 => 32,
-            IntS48 => 33,
-            IntS40 => 34,
-            IntS32 => 35,
-            IntS24 => 36,
-            IntS16 => 37,
-            IntS8 => 38,
-            Zero => 39,
-            One => 40,
-            NegOne => 41,
-            F32 => 42,
-            F64 => 43,
-            NaN => 44,
-            Str0 => 45,
-            Str1 => 46,
-            Str2 => 47,
-            Str3 => 48,
-            Str => 49,
-            Enum => 50,
-        }
-    }
-}
+    Array0: 1,
+    Array1: 2,
+    ArrayN: 3,
+    True: 4,
+    False: 5,
+    IntU64: 6,
+    IntU56: 7,
+    IntU48: 8,
+    IntU40: 9,
+    IntU32: 10,
+    IntU24: 11,
+    IntU16: 12,
+    IntU8: 13,
+    IntS64: 14,
+    IntS56: 15,
+    IntS48: 16,
+    IntS40: 17,
+    IntS32: 18,
+    IntS24: 19,
+    IntS16: 20,
+    IntS8: 21,
+    Zero: 22,
+    One: 23,
+    NegOne: 24,
+    F32: 25,
+    F64: 26,
+    NaN: 27,
+    Str0: 28,
+    Str1: 29,
+    Str2: 30,
+    Str3: 31,
+    Str: 32,
+    Enum: 33,
+]);
 
 impl RootInteger {
     #[inline(always)]

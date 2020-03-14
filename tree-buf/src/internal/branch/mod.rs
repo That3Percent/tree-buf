@@ -1,5 +1,74 @@
 use crate::prelude::*;
 
+#[macro_use]
+macro_rules! impl_type_id {
+    ($T:ident, [$($name:ident: $i:expr,)+]) => {
+        impl_type_id_inner!($T, [
+            Void: 0,
+            Tuple2: 100,
+            Tuple3: 101,
+            Tuple4: 102,
+            Tuple5: 103,
+            Tuple6: 104,
+            Tuple7: 105,
+            Tuple8: 106,
+            TupleN: 107,
+            Obj0: 108,
+            Obj1: 109,
+            Obj2: 110,
+            Obj3: 111,
+            Obj4: 112,
+            Obj5: 113,
+            Obj6: 114,
+            Obj7: 115,
+            Obj8: 116,
+            ObjN: 117,
+            $($name: $i,)+
+        ]);
+    };
+}
+
+macro_rules! impl_type_id_inner {
+    ($T:ident, [$($name:ident: $i:expr,)+]) => {
+        #[derive(PartialEq, Eq, Debug, Copy, Clone)]
+        pub enum $T {
+            $($name),+
+        }
+
+        impl TypeId for $T {
+            fn void() -> Self where Self: Sized {
+                $T::Void
+            }
+        }
+
+        impl TryFrom<u8> for $T {
+            type Error = ReadError;
+            fn try_from(value: u8) -> ReadResult<Self> {
+                Ok(match value {
+                    $($i => $T::$name,)+
+                    _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
+                })
+            }
+        }
+
+        impl From<$T> for u8 {
+            fn from(value: $T) -> Self {
+                match value {
+                    $($T::$name => $i,)+
+                }
+            }
+        }
+
+        impl $T {
+            fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
+                let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
+                *offset += 1;
+                (*next).try_into()
+            }
+        }
+    }
+}
+
 mod root_branch;
 pub use root_branch::*;
 
