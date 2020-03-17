@@ -12,12 +12,28 @@ pub enum ArrayFloat<'a> {
 
 #[derive(Debug)]
 pub enum DynArrayBranch<'a> {
-    Object { children: HashMap<Ident<'a>, DynArrayBranch<'a>> },
-    Tuple { children: Vec<DynArrayBranch<'a>> },
+    Object {
+        children: HashMap<Ident<'a>, DynArrayBranch<'a>>,
+    },
+    Tuple {
+        children: Vec<DynArrayBranch<'a>>,
+    },
     Array0,
-    Array { len: Box<DynArrayBranch<'a>>, values: Box<DynArrayBranch<'a>> },
+    Array {
+        len: Box<DynArrayBranch<'a>>,
+        values: Box<DynArrayBranch<'a>>,
+    },
+    Map0,
+    Map {
+        len: Box<DynArrayBranch<'a>>,
+        keys: Box<DynArrayBranch<'a>>,
+        values: Box<DynArrayBranch<'a>>,
+    },
     Integer(ArrayInteger<'a>),
-    Nullable { opt: &'a [u8], values: Box<DynArrayBranch<'a>> },
+    Nullable {
+        opt: &'a [u8],
+        values: Box<DynArrayBranch<'a>>,
+    },
     Boolean(&'a [u8]),
     Float(ArrayFloat<'a>),
     Void,
@@ -82,16 +98,32 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         Tuple8 => read_tuple(8, bytes, offset, lens)?,
         TupleN => read_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         ArrayVar => {
-            let values = read_next_array(bytes, offset, lens)?;
-            match values {
+            let len = read_next_array(bytes, offset, lens)?;
+            match len {
                 DynArrayBranch::Void => DynArrayBranch::Array0,
                 _ => {
-                    // FIXME: Verify that this is Integer here. If not, the file is invalid.
+                    // FIXME: Verify that len is Integer here. If not, the file is invalid.
                     // This may not be verified later if the schema is selectively matched.
-                    let len = read_next_array(bytes, offset, lens)?;
                     let len = Box::new(len);
+                    let values = read_next_array(bytes, offset, lens)?;
                     let values = Box::new(values);
                     DynArrayBranch::Array { len, values }
+                }
+            }
+        }
+        Map => {
+            let len = read_next_array(bytes, offset, lens)?;
+            match len {
+                DynArrayBranch::Void => DynArrayBranch::Map0,
+                _ => {
+                    // FIXME: Verify that len is Integer here. If not, the file is invalid.
+                    // This may not be verified later if the schema is selectively matched.
+                    let len = Box::new(len);
+                    let keys = read_next_array(bytes, offset, lens)?;
+                    let keys = Box::new(keys);
+                    let values = read_next_array(bytes, offset, lens)?;
+                    let values = Box::new(values);
+                    DynArrayBranch::Map { len, keys, values }
                 }
             }
         }
@@ -150,6 +182,7 @@ impl_type_id!(ArrayTypeId, [
     F64: 7,
     Utf8: 8,
     DoubleGorilla: 9,
+    Map: 10,
 ]);
 
 #[derive(Debug)]

@@ -60,10 +60,6 @@ impl<T: Readable> Readable for Vec<T> {
                     v.push(reader.read_next());
                 }
                 Ok(v)
-                // We could try to verify the file here by trying
-                // to read one more value, but that doesn't work well
-                // for block based readers (eg: bool) because they round up
-                // the number of values read to pad the block
             }
             _ => Err(ReadError::SchemaMismatch),
         }
@@ -106,12 +102,10 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
-            let type_id = stream.write_with_id(|stream| values.flush(stream));
-            debug_assert_ne!(type_id, ArrayTypeId::Void); // If this is Void, it's ambigous
-
             // TODO: Maybe combine the permutations of valid int compressors here with ArrayVar to save a byte
             // here every time. Eg: ArrayVarSimple16 ArrayVarIntPrefixVar
             stream.write_with_id(|stream| len.flush(stream));
+            stream.write_with_id(|stream| values.flush(stream));
         } else {
             stream.write_with_id(|_| ArrayTypeId::Void);
         }

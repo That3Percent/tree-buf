@@ -22,17 +22,37 @@ use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
-    Object { children: HashMap<Ident<'a>, DynRootBranch<'a>> },
-    Tuple { children: Vec<DynRootBranch<'a>> },
-    Enum { discriminant: Ident<'a>, value: Box<DynRootBranch<'a>> },
+    Object {
+        children: HashMap<Ident<'a>, DynRootBranch<'a>>,
+    },
+    Tuple {
+        children: Vec<DynRootBranch<'a>>,
+    },
+    Enum {
+        discriminant: Ident<'a>,
+        value: Box<DynRootBranch<'a>>,
+    },
     Array0,                         // Separate from Array because it infers Void
     Array1(Box<DynRootBranch<'a>>), // Separate from Array because it does not need to enter an array context
-    Array { len: usize, values: DynArrayBranch<'a> },
+    Array {
+        len: usize,
+        values: DynArrayBranch<'a>,
+    },
     Integer(RootInteger),
     Boolean(bool),
     Float(RootFloat),
     Void,
     String(&'a str),
+    Map0,
+    Map1 {
+        key: Box<DynRootBranch<'a>>,
+        value: Box<DynRootBranch<'a>>,
+    },
+    Map {
+        len: usize,
+        keys: DynArrayBranch<'a>,
+        values: DynArrayBranch<'a>,
+    },
 }
 
 pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
@@ -90,6 +110,22 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
         //Array4 => read_array(4, bytes, offset, lens)?,
         // TODO: usize - 2
         ArrayN => read_array(read_usize(bytes, offset)?, bytes, offset, lens)?,
+        Map => {
+            let len = read_usize(bytes, offset)?;
+            match len {
+                0 => DynRootBranch::Map0,
+                1 => {
+                    let key = read_next_root(bytes, offset, lens)?.into();
+                    let value = read_next_root(bytes, offset, lens)?.into();
+                    DynRootBranch::Map1 { key, value }
+                }
+                _ => {
+                    let keys = read_next_array(bytes, offset, lens)?;
+                    let values = read_next_array(bytes, offset, lens)?;
+                    DynRootBranch::Map { len, keys, values }
+                }
+            }
+        }
 
         // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
         Obj0 => read_obj(0, bytes, offset, lens)?,
@@ -208,6 +244,7 @@ impl_type_id!(RootTypeId, [
     Str3: 31,
     Str: 32,
     Enum: 33,
+    Map: 34,
 ]);
 
 impl RootInteger {

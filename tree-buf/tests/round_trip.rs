@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use tree_buf::prelude::*;
 mod common;
 use common::*;
+use std::collections::HashMap;
 use tree_buf::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
@@ -288,4 +289,48 @@ fn large_structs() {
     round_trip_default::<_15>(47);
     round_trip_default::<_16>(50);
     round_trip_default::<_17>(53);
+}
+
+#[test]
+fn map_0_root() {
+    let data = HashMap::<u32, u32>::new();
+    round_trip(&data, 2);
+}
+
+#[test]
+fn map_1_root() {
+    let mut data = HashMap::new();
+    data.insert("test".to_owned(), 5u32);
+    round_trip(&data, 10);
+}
+
+#[test]
+fn map_n_root() {
+    let mut data = HashMap::new();
+    data.insert("test3".to_owned(), 5u32);
+    data.insert("test2".to_owned(), 5);
+    data.insert("test1".to_owned(), 0);
+    round_trip(&data, 27);
+}
+
+#[test]
+fn maps_array() {
+    let mut data = Vec::new();
+    for i in 0..5u32 {
+        let mut h = HashMap::new();
+        h.insert(i, Vec::<u32>::new());
+        h.insert(10, vec![10, 9, 8, 7]);
+        data.push(h);
+    }
+    round_trip(&data, 44);
+}
+
+#[test]
+fn maps_void() {
+    let mut data = Vec::new();
+    for _ in 0..5 {
+        let h = HashMap::<String, String>::new();
+        data.push(h);
+    }
+    round_trip(&data, 13);
 }
