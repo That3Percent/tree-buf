@@ -1,9 +1,6 @@
 use tree_buf::prelude::*;
 
-
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-
 
 fn increasing_floats(c: &mut Criterion) {
     let mut data = Vec::new();
@@ -12,8 +9,6 @@ fn increasing_floats(c: &mut Criterion) {
         f += i as f64 * 0.001;
         data.push(f);
     }
-
-    
 
     c.bench_function("write", |b| b.iter_with_large_drop(|| black_box(write(&data))));
 

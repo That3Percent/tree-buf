@@ -11,6 +11,12 @@ pub enum ArrayFloat<'a> {
 }
 
 #[derive(Debug)]
+pub struct ArrayEnumVariant<'a> {
+    pub ident: Ident<'a>,
+    pub data: DynArrayBranch<'a>,
+}
+
+#[derive(Debug)]
 pub enum DynArrayBranch<'a> {
     Object {
         children: HashMap<Ident<'a>, DynArrayBranch<'a>>,
@@ -38,6 +44,10 @@ pub enum DynArrayBranch<'a> {
     Float(ArrayFloat<'a>),
     Void,
     String(&'a [u8]),
+    Enum {
+        discriminants: Box<DynArrayBranch<'a>>,
+        variants: Vec<ArrayEnumVariant<'a>>,
+    },
     // TODO:
     // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
     // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
@@ -161,6 +171,24 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::DoubleGorilla(bytes))
         }
+        Enum => {
+            let count = decode_prefix_varint(bytes, offset)? as usize;
+            let mut variants = Vec::with_capacity(count);
+
+            // TODO: Elide discriminants when there are 0 or 1 variants
+            let discriminants = read_next_array(bytes, offset, lens)?.into();
+
+            if count != 0 {
+                for _ in 0..count {
+                    variants.push(ArrayEnumVariant {
+                        ident: read_ident(bytes, offset)?,
+                        data: read_next_array(bytes, offset, lens)?,
+                    });
+                }
+            }
+
+            DynArrayBranch::Enum { discriminants, variants }
+        }
     };
 
     Ok(branch)
@@ -183,6 +211,7 @@ impl_type_id!(ArrayTypeId, [
     Utf8: 8,
     DoubleGorilla: 9,
     Map: 10,
+    Enum: 11,
 ]);
 
 #[derive(Debug)]

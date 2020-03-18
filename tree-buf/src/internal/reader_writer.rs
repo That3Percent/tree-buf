@@ -1,3 +1,4 @@
+use crate::internal::encodings::varint::{size_for_varint, write_varint_into};
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
@@ -7,6 +8,27 @@ pub trait WriterStream {
     fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
     fn bytes(&mut self) -> &mut Vec<u8>;
     fn options(&self) -> &Self::Options;
+    // TODO: Not yet used
+    fn restore_if_void<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let restore = self.bytes().len();
+        let id = f(self);
+        if id == T::void() {
+            self.bytes().drain(restore..);
+        }
+        id
+    }
+    // TODO: Not yet used
+    fn reserve_and_write_with_varint(&mut self, max: u64, f: impl FnOnce(&mut Self) -> u64) {
+        let reserved = size_for_varint(max);
+        let start = self.bytes().len();
+        for _ in 0..reserved {
+            self.bytes().push(0);
+        }
+        let end = self.bytes().len();
+        let v = f(self);
+        debug_assert!(v <= max);
+        write_varint_into(v, &mut self.bytes()[start..end]);
+    }
 }
 
 pub struct VecWriterStream<'a, O> {
@@ -84,5 +106,5 @@ pub trait ReaderArray: Sized {
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
     // I think that may require GAT though the way things are setup so come back to this later.
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self>;
-    fn read_next(&mut self) -> ReadResult<Self::Read>;
+    fn read_next(&mut self) -> Self::Read;
 }

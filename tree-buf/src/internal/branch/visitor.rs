@@ -25,7 +25,7 @@ pub fn visit_all(root: &DynRootBranch<'_>, visitor: &mut impl Visitor) {
                 Array { len: _, values } => {
                     arrays.push(values);
                 },
-                _ => todo!(),
+                _ => todo!("visitor"),
             }
         }
     }

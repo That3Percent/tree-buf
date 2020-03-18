@@ -14,7 +14,7 @@ pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compre
     }
 
     let restore_point = bytes.len();
-    let sample_size = data.len().min(512);
+    let sample_size = data.len().min(256);
     let sample = &data[..sample_size];
 
     // Rank compressors by how well they do on a sample of the data
@@ -79,7 +79,7 @@ impl<'a> Compressor<'a> for Utf8Compressor {
         Some(total)
     }
     fn compress(&self, _data: &[Self::Data], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-        todo!();
+        todo!("utf8 compress");
     }
 }
 

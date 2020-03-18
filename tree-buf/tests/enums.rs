@@ -3,6 +3,17 @@ use common::round_trip;
 use tree_buf::prelude::*;
 
 #[test]
+fn root_1_unnamed() {
+    #[derive(Read, Write, Debug, PartialEq)]
+    enum K {
+        String(String),
+    }
+
+    round_trip(&K::String("s".to_owned()), 0);
+}
+
+/*
+#[test]
 fn visibility_modifiers() {
     #[derive(Read, Write, Debug, PartialEq)]
     enum Priv {
@@ -18,6 +29,8 @@ fn visibility_modifiers() {
 
     round_trip(&Pub::Val(10), 0);
 }
+*/
+/*
 
 #[test]
 fn selects_correct_discriminant() {
@@ -51,3 +64,4 @@ fn struct_value() {
 
     round_trip(&HasStruct::S { one: 15, two: 15 }, 0);
 }
+*/

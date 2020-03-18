@@ -23,6 +23,22 @@ pub fn size_for_varint(value: u64) -> usize {
     }
 }
 
+// TODO: This isn't yet used
+#[cfg(feature = "write")]
+pub fn write_varint_into(value: u64, into: &mut [u8]) {
+    debug_assert!(size_for_varint(value) <= into.len());
+    match into.len() {
+        1 => {
+            into[0] = (value << 1) as u8 | 1;
+        }
+        2 => {
+            into[0] = (value << 2) as u8 | (1 << 1);
+            into[1] = (value >> 6) as u8;
+        }
+        _ => todo!("write_varint_into"),
+    }
+}
+
 #[cfg(feature = "write")]
 pub fn encode_prefix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
@@ -285,6 +301,25 @@ mod tests {
     #[cfg(all(feature = "read", feature = "write"))]
     use super::super::tests::round_trip;
     use super::*;
+
+    #[cfg(all(feature = "read", feature = "write"))]
+    #[test]
+    fn round_trip_reserved() {
+        let mut v = Vec::new();
+        for i in 0..2048 {
+            let reserve = size_for_varint(i);
+            for _ in 0..reserve {
+                v.push(0);
+            }
+            let w = i / ((i % 3) + 1);
+            write_varint_into(w, &mut v[..]);
+            let mut offset = 0;
+            let result = decode_prefix_varint(&v[..], &mut offset);
+            assert_eq!(Ok(w), result);
+            assert_eq!(offset, v.len());
+            v.clear();
+        }
+    }
 
     #[cfg(all(feature = "read", feature = "write"))]
     fn round_trip_prefix(values: &[u64]) -> ReadResult<()> {

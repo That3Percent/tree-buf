@@ -2,11 +2,13 @@ extern crate proc_macro;
 extern crate syn;
 #[macro_use]
 extern crate quote;
-use inflector::cases::camelcase::to_camel_case;
 
-use quote::ToTokens;
-use proc_macro2::{Ident, Span, TokenStream};
-use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, Type, Visibility};
+use {
+    inflector::cases::camelcase::to_camel_case,
+    proc_macro2::{Ident, TokenStream},
+    quote::ToTokens,
+    syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed, Type, Visibility},
+};
 
 struct NamedField<'a> {
     ident: &'a Ident,
@@ -62,6 +64,13 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     let num_fields = fields.len();
 
+    /*
+    quote! {
+        ::tree_buf::internal::write_fields(#num_fields, stream, |stream| move {
+            #(#writers)*
+        })
+    };
+    */
     // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
     let (prefix, suffix) = match num_fields {
         0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), ast.ident.span().clone())),
@@ -89,13 +98,19 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
         ::tree_buf::internal::RootTypeId::#suffix
     };
 
-   fill_write_skeleton(ast, array_fields, buffer, flush, write_root)
+    fill_write_skeleton(ast, array_fields, buffer, flush, write_root)
 }
 
-fn fill_write_skeleton<A: ToTokens>(ast: &DeriveInput, array_fields: impl Iterator<Item=A>, buffer: impl ToTokens, flush: impl ToTokens, write_root: impl ToTokens) -> TokenStream {
+fn fill_write_skeleton<A: ToTokens>(
+    ast: &DeriveInput,
+    array_fields: impl Iterator<Item = A>,
+    buffer: impl ToTokens,
+    flush: impl ToTokens,
+    write_root: impl ToTokens,
+) -> TokenStream {
     let name = &ast.ident;
     let vis = &ast.vis;
-    let array_writer_name = format_ident!("{}TreeBufArrayWriter", name);
+    let array_writer_name = format_ident!("{}TreeBufWriterArray", name);
 
     quote! {
         #[derive(Default)]
@@ -120,19 +135,86 @@ fn fill_write_skeleton<A: ToTokens>(ast: &DeriveInput, array_fields: impl Iterat
             }
         }
     }
-
 }
 
 fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
-    /// What is needed:
-    /// An outer struct containing writers for each variant
-    /// For each variant, possibly it's own writer struct if it's a tuple or struct sort of DataEnum
-    /// A discriminant
-    
-    let write_root = quote! { todo!() };
-    let array_fields = vec![quote! { _todo_remove: ::std::marker::PhantomData<&'a ()> }];
-    let buffer = quote! { todo!() };
-    let flush = quote! { todo!() };
+    // What is needed:
+    // An outer struct containing writers for each variant
+    // For each variant, possibly it's own writer struct if it's a tuple or struct sort of DataEnum
+    // A discriminant
+
+    let mut array_fields = Vec::new();
+    array_fields.push(quote! {
+        tree_buf_discriminant: <u64 as ::tree_buf::Writable<'a>>::WriterArray
+    });
+    let mut array_matches = Vec::new();
+    let mut root_matches = Vec::new();
+    let mut flushes = Vec::new();
+    let ident = &ast.ident;
+
+    let variants: Vec<_> = data_enum.variants.iter().collect();
+    for (i, variant) in variants.iter().enumerate() {
+        let variant_ident = &variant.ident;
+        let discriminant = canonical_ident(variant_ident);
+
+        match &variant.fields {
+            Fields::Unit => todo!("Unit enums not yet supported by tree-buf"),
+            Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf"),
+            Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
+                let unnamed: Vec<_> = unnamed.iter().collect();
+                match unnamed.len() {
+                    0 => unreachable!(),
+                    1 => {
+                        let ty = &unnamed[0].ty;
+                        array_fields.push(quote! {
+                            #variant_ident: <#ty as ::tree_buf::Writable<'a>>::WriterArray
+                        });
+                        array_matches.push(quote! {
+                            #ident::#variant_ident(_0) => {
+                                // TODO: 'take' a discriminant at buffer time,
+                                // and use Option for array writer to avoid writing unused variants.
+                                self.tree_buf_discriminant.buffer(&(#i as u64));
+                                self.#variant_ident.buffer(_0);
+                            }
+                        });
+                        flushes.push(quote! {
+                            let _0 = self.#variant_ident;
+                            stream.write_with_id(|stream| _0.flush(stream));
+                        });
+                        root_matches.push(quote! {
+                            #ident::#variant_ident(_0) => {
+                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
+                                stream.write_with_id(|stream| _0.write_root(stream));
+                            }
+                        });
+                    }
+                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf"),
+                }
+            }
+        }
+    }
+    let variant_count = variants.len();
+
+    let write_root = quote! {
+       match self {
+           #(#root_matches,)*
+       }
+       ::tree_buf::internal::RootTypeId::Enum
+    };
+    let buffer = quote! {
+       match value {
+           #(#array_matches,)*
+       }
+    };
+    let flush = quote! {
+        ::tree_buf::internal::encodings::varint::encode_prefix_varint(#variant_count as u64, stream.bytes());
+        let _0 = self.tree_buf_discriminant;
+        stream.write_with_id(|stream| _0.flush(stream));
+
+        #(#flushes)*
+
+        ::tree_buf::internal::ArrayTypeId::Enum
+    };
 
     fill_write_skeleton(ast, array_fields.iter(), buffer, flush, write_root)
 }
@@ -229,7 +311,7 @@ fn impl_enum_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, dat
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
             fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                todo!()
+                todo!("Enum read macro")
             }
         }
         #vis struct #array_reader_name {
@@ -238,10 +320,10 @@ fn impl_enum_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, dat
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                todo!()
+                todo!("Enum ReaderArray new macro")
             }
             fn read_next(&mut self) -> Self::Read {
-                todo!()
+                todo!("Enum ReaderArray read_next macro")
             }
         }
     }
