@@ -44,7 +44,7 @@ impl ReaderArray for IntoIter<bool> {
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Boolean(bytes) => {
-                let v = decode_packed_bool(bytes);
+                let v = decode_packed_bool(&bytes);
                 Ok(v.into_iter())
             }
             _ => Err(ReadError::SchemaMismatch),

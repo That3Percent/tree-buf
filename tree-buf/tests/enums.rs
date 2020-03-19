@@ -1,7 +1,6 @@
 mod common;
 use common::round_trip;
 use tree_buf::prelude::*;
-
 #[test]
 fn root_1_unnamed() {
     #[derive(Read, Write, Debug, PartialEq)]
@@ -12,6 +11,15 @@ fn root_1_unnamed() {
     round_trip(&K::String("s".to_owned()), 0);
 }
 
+#[test]
+fn array_1_unnamed() {
+    #[derive(Read, Write, Debug, PartialEq)]
+    enum K {
+        String(String),
+    }
+
+    round_trip(&vec![K::String("s".to_owned()), K::String("k".to_owned())], 0);
+}
 /*
 #[test]
 fn visibility_modifiers() {

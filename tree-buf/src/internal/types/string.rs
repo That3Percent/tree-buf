@@ -90,7 +90,7 @@ impl ReaderArray for IntoIter<String> {
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::String(bytes) => {
-                let strs = read_all(bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
+                let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
             }
             _ => Err(ReadError::SchemaMismatch),

@@ -27,7 +27,7 @@ use std::vec::IntoIter;
 // TODO: More compressors
 
 macro_rules! impl_float {
-    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $zfp:ident, $($rest:ident),*) => {
+    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $LossyGorilla:ident, $($rest:ident),*) => {
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "write")]
         fn $write_item(item: $T, bytes: &mut Vec<u8>) {
@@ -122,11 +122,11 @@ macro_rules! impl_float {
                         match float {
                             ArrayFloat::F64(bytes) => {
                                 // FIXME: Should do schema mismatch for f32 -> f64
-                                let values = read_all(bytes, |bytes, offset| Ok(read_64(bytes, offset)?.as_()))?;
+                                let values = read_all(&bytes, |bytes, offset| Ok(read_64(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
-                                let values = read_all(bytes, |bytes, offset| Ok(read_32(bytes, offset)?.as_()))?;
+                                let values = read_all(&bytes, |bytes, offset| Ok(read_32(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
@@ -179,16 +179,16 @@ macro_rules! impl_float {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
-                let compressors: Vec<Box<dyn Compressor<Data=$T>>> = vec![
+                let mut compressors: Vec<Box<dyn Compressor<Data=$T>>> = vec![
                     Box::new($fixed),
                     $(Box::new($rest)),*
                 ];
                 // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
-                /*
-                if let Some(tolerance) = options.lossy_float_tolerance() {
-                    compressors.push(Box::new($zfp { tolerance }));
+                if let Some(tolerance) = stream.options().lossy_float_tolerance() {
+                    compressors.push(Box::new($LossyGorilla(tolerance)));
+                } else {
+                    compressors.push(Box::new($Gorilla));
                 }
-                */
                 stream.write_with_len(|stream| compress(&self, stream.bytes(), &compressors[..]))
             }
         }
@@ -204,6 +204,30 @@ macro_rules! impl_float {
                     $write_item(*item, bytes);
                 }
                 Ok(ArrayTypeId::$id)
+            }
+        }
+
+        // FIXME: Not clear if this is canon. The source for gibbon is a bit shaky.
+        // Alternatively, there is the tsz crate, but that doesn't offer a separate
+        // double-stream (just joined time+double stream). Both of the implementations
+        // aren't perfect for our API.
+        struct $Gorilla;
+        impl Compressor<'_> for $Gorilla {
+            type Data = $T;
+            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                compress_gorilla(data.iter().map(|f| *f as f64), bytes)
+            }
+        }
+
+        // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
+        // before a real lossy compressor (Eg: fzip) is used.
+        struct $LossyGorilla(i32);
+        impl Compressor<'_> for $LossyGorilla {
+            type Data = $T;
+            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                let multiplier = (2.0 as $T).powi(self.0);
+                let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
+                compress_gorilla(data, bytes)
             }
         }
 
@@ -232,43 +256,36 @@ macro_rules! impl_float {
     };
 }
 
-impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, ZfpCompressor64, GorillaCompressor);
-impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, ZfpCompressor32,);
+impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, LossyGorillaCompressor64,);
+impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32,);
 
-// FIXME: Not clear if this is canon. The source for gibbon is a bit shaky.
-// Alternatively, there is the tsz crate, but that doesn't offer a separate
-// double-stream (just joined time+double stream). Both of the implementations
-// aren't perfect for our API.
-struct GorillaCompressor;
-impl Compressor<'_> for GorillaCompressor {
-    type Data = f64;
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-        use gibbon::{vec_stream::VecWriter, DoubleStream};
-        if data.is_empty() {
-            return Ok(ArrayTypeId::DoubleGorilla);
-        }
 
-        let mut writer = VecWriter::new();
-        let mut stream = DoubleStream::new();
-        for value in data {
-            stream.push(*value, &mut writer);
-        }
-        let VecWriter {
-            mut bit_vector,
-            used_bits_last_elm,
-        } = writer;
-        let last = bit_vector.pop().unwrap(); // Does not panic because of early out
-                                              // TODO: It should be safe to do 1 extend and a transmute on le platforms
-        for value in bit_vector {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
-        let mut byte_count = used_bits_last_elm / 8;
-        if byte_count * 8 != used_bits_last_elm {
-            byte_count += 1;
-        }
-        let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
-        bytes.extend_from_slice(&last);
-        bytes.push(used_bits_last_elm);
-        Ok(ArrayTypeId::DoubleGorilla)
+fn compress_gorilla(data: impl Iterator<Item=f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    use gibbon::{vec_stream::VecWriter, DoubleStream};
+    if data.len() == 0 {
+        return Ok(ArrayTypeId::DoubleGorilla);
     }
+
+    let mut writer = VecWriter::new();
+    let mut stream = DoubleStream::new();
+    for value in data {
+        stream.push(value, &mut writer);
+    }
+    let VecWriter {
+        mut bit_vector,
+        used_bits_last_elm,
+    } = writer;
+    let last = bit_vector.pop().unwrap(); // Does not panic because of early out
+                                          // TODO: It should be safe to do 1 extend and a transmute on le platforms
+    for value in bit_vector {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    let mut byte_count = used_bits_last_elm / 8;
+    if byte_count * 8 != used_bits_last_elm {
+        byte_count += 1;
+    }
+    let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
+    bytes.extend_from_slice(&last);
+    bytes.push(used_bits_last_elm);
+    Ok(ArrayTypeId::DoubleGorilla)
 }

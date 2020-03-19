@@ -65,7 +65,7 @@ impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
     fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
-                let opts = decode_packed_bool(opt).into_iter();
+                let opts = decode_packed_bool(&opt).into_iter();
                 let values = T::new(*values)?;
                 Ok(Some(NullableReader { opts, values }))
             }

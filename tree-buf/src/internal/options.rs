@@ -35,7 +35,7 @@ macro_rules! options {
     };
 }
 
-options!((lossy_float_tolerance, Option<f64>, None, override_lossy_float_tolerance));
+options!((lossy_float_tolerance, Option<i32>, None, override_lossy_float_tolerance));
 
 struct EncodeOptionsHierarchy<T0, T1> {
     fallback: T0,
@@ -44,18 +44,31 @@ struct EncodeOptionsHierarchy<T0, T1> {
 
 pub struct LosslessFloat;
 impl EncodeOptionsOverride for LosslessFloat {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> {
+    fn override_lossy_float_tolerance(&self) -> Option<Option<i32>> {
         Some(None)
     }
 }
 
-pub struct LossyFloatTolerance(pub f64);
+pub struct LossyFloatTolerance(pub i32);
 impl EncodeOptionsOverride for LossyFloatTolerance {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<f64>> {
+    fn override_lossy_float_tolerance(&self) -> Option<Option<i32>> {
         Some(Some(self.0))
     }
 }
 
 pub fn override_encode_options(options: impl EncodeOptions, overrides: impl EncodeOptionsOverride) -> impl EncodeOptions {
     EncodeOptionsHierarchy { fallback: options, overrides }
+}
+
+#[macro_export]
+macro_rules! encode_options {
+    ($($opts:expr),*) => {
+        {
+            let options = $crate::options::DefaultEncodeOptions;
+            $(
+                let options = $crate::options::override_encode_options(options, $opts); 
+            )*
+            options
+        }
+    }
 }

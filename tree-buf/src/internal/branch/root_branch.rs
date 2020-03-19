@@ -23,10 +23,10 @@ use std::convert::{TryFrom, TryInto};
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
     Object {
-        children: HashMap<Ident<'a>, DynRootBranch<'a>>,
+        fields: HashMap<Ident<'a>, DynRootBranch<'a>>,
     },
     Tuple {
-        children: Vec<DynRootBranch<'a>>,
+        fields: Vec<DynRootBranch<'a>>,
     },
     Enum {
         discriminant: Ident<'a>,
@@ -60,12 +60,12 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
 
     // See also e25db64d-8424-46b9-bdc1-cdb618807513
     fn read_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
-        let mut children = Vec::with_capacity(num_fields);
+        let mut fields = Vec::with_capacity(num_fields);
         for _ in 0..num_fields {
             let child = read_next_root(bytes, offset, lens)?;
-            children.push(child);
+            fields.push(child);
         }
-        Ok(DynRootBranch::Tuple { children })
+        Ok(DynRootBranch::Tuple { fields })
     }
 
     fn read_array<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
@@ -75,13 +75,13 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
 
     // See also 47a1482f-5ce3-4b78-b356-30c66dc60cda
     fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
-        let mut children = HashMap::with_capacity(num_fields);
+        let mut fields = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
             let name = crate::internal::read_ident(bytes, offset)?;
             let child = read_next_root(bytes, offset, lens)?;
-            children.insert(name, child);
+            fields.insert(name, child);
         }
-        Ok(DynRootBranch::Object { children })
+        Ok(DynRootBranch::Object { fields })
     }
 
     fn read_str<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {

@@ -95,7 +95,7 @@ macro_rules! impl_lowerable {
                         match encoding {
                             ArrayIntegerEncoding::PrefixVarInt => {
                                 let v: Vec<$Ty> = read_all(
-                                        bytes,
+                                        &bytes,
                                         |bytes, offset| {
                                             let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| ReadError::SchemaMismatch)?;
                                             Ok(r)
@@ -105,7 +105,7 @@ macro_rules! impl_lowerable {
                             }
                             ArrayIntegerEncoding::Simple16 => {
                                 let mut v = Vec::new();
-                                simple_16::decompress(bytes, &mut v).map_err(|_| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
+                                simple_16::decompress(&bytes, &mut v).map_err(|_| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
                                 let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
                                 let v = result.map_err(|_| ReadError::SchemaMismatch)?;
                                 Ok(v.into_iter())

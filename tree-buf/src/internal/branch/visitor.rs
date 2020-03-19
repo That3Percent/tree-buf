@@ -13,8 +13,8 @@ pub fn visit_all(root: &DynRootBranch<'_>, visitor: &mut impl Visitor) {
             visitor.visit_root(root);
             use DynRootBranch::*;
             match root {
-                Object { children } => {
-                    for child in children.values() {
+                Object { fields } => {
+                    for field in fields.values() {
                         roots.push(child);
                     }
                 }

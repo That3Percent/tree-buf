@@ -179,6 +179,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         });
                         flushes.push(quote! {
                             let _0 = self.#variant_ident;
+                            ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
                             stream.write_with_id(|stream| _0.flush(stream));
                         });
                         root_matches.push(quote! {
@@ -227,31 +228,28 @@ pub fn read_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStr
 }
 
 fn impl_read_macro(ast: &DeriveInput) -> TokenStream {
-    let name = &ast.ident;
-    let array_reader_name = Ident::new(format!("{}TreeBufArrayReader", name).as_str(), ast.ident.span());
-    let vis = &ast.vis;
-
     match &ast.data {
-        Data::Struct(data_struct) => impl_struct_read(name, vis, &array_reader_name, data_struct),
-        Data::Enum(data_enum) => impl_enum_read(name, vis, &array_reader_name, data_enum),
+        Data::Struct(data_struct) => impl_struct_read(ast, data_struct),
+        Data::Enum(data_enum) => impl_enum_read(ast, data_enum),
         Data::Union(_) => panic!("Unions are not supported by tree-buf"),
     }
 }
 
-fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, data_struct: &DataStruct) -> TokenStream {
+fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
     let fields = get_named_fields(data_struct);
+    let name = &ast.ident;
 
     let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
             #ident: <#ty as ::tree_buf::internal::Readable>::read(
-                children.remove(#canon_str).unwrap_or_default()
+                fields.remove(#canon_str).unwrap_or_default()
             )?,
         }
     });
 
     let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            #ident: ::tree_buf::internal::ReaderArray::new(children.remove(#canon_str).unwrap_or_default())?,
+            #ident: ::tree_buf::internal::ReaderArray::new(fields.remove(#canon_str).unwrap_or_default())?,
         }
     });
 
@@ -267,18 +265,52 @@ fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, d
         }
     });
 
+    let read = quote! {
+        let mut fields = match sticks {
+            ::tree_buf::internal::DynRootBranch::Object { fields } => fields,
+            _ => return Err(::tree_buf::ReadError::SchemaMismatch),
+        };
+
+        Ok(Self {
+            #(#reads)*
+        })
+    };
+    let new = quote! {
+        let mut fields = match sticks {
+            ::tree_buf::internal::DynArrayBranch::Object { fields } => fields,
+            _ => return Err(::tree_buf::ReadError::SchemaMismatch),
+        };
+
+        Ok(Self {
+            #(#news)*
+        })
+    };
+
+    let read_next = quote! {
+        #name {
+            #(#read_nexts)*
+        }
+    };
+
+    fill_read_skeleton(ast, read, array_fields, new, read_next)
+}
+
+fn fill_read_skeleton<A: ToTokens>(
+    ast: &DeriveInput,
+    read: impl ToTokens,
+    array_fields: impl Iterator<Item = A>,
+    new: impl ToTokens,
+    read_next: impl ToTokens,
+) -> TokenStream {
+    let name = &ast.ident;
+    let vis = &ast.vis;
+    let array_reader_name = format_ident!("{}TreeBufReaderArray", name);
+
     quote! {
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
             fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                let mut children = match sticks {
-                    ::tree_buf::internal::DynRootBranch::Object { children } => children,
-                    _ => return Err(::tree_buf::ReadError::SchemaMismatch),
-                };
-
-                Ok(Self {
-                    #(#reads)*
-                })
+                #read
             }
         }
         #vis struct #array_reader_name {
@@ -288,45 +320,22 @@ fn impl_struct_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, d
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                let mut children = match sticks {
-                    ::tree_buf::internal::DynArrayBranch::Object { children } => children,
-                    _ => return Err(::tree_buf::ReadError::SchemaMismatch),
-                };
-
-                Ok(Self {
-                    #(#news)*
-                })
+                #new
             }
             fn read_next(&mut self) -> Self::Read {
-                #name {
-                    #(#read_nexts)*
-                }
+                #read_next
             }
         }
     }
 }
 
-fn impl_enum_read(name: &Ident, vis: &Visibility, array_reader_name: &Ident, data_enum: &DataEnum) -> TokenStream {
-    quote! {
-        impl ::tree_buf::internal::Readable for #name {
-            type ReaderArray = #array_reader_name;
-            fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                todo!("Enum read macro")
-            }
-        }
-        #vis struct #array_reader_name {
-        }
-
-        impl ::tree_buf::internal::ReaderArray for #array_reader_name {
-            type Read=#name;
-            fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
-                todo!("Enum ReaderArray new macro")
-            }
-            fn read_next(&mut self) -> Self::Read {
-                todo!("Enum ReaderArray read_next macro")
-            }
-        }
-    }
+fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
+    let new = quote! { todo!("Enum read macro new") };
+    let read_next = quote! { todo!("Enum read macro read_next"); };
+    let read = quote! { todo!("Enum read macro read"); };
+    let array_fields = Vec::<TokenStream>::new();
+    
+    fill_read_skeleton(ast, read, array_fields.iter(), new, read_next)
 }
 
 fn get_named_fields(data_struct: &DataStruct) -> NamedFields {

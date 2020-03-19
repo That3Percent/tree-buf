@@ -2,12 +2,38 @@ use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::ops::Deref;
+
+/// This wrapper is just to make the Debug impl not write every byte
+pub struct Bytes<'a>(&'a [u8]);
+
+impl fmt::Debug for Bytes<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Bytes").field(&self.0.len()).finish()
+    }
+}
+
+impl<'a> From<&'a [u8]> for Bytes<'a> {
+    #[inline]
+    fn from(value: &'a [u8]) -> Self {
+        Bytes(value)
+    }
+}
+
+impl Deref for Bytes<'_> {
+    type Target = [u8];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug)]
 pub enum ArrayFloat<'a> {
-    F64(&'a [u8]),
-    F32(&'a [u8]),
-    DoubleGorilla(&'a [u8]),
+    F64(Bytes<'a>),
+    F32(Bytes<'a>),
+    DoubleGorilla(Bytes<'a>),
 }
 
 #[derive(Debug)]
@@ -19,10 +45,10 @@ pub struct ArrayEnumVariant<'a> {
 #[derive(Debug)]
 pub enum DynArrayBranch<'a> {
     Object {
-        children: HashMap<Ident<'a>, DynArrayBranch<'a>>,
+        fields: HashMap<Ident<'a>, DynArrayBranch<'a>>,
     },
     Tuple {
-        children: Vec<DynArrayBranch<'a>>,
+        fields: Vec<DynArrayBranch<'a>>,
     },
     Array0,
     Array {
@@ -37,13 +63,13 @@ pub enum DynArrayBranch<'a> {
     },
     Integer(ArrayInteger<'a>),
     Nullable {
-        opt: &'a [u8],
+        opt: Bytes<'a>,
         values: Box<DynArrayBranch<'a>>,
     },
-    Boolean(&'a [u8]),
+    Boolean(Bytes<'a>),
     Float(ArrayFloat<'a>),
     Void,
-    String(&'a [u8]),
+    String(Bytes<'a>),
     Enum {
         discriminants: Box<DynArrayBranch<'a>>,
         variants: Vec<ArrayEnumVariant<'a>>,
@@ -52,7 +78,7 @@ pub enum DynArrayBranch<'a> {
     // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
     // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
     // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
-    // Dynamic(&'a [u8]),
+    // Dynamic(Bytes<'a>),
 }
 
 pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
@@ -61,34 +87,34 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
     use ArrayTypeId::*;
 
     fn read_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> ReadResult<DynArrayBranch<'a>> {
-        let bytes = read_bytes_from_len(bytes, offset, lens)?;
+        let bytes = read_bytes_from_len(bytes, offset, lens)?.into();
         Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 
-    fn read_bytes_from_len<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<&'a [u8]> {
+    fn read_bytes_from_len<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<Bytes<'a>> {
         let len = decode_suffix_varint(bytes, lens)?;
-        read_bytes(len as usize, bytes, offset)
+        Ok(read_bytes(len as usize, bytes, offset)?.into())
     }
 
     // See also e25db64d-8424-46b9-bdc1-cdb618807513
     fn read_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
-        let mut children = Vec::with_capacity(num_fields);
+        let mut fields = Vec::with_capacity(num_fields);
         for _ in 0..num_fields {
             let child = read_next_array(bytes, offset, lens)?;
-            children.push(child);
+            fields.push(child);
         }
-        Ok(DynArrayBranch::Tuple { children })
+        Ok(DynArrayBranch::Tuple { fields })
     }
 
     // See also 47a1482f-5ce3-4b78-b356-30c66dc60cda
     fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
-        let mut children = HashMap::with_capacity(num_fields);
+        let mut fields = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
             let name = crate::internal::read_ident(bytes, offset)?;
             let child = read_next_array(bytes, offset, lens)?;
-            children.insert(name, child);
+            fields.insert(name, child);
         }
-        Ok(DynArrayBranch::Object { children })
+        Ok(DynArrayBranch::Object { fields })
     }
 
     let branch = match id {
@@ -216,7 +242,7 @@ impl_type_id!(ArrayTypeId, [
 
 #[derive(Debug)]
 pub struct ArrayInteger<'a> {
-    pub bytes: &'a [u8],
+    pub bytes: Bytes<'a>,
     //delta: bool,
     //zigzag: bool,
     pub encoding: ArrayIntegerEncoding,

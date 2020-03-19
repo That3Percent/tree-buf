@@ -51,15 +51,15 @@ macro_rules! impl_tuple {
             type ReaderArray=($($ts::ReaderArray),+);
             fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
                 match sticks {
-                    DynRootBranch::Tuple { mut children } => {
+                    DynRootBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                        if children.len() != $count {
+                        if fields.len() != $count {
                             return Err(ReadError::SchemaMismatch)
                         }
-                        let mut children = children.drain(..);
+                        let mut fields = fields.drain(..);
                         Ok((
                             // This unwrap is ok because we verified the len already. See alsoa abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                            $($ts::read(children.next().unwrap())?),+
+                            $($ts::read(fields.next().unwrap())?),+
                         ))
                     },
                     _ => Err(ReadError::SchemaMismatch),
@@ -72,15 +72,15 @@ macro_rules! impl_tuple {
             type Read=($($ts::Read),+);
             fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
                 match sticks {
-                    DynArrayBranch::Tuple { mut children } => {
+                    DynArrayBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                        if children.len() != $count {
+                        if fields.len() != $count {
                             return Err(ReadError::SchemaMismatch)
                         }
-                        let mut children = children.drain(..);
+                        let mut fields = fields.drain(..);
                         Ok((
                             // This unwrap is ok because we verified the len already. See alsoa abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                            $($ts::new(children.next().unwrap())?),+
+                            $($ts::new(fields.next().unwrap())?),+
                         ))
                     },
                     _ => Err(ReadError::SchemaMismatch)
