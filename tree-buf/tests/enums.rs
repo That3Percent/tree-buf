@@ -1,6 +1,7 @@
 mod common;
 use common::round_trip;
 use tree_buf::prelude::*;
+
 #[test]
 fn root_1_unnamed() {
     #[derive(Read, Write, Debug, PartialEq)]
@@ -8,9 +9,22 @@ fn root_1_unnamed() {
         String(String),
     }
 
-    round_trip(&K::String("s".to_owned()), 0);
+    round_trip(&K::String("s".to_owned()), 10);
 }
 
+#[test]
+fn selects_correct_discriminant_root() {
+    #[derive(Read, Write, Debug, PartialEq)]
+    enum Opts {
+        One(u32),
+        Two(u8),
+    }
+
+    round_trip(&Opts::One(1), 6);
+    round_trip(&Opts::Two(2), 7);
+}
+
+/*
 #[test]
 fn array_1_unnamed() {
     #[derive(Read, Write, Debug, PartialEq)]
@@ -20,9 +34,9 @@ fn array_1_unnamed() {
 
     round_trip(&vec![K::String("s".to_owned()), K::String("k".to_owned())], 0);
 }
-/*
 #[test]
 fn visibility_modifiers() {
+    // TODO: This needs to be in Array to be useful
     #[derive(Read, Write, Debug, PartialEq)]
     enum Priv {
         Val(u32),
@@ -39,18 +53,6 @@ fn visibility_modifiers() {
 }
 */
 /*
-
-#[test]
-fn selects_correct_discriminant() {
-    #[derive(Read, Write, Debug, PartialEq)]
-    enum Opts {
-        One(u32),
-        Two(u8),
-    }
-
-    round_trip(&Opts::One(1), 0);
-    round_trip(&Opts::Two(2), 0);
-}
 
 #[test]
 fn void_value() {

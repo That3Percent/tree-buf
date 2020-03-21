@@ -158,14 +158,22 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         let discriminant = canonical_ident(variant_ident);
 
         match &variant.fields {
-            Fields::Unit => todo!("Unit enums not yet supported by tree-buf"),
+            Fields::Unit => todo!("Unit enums not yet supported by tree-buf write"),
             Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf"),
             Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
                 let unnamed: Vec<_> = unnamed.iter().collect();
                 match unnamed.len() {
+                    // TODO: Check if this is really unreachable. It might be `Variant {}`.
+                    // In this case consider writing a struct with no fields
                     0 => unreachable!(),
                     1 => {
                         let ty = &unnamed[0].ty;
+                        root_matches.push(quote! {
+                            #ident::#variant_ident(_0) => {
+                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
+                                stream.write_with_id(|stream| _0.write_root(stream));
+                            }
+                        });
                         array_fields.push(quote! {
                             #variant_ident: <#ty as ::tree_buf::Writable<'a>>::WriterArray
                         });
@@ -182,14 +190,9 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
                             stream.write_with_id(|stream| _0.flush(stream));
                         });
-                        root_matches.push(quote! {
-                            #ident::#variant_ident(_0) => {
-                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
-                                stream.write_with_id(|stream| _0.write_root(stream));
-                            }
-                        });
+                        
                     }
-                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf"),
+                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Write"),
                 }
             }
         }
@@ -330,11 +333,53 @@ fn fill_read_skeleton<A: ToTokens>(
 }
 
 fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
+    
+    let array_fields = Vec::<TokenStream>::new();
     let new = quote! { todo!("Enum read macro new") };
     let read_next = quote! { todo!("Enum read macro read_next"); };
-    let read = quote! { todo!("Enum read macro read"); };
-    let array_fields = Vec::<TokenStream>::new();
-    
+
+    let mut root_matches = Vec::new();
+
+    for (i, variant) in data_enum.variants.iter().enumerate() {
+        let variant_ident = &variant.ident;
+        let discriminant = canonical_ident(variant_ident);
+        
+        match &variant.fields {
+            Fields::Unit => todo!("Unit enums not yet supported by tree-buf read"),
+            Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf read"),
+            Fields::Unnamed(FieldsUnnamed { unnamed, ..}) => {
+                match unnamed.len() {
+                    // TODO: Check if this is really unreachable. It might be `Variant {}`
+                    0 => unreachable!(),
+                    1 => {
+                        root_matches.push(quote! {
+                            #discriminant => {
+                                Self::#variant_ident(::tree_buf::internal::Readable::read(*value)?)
+                            }
+                        })
+                    },
+                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Read"),
+                }
+            },
+        }
+    }
+
+    let read = quote! {
+        // If this is an enum,
+        if let ::tree_buf::internal::DynRootBranch::Enum { discriminant, value } = sticks {
+            Ok(
+                // See if it's a variant we are aware of, and that the value
+                // matches the expected data.
+                match discriminant {
+                    #(#root_matches),*
+                    _ => { return Err(::tree_buf::ReadError::SchemaMismatch); },
+                }
+            )
+        } else {
+            Err(::tree_buf::ReadError::SchemaMismatch)
+        }
+    };
+
     fill_read_skeleton(ast, read, array_fields.iter(), new, read_next)
 }
 
