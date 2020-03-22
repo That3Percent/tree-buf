@@ -9,6 +9,7 @@ pub enum InvalidFormat {
     Utf8Error(std::str::Utf8Error),
     EndOfFile,
     DecompressionError,
+    DuplicateEnumDiscriminant,
 }
 
 #[cfg(feature = "read")]
@@ -30,6 +31,7 @@ impl Display for ReadError {
                     InvalidFormat::EndOfFile => f.write_str("Attempted to read beyond the end of the file"),
                     InvalidFormat::Utf8Error(inner) => std::fmt::Display::fmt(inner, f),
                     InvalidFormat::DecompressionError => f.write_str("A decompression failed"),
+                    InvalidFormat::DuplicateEnumDiscriminant => f.write_str("An enum contained duplicate discriminants"),
                 }
             }
         }

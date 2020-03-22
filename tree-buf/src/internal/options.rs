@@ -66,7 +66,7 @@ macro_rules! encode_options {
         {
             let options = $crate::options::DefaultEncodeOptions;
             $(
-                let options = $crate::options::override_encode_options(options, $opts); 
+                let options = $crate::options::override_encode_options(options, $opts);
             )*
             options
         }

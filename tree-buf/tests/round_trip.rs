@@ -3,8 +3,8 @@ use tree_buf::prelude::*;
 mod common;
 use common::*;
 use std::collections::HashMap;
-use tree_buf::options;
 use tree_buf::encode_options;
+use tree_buf::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {

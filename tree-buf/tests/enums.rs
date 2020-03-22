@@ -1,57 +1,67 @@
 mod common;
 use common::round_trip;
 use tree_buf::prelude::*;
+use tree_buf::{Readable, Writable};
 
-#[test]
-fn root_1_unnamed() {
-    #[derive(Read, Write, Debug, PartialEq)]
-    enum K {
-        String(String),
-    }
+// TODO: Get a code coverage checker
 
-    round_trip(&K::String("s".to_owned()), 10);
+// TODO: Move all round trip tests to cover both the array case and the root case.
+fn round_trips<'a, 'b: 'a, T: Writable<'a> + Readable + Clone + std::fmt::Debug + PartialEq + 'static>(value: &'b T, root_size: usize, array_size: usize) {
+    round_trip(value, root_size);
+    let v = vec![value.clone(), value.clone()];
+    // Hack! What's up with the borrow checker here?
+    let slice: &'static Vec<T> = unsafe { std::mem::transmute(&v) };
+    round_trip(slice, array_size);
 }
 
 #[test]
-fn selects_correct_discriminant_root() {
-    #[derive(Read, Write, Debug, PartialEq)]
+fn unnamed_field_one_variant() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum K {
+        St(String),
+    }
+
+    round_trips(&K::St("s".to_owned()), 6, 17);
+}
+
+#[test]
+fn selects_correct_discriminant() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
     enum Opts {
         One(u32),
         Two(u8),
     }
 
-    round_trip(&Opts::One(1), 6);
-    round_trip(&Opts::Two(2), 7);
+    round_trips(&Opts::One(1), 6, 16);
+    round_trips(&Opts::Two(2), 7, 16);
 }
 
-/*
 #[test]
-fn array_1_unnamed() {
-    #[derive(Read, Write, Debug, PartialEq)]
-    enum K {
-        String(String),
-    }
-
-    round_trip(&vec![K::String("s".to_owned()), K::String("k".to_owned())], 0);
-}
-#[test]
-fn visibility_modifiers() {
-    // TODO: This needs to be in Array to be useful
-    #[derive(Read, Write, Debug, PartialEq)]
-    enum Priv {
-        Val(u32),
-    }
-
-    round_trip(&Priv::Val(10), 0);
-
-    #[derive(Read, Write, Debug, PartialEq)]
+fn pub_vis() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
     pub enum Pub {
         Val(u32),
     }
 
-    round_trip(&Pub::Val(10), 0);
+    round_trips(&Pub::Val(10), 7, 16);
 }
-*/
+
+#[test]
+fn unused_variations_do_not_affect_size() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum A {
+        One(u32),
+    }
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum B {
+        One(u32),
+        Two(u32),
+    }
+
+    round_trips(&A::One(1), 6, 16);
+    round_trips(&B::One(1), 6, 16);
+}
+
 /*
 
 #[test]

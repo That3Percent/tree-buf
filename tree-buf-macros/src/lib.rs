@@ -7,7 +7,7 @@ use {
     inflector::cases::camelcase::to_camel_case,
     proc_macro2::{Ident, TokenStream},
     quote::ToTokens,
-    syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed, Type, Visibility},
+    syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed, Type},
 };
 
 struct NamedField<'a> {
@@ -114,6 +114,7 @@ fn fill_write_skeleton<A: ToTokens>(
 
     quote! {
         #[derive(Default)]
+        #[allow(non_snake_case)]
         #vis struct #array_writer_name<'a> {
             #(#array_fields,)*
         }
@@ -123,7 +124,7 @@ fn fill_write_skeleton<A: ToTokens>(
             fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
                 #buffer
             }
-            fn flush(self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush(mut self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
                 #flush
             }
         }
@@ -145,15 +146,16 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
 
     let mut array_fields = Vec::new();
     array_fields.push(quote! {
-        tree_buf_discriminant: <u64 as ::tree_buf::Writable<'a>>::WriterArray
+        tree_buf_discriminant: <u64 as ::tree_buf::Writable<'a>>::WriterArray,
+        tree_buf_next_discriminant: u64
     });
+
     let mut array_matches = Vec::new();
     let mut root_matches = Vec::new();
     let mut flushes = Vec::new();
     let ident = &ast.ident;
 
-    let variants: Vec<_> = data_enum.variants.iter().collect();
-    for (i, variant) in variants.iter().enumerate() {
+    for variant in data_enum.variants.iter() {
         let variant_ident = &variant.ident;
         let discriminant = canonical_ident(variant_ident);
 
@@ -175,29 +177,39 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             }
                         });
                         array_fields.push(quote! {
-                            #variant_ident: <#ty as ::tree_buf::Writable<'a>>::WriterArray
+                            #variant_ident: Option<(u64, <#ty as ::tree_buf::Writable<'a>>::WriterArray)>
                         });
                         array_matches.push(quote! {
                             #ident::#variant_ident(_0) => {
-                                // TODO: 'take' a discriminant at buffer time,
-                                // and use Option for array writer to avoid writing unused variants.
-                                self.tree_buf_discriminant.buffer(&(#i as u64));
-                                self.#variant_ident.buffer(_0);
+                                if self.#variant_ident.is_none() {
+                                    self.#variant_ident = Some((self.tree_buf_next_discriminant, Default::default()));
+                                    self.tree_buf_next_discriminant += 1;
+                                }
+                                let t = self.#variant_ident.as_mut().unwrap();
+                                self.tree_buf_discriminant.buffer(&t.0);
+                                t.1.buffer(_0);
                             }
                         });
                         flushes.push(quote! {
-                            let _0 = self.#variant_ident;
-                            ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
-                            stream.write_with_id(|stream| _0.flush(stream));
+                            let mut matches = false;
+                            if let Some((d, _)) = &self.#variant_ident {
+                                if *d == current_discriminant {
+                                    matches = true;
+                                }
+                            }
+                            if matches {
+                                let mut buffer = self.#variant_ident.take().unwrap().1;
+                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
+                                stream.write_with_id(|stream| buffer.flush(stream));
+                                continue;
+                            }
                         });
-                        
                     }
                     _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Write"),
                 }
             }
         }
     }
-    let variant_count = variants.len();
 
     let write_root = quote! {
        match self {
@@ -211,11 +223,14 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
        }
     };
     let flush = quote! {
-        ::tree_buf::internal::encodings::varint::encode_prefix_varint(#variant_count as u64, stream.bytes());
+        let variant_count = self.tree_buf_next_discriminant;
+        ::tree_buf::internal::encodings::varint::encode_prefix_varint(variant_count, stream.bytes());
         let _0 = self.tree_buf_discriminant;
         stream.write_with_id(|stream| _0.flush(stream));
 
-        #(#flushes)*
+        for current_discriminant in 0..variant_count {
+            #(#flushes)*
+        }
 
         ::tree_buf::internal::ArrayTypeId::Enum
     };
@@ -258,7 +273,7 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as ::tree_buf::internal::Readable>::ReaderArray,
+            #ident: <#ty as ::tree_buf::internal::Readable>::ReaderArray
         }
     });
 
@@ -298,13 +313,7 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     fill_read_skeleton(ast, read, array_fields, new, read_next)
 }
 
-fn fill_read_skeleton<A: ToTokens>(
-    ast: &DeriveInput,
-    read: impl ToTokens,
-    array_fields: impl Iterator<Item = A>,
-    new: impl ToTokens,
-    read_next: impl ToTokens,
-) -> TokenStream {
+fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array_fields: impl Iterator<Item = A>, new: impl ToTokens, read_next: impl ToTokens) -> TokenStream {
     let name = &ast.ident;
     let vis = &ast.vis;
     let array_reader_name = format_ident!("{}TreeBufReaderArray", name);
@@ -316,8 +325,10 @@ fn fill_read_skeleton<A: ToTokens>(
                 #read
             }
         }
+
+        #[allow(non_snake_case)]
         #vis struct #array_reader_name {
-            #(#array_fields)*
+            #(#array_fields,)*
         }
 
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
@@ -333,21 +344,26 @@ fn fill_read_skeleton<A: ToTokens>(
 }
 
 fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
-    
-    let array_fields = Vec::<TokenStream>::new();
-    let new = quote! { todo!("Enum read macro new") };
-    let read_next = quote! { todo!("Enum read macro read_next"); };
+    let ident = &ast.ident;
+    let mut array_fields = Vec::new();
+    array_fields.push(quote! {
+        tree_buf_discriminant: <u64 as ::tree_buf::Readable>::ReaderArray
+    });
+
+    let mut new_matches = Vec::new();
+    let mut new_defaults = Vec::new();
+    let mut read_nexts = Vec::new();
 
     let mut root_matches = Vec::new();
 
-    for (i, variant) in data_enum.variants.iter().enumerate() {
+    for variant in data_enum.variants.iter() {
         let variant_ident = &variant.ident;
         let discriminant = canonical_ident(variant_ident);
-        
+
         match &variant.fields {
             Fields::Unit => todo!("Unit enums not yet supported by tree-buf read"),
             Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf read"),
-            Fields::Unnamed(FieldsUnnamed { unnamed, ..}) => {
+            Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
                 match unnamed.len() {
                     // TODO: Check if this is really unreachable. It might be `Variant {}`
                     0 => unreachable!(),
@@ -356,11 +372,36 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             #discriminant => {
                                 Self::#variant_ident(::tree_buf::internal::Readable::read(*value)?)
                             }
+                        });
+                        let ty = &unnamed[0].ty;
+                        array_fields.push(quote! {
+                            #variant_ident: Option<(u64, <#ty as ::tree_buf::internal::Readable>::ReaderArray)>
+                        });
+                        new_matches.push(quote! {
+                            #discriminant => {
+                                if result.#variant_ident.is_some() {
+                                    return Err(::tree_buf::ReadError::InvalidFormat(::tree_buf::internal::error::InvalidFormat::DuplicateEnumDiscriminant));
+                                }
+                                result.#variant_ident = Some(
+                                    (index as u64,
+                                    ::tree_buf::internal::ReaderArray::new(data)?)
+                                );
+                            }
+                        });
+                        new_defaults.push(quote! {
+                            #variant_ident: None
+                        });
+                        read_nexts.push(quote! {
+                            if let Some((d, r)) = &mut self.#variant_ident {
+                                if *d == discriminant {
+                                    return #ident::#variant_ident(r.read_next());
+                                }
+                            }
                         })
-                    },
+                    }
                     _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Read"),
                 }
-            },
+            }
         }
     }
 
@@ -378,6 +419,42 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         } else {
             Err(::tree_buf::ReadError::SchemaMismatch)
         }
+    };
+
+    let new = quote! {
+        match sticks {
+            ::tree_buf::internal::DynArrayBranch::Enum {discriminants, variants} => {
+                let tree_buf_discriminant = ::tree_buf::internal::ReaderArray::new(*discriminants)?;
+                let mut result = Self {
+                    tree_buf_discriminant,
+                    #(#new_defaults),*
+                };
+
+                for (index, variant) in variants.into_iter().enumerate() {
+                    let ::tree_buf::internal::ArrayEnumVariant { ident, data } = variant;
+                    match ident {
+                        #(#new_matches),*
+                        _ => { return Err(::tree_buf::ReadError::SchemaMismatch); }
+                    }
+                }
+
+                // FIXME: Need to verify that the range of tree_buf_discriminant does
+                // not go beyond the number of variants listed (this would indicate a corrupt file)
+                // See also: fb0a3c86-23be-4d4a-9dbf-9c83ae6e2f0f
+                Ok(result)
+            }
+            _ => {
+                Err(::tree_buf::ReadError::SchemaMismatch)
+            }
+        }
+    };
+
+    let read_next = quote! {
+        let discriminant = self.tree_buf_discriminant.read_next();
+        #(#read_nexts)*
+
+        // See also: fb0a3c86-23be-4d4a-9dbf-9c83ae6e2f0f
+        todo!("Make this unreachable by verifying range");
     };
 
     fill_read_skeleton(ast, read, array_fields.iter(), new, read_next)

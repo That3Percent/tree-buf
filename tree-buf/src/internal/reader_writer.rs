@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 #[cfg(feature = "write")]
 pub trait WriterStream {
-    type Options : EncodeOptions;
+    type Options: EncodeOptions;
     fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
     fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
     fn bytes(&mut self) -> &mut Vec<u8>;

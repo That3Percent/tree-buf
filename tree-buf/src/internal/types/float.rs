@@ -259,8 +259,7 @@ macro_rules! impl_float {
 impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, LossyGorillaCompressor64,);
 impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32,);
 
-
-fn compress_gorilla(data: impl Iterator<Item=f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+fn compress_gorilla(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
     use gibbon::{vec_stream::VecWriter, DoubleStream};
     if data.len() == 0 {
         return Ok(ArrayTypeId::DoubleGorilla);
