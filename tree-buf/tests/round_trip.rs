@@ -52,55 +52,58 @@ fn make_item() -> Bits {
 
 #[test]
 fn bools_root() {
-    round_trip(&true, 1);
-    round_trip(&false, 1);
+    round_trip(&true, 1, 5);
+    round_trip(&false, 1, 5);
 }
 
 #[test]
 fn opts_root() {
-    round_trip(&Some(true), 1);
-    round_trip(&Option::<bool>::None, 1);
+    round_trip(&Some(true), 1, 8);
+    round_trip(&Option::<bool>::None, 1, 3);
 }
 
 #[test]
 fn bool_array() {
-    round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6);
+    round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6, 12);
 }
 
 #[test]
 fn ints_root() {
-    round_trip(&0u32, 1);
-    round_trip(&1u32, 1);
-    for i in 2..=255u32 {
-        round_trip(&i, 2);
+    round_trip(&0u32, 1, 6);
+    round_trip(&1u32, 1, 6);
+    for i in 2..=127u32 {
+        round_trip(&i, 2, 6);
+    }
+    for i in 128..=255u32 {
+        round_trip(&i, 2, 8);
     }
     for i in 256..1024u32 {
-        round_trip(&i, 3);
+        round_trip(&i, 3, 8);
     }
 }
 
 // Special case for 1 element array encodes root object
 #[test]
 fn array1() {
-    round_trip(&vec![99u64], 3);
-    round_trip(&vec![1u64], 2);
+    round_trip(&vec![99u64], 3, 11);
+    round_trip(&vec![1u64], 2, 11);
 }
 
 #[test]
 fn int_vec() {
-    round_trip(&vec![99u64, 100], 6);
+    round_trip(&vec![99u64, 100], 6, 13);
 }
 
 #[test]
 fn float64_vec() {
-    round_trip(&vec![0.99], 10);
-    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36);
+    round_trip(&vec![0.99], 10, 19);
+    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 68);
 }
 
 #[test]
 fn float32_vec() {
-    round_trip(&vec![0.99f32], 6);
-    round_trip(&vec![0.01f32, 0.02, 0.03, 0.04], 20);
+    round_trip(&vec![0.99f32], 6, 17);
+    round_trip(&vec![0.01f32, 0.02, 0.03, 0.04], 20, 41);
 }
 
 #[test]
@@ -130,69 +133,70 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 35);
 }
 
 #[test]
 fn array_tuple() {
-    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14);
+    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14, 25);
 }
 
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 144);
+    round_trip(&item, 144, 226);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 405);
+    round_trip(&item, 405, 708);
 }
 
 #[test]
 fn nullable_array() {
-    round_trip(&vec![Some(1u32), Some(2)], 9);
+    round_trip(&vec![Some(1u32), Some(2)], 9, 16);
 }
 
 #[test]
 fn visibility_modifiers() {
-    #[derive(Default, Read, Write, Debug, PartialEq)]
+    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
     struct Inherited {
         a: u64,
     }
 
-    #[derive(Default, Read, Write, Debug, PartialEq)]
+    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
     pub(crate) struct Crate {
         a: u64,
     }
 
-    #[derive(Default, Read, Write, Debug, PartialEq)]
+    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
     pub struct Public {
         a: u64,
     }
 
-    round_trip_default::<Inherited>(4);
-    round_trip_default::<Crate>(4);
-    round_trip_default::<Public>(4);
+    round_trip_default::<Inherited>(4, 9);
+    round_trip_default::<Crate>(4, 9);
+    round_trip_default::<Public>(4, 9);
 }
 
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {
-    round_trip_default::<u64>(1);
-    round_trip_default::<u32>(1);
-    round_trip_default::<u16>(1);
-    round_trip_default::<u8>(1);
-    round_trip_default::<(u64, u64)>(3);
-    round_trip_default::<(u64, u32)>(3);
-    round_trip_default::<f64>(1);
-    round_trip_default::<Vec<u32>>(1);
-    round_trip_default::<Option<Vec<u32>>>(1);
-    round_trip_default::<Option<u32>>(1);
-    round_trip_default::<Vec<Option<u32>>>(1);
-    round_trip_default::<String>(1);
+    round_trip_default::<u64>(1, 6);
+    round_trip_default::<u32>(1, 6);
+    round_trip_default::<u16>(1, 6);
+    round_trip_default::<u8>(1, 6);
+    round_trip_default::<(u64, u64)>(3, 11);
+    round_trip_default::<(u64, u32)>(3, 11);
+    round_trip_default::<f64>(1, 14);
+    // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
+    round_trip_default::<Vec<u32>>(1, 8);
+    round_trip_default::<Option<Vec<u32>>>(1, 3);
+    round_trip_default::<Option<u32>>(1, 3);
+    round_trip_default::<Vec<Option<u32>>>(1, 8);
+    round_trip_default::<String>(1, 6);
 }
 
 #[test]
@@ -207,17 +211,17 @@ fn conversions() {
 
 #[test]
 fn small_structs() {
-    #[derive(Read, Write, Default, Debug, PartialEq)]
+    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
     struct _1 {
         a: u64,
     }
 
-    round_trip_default::<_1>(4);
+    round_trip_default::<_1>(4, 9);
 }
 
 #[test]
 fn large_structs() {
-    #[derive(Read, Write, Default, Debug, PartialEq)]
+    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
     struct _14 {
         a: f64,
         b: f64,
@@ -235,7 +239,7 @@ fn large_structs() {
         n: f64,
     }
 
-    #[derive(Read, Write, Default, Debug, PartialEq)]
+    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
     struct _15 {
         a: f64,
         b: f64,
@@ -254,7 +258,7 @@ fn large_structs() {
         o: f64,
     }
 
-    #[derive(Read, Write, Default, Debug, PartialEq)]
+    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
     struct _16 {
         a: f64,
         b: f64,
@@ -273,7 +277,7 @@ fn large_structs() {
         o: f64,
         p: f64,
     }
-    #[derive(Read, Write, Default, Debug, PartialEq)]
+    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
     struct _17 {
         a: f64,
         b: f64,
@@ -294,23 +298,24 @@ fn large_structs() {
         q: f64,
     }
 
-    round_trip_default::<_14>(44);
-    round_trip_default::<_15>(47);
-    round_trip_default::<_16>(50);
-    round_trip_default::<_17>(53);
+    round_trip_default::<_14>(44, 200);
+    round_trip_default::<_15>(47, 214);
+    round_trip_default::<_16>(50, 228);
+    round_trip_default::<_17>(53, 242);
 }
 
 #[test]
 fn map_0_root() {
+     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     let data = HashMap::<u32, u32>::new();
-    round_trip(&data, 2);
+    round_trip(&data, 2, 9);
 }
 
 #[test]
 fn map_1_root() {
     let mut data = HashMap::new();
     data.insert("test".to_owned(), 5u32);
-    round_trip(&data, 10);
+    round_trip(&data, 10, 23);
 }
 
 #[test]
@@ -319,7 +324,7 @@ fn map_n_root() {
     data.insert("test3".to_owned(), 5u32);
     data.insert("test2".to_owned(), 5);
     data.insert("test1".to_owned(), 0);
-    round_trip(&data, 27);
+    round_trip(&data, 27, 51);
 }
 
 #[test]
@@ -331,7 +336,7 @@ fn maps_array() {
         h.insert(10, vec![10, 9, 8, 7]);
         data.push(h);
     }
-    round_trip(&data, 44);
+    round_trip(&data, 44, 69);
 }
 
 #[test]
@@ -341,5 +346,5 @@ fn maps_void() {
         let h = HashMap::<String, String>::new();
         data.push(h);
     }
-    round_trip(&data, 13);
+    round_trip(&data, 13, 18);
 }

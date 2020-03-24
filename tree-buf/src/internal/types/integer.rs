@@ -111,6 +111,13 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             }
                         }
+                    },
+                    // FIXME: This fixes a particular test.
+                    // It is unclear if this is canon.
+                    // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
+                    // TODO: Also apply this to other types
+                    DynArrayBranch::Void => {
+                        Ok(Vec::new().into_iter())
                     }
                     _ => Err(ReadError::SchemaMismatch),
                 }

@@ -102,8 +102,6 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
-            // TODO: Maybe combine the permutations of valid int compressors here with ArrayVar to save a byte
-            // here every time. Eg: ArrayVarSimple16 ArrayVarIntPrefixVar
             stream.write_with_id(|stream| len.flush(stream));
             stream.write_with_id(|stream| values.flush(stream));
         } else {
