@@ -72,7 +72,7 @@ macro_rules! impl_float {
         #[cfg(feature = "read")]
         impl Readable for $T {
             type ReaderArray = IntoIter<$T>;
-            fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+            fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     DynRootBranch::Integer(root_integer) => {
                         // FIXME: Fast and lose to get refactoring done. Double check here.
@@ -116,7 +116,7 @@ macro_rules! impl_float {
         #[cfg(feature = "read")]
         impl ReaderArray for IntoIter<$T> {
             type Read = $T;
-            fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     DynArrayBranch::Float(float) => {
                         match float {

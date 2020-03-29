@@ -24,8 +24,8 @@ pub struct BoxReaderArray<T> {
 #[cfg(feature = "read")]
 impl<T: Readable> Readable for Box<T> {
     type ReaderArray = BoxReaderArray<T::ReaderArray>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
-        Ok(Box::new(T::read(sticks)?))
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        Ok(Box::new(T::read(sticks, options)?))
     }
 }
 
@@ -43,8 +43,8 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for BoxWriterArray<T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for BoxReaderArray<T> {
     type Read = Box<T::Read>;
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
-        Ok(BoxReaderArray { inner: T::new(sticks)? })
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        Ok(BoxReaderArray { inner: T::new(sticks, options)? })
     }
     fn read_next(&mut self) -> Self::Read {
         Box::new(self.inner.read_next())

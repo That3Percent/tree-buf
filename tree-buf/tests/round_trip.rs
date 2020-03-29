@@ -123,7 +123,7 @@ fn lossy_f64_vec() {
     }
 
     // Show how much smaller this is than lossless
-    let options = options::override_encode_options(options::DefaultEncodeOptions, options::LosslessFloat);
+    let options = encode_options! { options::LosslessFloat };
     let binary = tree_buf::write_with_options(&data, &options);
     assert_eq!(binary.len(), 376);
 

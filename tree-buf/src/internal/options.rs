@@ -6,56 +6,90 @@
 //
 
 macro_rules! options {
-    ($(($name:ident, $T:ty, $fallback:expr, $over:ident)),*) => {
-        pub trait EncodeOptions {
+    ($Options:ident, $Default:ident, $Override:ident, $Hierarchy:ident, {$($name:ident: $T:ty = $fallback:expr),*}) => {
+        pub trait $Options: Send + Sync {
             $(
                 #[inline(always)]
                 fn $name(&self) -> $T { $fallback }
             )*
         }
 
-        pub struct DefaultEncodeOptions;
-        impl EncodeOptions for DefaultEncodeOptions { }
+        pub struct $Default;
+        impl $Options for $Default { }
 
-        pub trait EncodeOptionsOverride {
+        pub trait $Override: Send + Sync {
             $(
                 #[inline(always)]
-                fn $over(&self) -> Option<$T> { None }
+                fn $name(&self) -> Option<$T> { None }
             )*
         }
 
-        impl<T0: EncodeOptions, T1: EncodeOptionsOverride> EncodeOptions for EncodeOptionsHierarchy<T0, T1> {
+        impl<T0: $Options, T1: $Override> $Options for $Hierarchy<T0, T1> {
             $(
                 #[inline(always)]
                 fn $name(&self) -> $T {
-                    self.overrides.$over().unwrap_or_else(|| self.fallback.$name())
+                    self.overrides.$name().unwrap_or_else(|| self.fallback.$name())
                 }
             )*
+        }
+
+        struct $Hierarchy<T0, T1> {
+            fallback: T0,
+            overrides: T1,
         }
     };
 }
 
-options!((lossy_float_tolerance, Option<i32>, None, override_lossy_float_tolerance));
 
-struct EncodeOptionsHierarchy<T0, T1> {
-    fallback: T0,
-    overrides: T1,
+options!(
+    EncodeOptions, EncodeOptionsDefault, EncodeOptionsOverride, EncodeOptionsHierarchy,
+    {
+        lossy_float_tolerance: Option<i32> = None
+    }
+);
+
+options!(
+    DecodeOptions, DecodeOptionsDefault, DecodeOptionsOverride, DecodeOptionsHierarchy,
+    {
+        parallel: bool = true
+    }
+);
+
+
+pub struct EnableParallel;
+impl DecodeOptionsOverride for EnableParallel {
+    #[inline(always)]
+    fn parallel(&self) -> Option<bool> {
+        Some(true)
+    }
+}
+
+pub struct DisableParallel;
+impl DecodeOptionsOverride for DisableParallel {
+    #[inline(always)]
+    fn parallel(&self) -> Option<bool> {
+        Some(false)
+    }
 }
 
 pub struct LosslessFloat;
 impl EncodeOptionsOverride for LosslessFloat {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<i32>> {
+    #[inline(always)]
+    fn lossy_float_tolerance(&self) -> Option<Option<i32>> {
         Some(None)
     }
 }
 
 pub struct LossyFloatTolerance(pub i32);
 impl EncodeOptionsOverride for LossyFloatTolerance {
-    fn override_lossy_float_tolerance(&self) -> Option<Option<i32>> {
+    #[inline(always)]
+    fn lossy_float_tolerance(&self) -> Option<Option<i32>> {
         Some(Some(self.0))
     }
 }
 
+
+// TODO: Move the remainder here into the macro
 pub fn override_encode_options(options: impl EncodeOptions, overrides: impl EncodeOptionsOverride) -> impl EncodeOptions {
     EncodeOptionsHierarchy { fallback: options, overrides }
 }
@@ -64,9 +98,26 @@ pub fn override_encode_options(options: impl EncodeOptions, overrides: impl Enco
 macro_rules! encode_options {
     ($($opts:expr),*) => {
         {
-            let options = $crate::options::DefaultEncodeOptions;
+            let options = $crate::options::EncodeOptionsDefault;
             $(
                 let options = $crate::options::override_encode_options(options, $opts);
+            )*
+            options
+        }
+    }
+}
+
+pub fn override_decode_options(options: impl DecodeOptions, overrides: impl DecodeOptionsOverride) -> impl DecodeOptions {
+    DecodeOptionsHierarchy { fallback: options, overrides }
+}
+
+#[macro_export]
+macro_rules! decode_options {
+    ($($opts:expr),*) => {
+        {
+            let options = $crate::options::DecodeOptionsDefault;
+            $(
+                let options = $crate::options::override_decode_options(options, $opts);
             )*
             options
         }

@@ -43,11 +43,11 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
 #[cfg(feature = "read")]
 impl<T: Readable> Readable for Vec<T> {
     type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynRootBranch::Array0 => Ok(Vec::new()),
             DynRootBranch::Array1(inner) => {
-                let inner = T::read(*inner)?;
+                let inner = T::read(*inner, options)?;
                 Ok(vec![inner])
             }
             DynRootBranch::Array { len, values } => {
@@ -55,7 +55,7 @@ impl<T: Readable> Readable for Vec<T> {
                 // TODO: Some of what the code is actually doing here is silly.
                 // Actual ReaderArray's may be IntoIter, which moved out of a Vec
                 // that we wanted in the first place. Specialization here would be nice.
-                let mut reader = T::ReaderArray::new(values)?;
+                let mut reader = T::ReaderArray::new(values, options)?;
                 for _ in 0..len {
                     v.push(reader.read_next());
                 }
@@ -102,6 +102,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
+            // TODO: Consider an all-0 type // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
             stream.write_with_id(|stream| len.flush(stream));
             stream.write_with_id(|stream| values.flush(stream));
         } else {
@@ -115,12 +116,17 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     type Read = Vec<T::Read>;
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {
-                let values = T::new(*values)?;
-                let len = <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len)?;
+                let (values, len) = parallel(
+                    || T::new(*values, options),
+                    || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options),
+                    options
+                );
+                let values = values?;
+                let len = len?;
                 Ok(Some(VecArrayReader { len, values }))
             }
             _ => Err(ReadError::SchemaMismatch),

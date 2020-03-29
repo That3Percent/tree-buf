@@ -76,7 +76,7 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
 impl Readable for String {
     // TODO: Use lifetimes to make this read lazy rather than IntoIter
     type ReaderArray = IntoIter<String>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+    fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynRootBranch::String(s) => Ok(s.to_owned()),
             _ => Err(ReadError::SchemaMismatch),
@@ -87,7 +87,7 @@ impl Readable for String {
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<String> {
     type Read = String;
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::String(bytes) => {
                 let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;

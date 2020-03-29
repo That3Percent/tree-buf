@@ -17,10 +17,10 @@ impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
 #[cfg(feature = "read")]
 impl<T: Readable> Readable for Option<T> {
     type ReaderArray = Option<NullableReader<T::ReaderArray>>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynRootBranch::Void => Ok(None),
-            _ => Ok(Some(T::read(sticks)?)),
+            _ => Ok(Some(T::read(sticks, options)?)),
         }
     }
 }
@@ -62,11 +62,15 @@ pub struct NullableReader<T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
     type Read = Option<T::Read>;
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
-                let opts = decode_packed_bool(&opt).into_iter();
-                let values = T::new(*values)?;
+                let (opts, values) = parallel(
+                    || decode_packed_bool(&opt).into_iter(),
+                    || T::new(*values, options),
+                    options
+                );
+                let values = values?;
                 Ok(Some(NullableReader { opts, values }))
             }
             DynArrayBranch::Void => Ok(None),

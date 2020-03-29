@@ -2,7 +2,6 @@ use crate::encodings::varint::encode_prefix_varint;
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
-use std::marker::PhantomData;
 use std::vec::IntoIter;
 
 #[cfg(feature = "write")]
@@ -40,19 +39,29 @@ impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a
 }
 
 #[cfg(feature = "read")]
-impl<K: Readable + Hash + Eq, V: Readable, S: Default + BuildHasher> Readable for HashMap<K, V, S> {
+impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHasher> Readable for HashMap<K, V, S> {
     type ReaderArray = Option<HashMapArrayReader<K::ReaderArray, V::ReaderArray, S>>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         let mut v = Default::default(); // TODO: (Performance) Capacity
         match sticks {
             DynRootBranch::Map0 => Ok(v),
             DynRootBranch::Map1 { key, value } => {
-                v.insert(K::read(*key)?, V::read(*value)?);
+                let (key, value) = parallel(
+                    move || K::read(*key, options),
+                    move || V::read(*value, options),
+                    options,
+                );
+                v.insert(key?, value?);
                 Ok(v)
             }
             DynRootBranch::Map { len, keys, values } => {
-                let mut keys = K::ReaderArray::new(keys)?;
-                let mut values = V::ReaderArray::new(values)?;
+                let (keys, values) = parallel(
+                    || K::ReaderArray::new(keys, options),
+                    || V::ReaderArray::new(values, options),
+                    options,
+                );
+                let mut keys = keys?;
+                let mut values = values?;
                 for _ in 0..len {
                     // TODO: This should not be infallable.
                     v.insert(keys.read_next(), values.read_next());
@@ -69,7 +78,7 @@ impl<K: Readable + Hash + Eq, V: Readable, S: Default + BuildHasher> Readable fo
 pub struct HashMapArrayWriter<'a, K, V, S> {
     len: <u64 as Writable<'a>>::WriterArray,
     items: Option<(K, V)>,
-    _marker: PhantomData<*const S>,
+    _marker: Unowned<S>,
 }
 
 #[cfg(feature = "read")]
@@ -77,7 +86,7 @@ pub struct HashMapArrayReader<K, V, S> {
     len: IntoIter<u64>,
     keys: K,
     values: V,
-    _marker: PhantomData<*const S>,
+    _marker: Unowned<S>,
 }
 
 #[cfg(feature = "write")]
@@ -110,18 +119,27 @@ where
     K::Read: Hash + Eq,
 {
     type Read = HashMap<K::Read, V::Read, S>;
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Map0 => Ok(None),
             DynArrayBranch::Map { len, keys, values } => {
-                let keys = K::new(*keys)?;
-                let values = V::new(*values)?;
-                let len = <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len)?;
+                let (keys, (values, len)) = parallel(
+                    || K::new(*keys, options),
+                    || parallel(
+                        || V::new(*values, options),
+                        || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options),
+                        options,
+                    ),
+                    options
+                );
+                let keys = keys?;
+                let values = values?;
+                let len = len?;
                 Ok(Some(HashMapArrayReader {
                     len,
                     keys,
                     values,
-                    _marker: PhantomData,
+                    _marker: Unowned::new(),
                 }))
             }
             _ => Err(ReadError::SchemaMismatch),

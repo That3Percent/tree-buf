@@ -260,14 +260,15 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
             #ident: <#ty as ::tree_buf::internal::Readable>::read(
-                fields.remove(#canon_str).unwrap_or_default()
+                fields.remove(#canon_str).unwrap_or_default(),
+                options,
             )?,
         }
     });
 
     let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            #ident: ::tree_buf::internal::ReaderArray::new(fields.remove(#canon_str).unwrap_or_default())?,
+            #ident: ::tree_buf::internal::ReaderArray::new(fields.remove(#canon_str).unwrap_or_default(), options)?,
         }
     });
 
@@ -321,7 +322,8 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
     quote! {
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
-            fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
+            // TODO: Parallel
+            fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
                 #read
             }
         }
@@ -333,7 +335,8 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
 
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
-            fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>) -> Result<Self, ::tree_buf::ReadError> {
+            // TODO: Use parallel here
+            fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
                 #new
             }
             fn read_next(&mut self) -> Self::Read {
@@ -370,7 +373,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                     1 => {
                         root_matches.push(quote! {
                             #discriminant => {
-                                Self::#variant_ident(::tree_buf::internal::Readable::read(*value)?)
+                                Self::#variant_ident(::tree_buf::internal::Readable::read(*value, options)?)
                             }
                         });
                         let ty = &unnamed[0].ty;
@@ -384,7 +387,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                                 }
                                 result.#variant_ident = Some(
                                     (index as u64,
-                                    ::tree_buf::internal::ReaderArray::new(data)?)
+                                    ::tree_buf::internal::ReaderArray::new(data, options)?)
                                 );
                             }
                         });
@@ -424,7 +427,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     let new = quote! {
         match sticks {
             ::tree_buf::internal::DynArrayBranch::Enum {discriminants, variants} => {
-                let tree_buf_discriminant = ::tree_buf::internal::ReaderArray::new(*discriminants)?;
+                let tree_buf_discriminant = ::tree_buf::internal::ReaderArray::new(*discriminants, options)?;
                 let mut result = Self {
                     tree_buf_discriminant,
                     #(#new_defaults),*

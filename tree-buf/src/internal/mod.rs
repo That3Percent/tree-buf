@@ -11,5 +11,6 @@ pub mod options;
 pub mod reader_writer;
 pub mod rust_std;
 pub mod types;
+pub mod parallel;
 
-pub use {branch::*, encodings::*, options::*, reader_writer::*, rust_std::*, types::*};
+pub use {branch::*, encodings::*, options::*, reader_writer::*, rust_std::*, types::*, parallel::*};

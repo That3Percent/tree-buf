@@ -14,6 +14,58 @@ macro_rules! tuple_index {
     };
 }
 
+macro_rules! parallel_new_rhs {
+    ($opts:ident, ) => {
+      ()  
+    };
+    ($opts:ident, $ts:ident) => {
+        $ts::new($ts, $opts)
+    };
+    ($opts:ident, $ts:ident, $($remainder:ident),+) => {
+        parallel(move || $ts::new($ts, $opts), move || parallel_new_rhs!($opts, $($remainder),*), $opts)
+    }
+}
+
+macro_rules! parallel_read_rhs {
+    ($opts: ident) => {
+      ()  
+    };
+    ($opts: ident, $ts:ident) => {
+        $ts::read($ts, $opts)
+    };
+    ($opts: ident, $ts:ident, $($remainder:ident),+) => {
+        parallel(move || $ts::read($ts, $opts), move || parallel_read_rhs!($opts, $($remainder),*), $opts)
+    }
+}
+
+macro_rules! parallel_lhs {
+    () => {
+      ()  
+    };
+    ($ts:ident) => {
+        $ts
+    };
+    ($ts:ident, $($remainder:ident),+) => {
+        ($ts, parallel_lhs!($($remainder),*))
+    }
+}
+
+macro_rules! parallel_new {
+    ($opts:ident, $($ts:ident),*) => {
+        let parallel_lhs!($($ts),*) = parallel_new_rhs!($opts, $($ts),*);
+    };
+}
+
+macro_rules! parallel_read {
+    ($opts:ident, $($ts:ident),*) => {
+        let parallel_lhs!($($ts),*) = parallel_read_rhs!($opts, $($ts),*);
+    };
+}
+
+
+
+
+
 macro_rules! impl_tuple {
     ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+) => {
         #[cfg(feature = "write")]
@@ -47,9 +99,9 @@ macro_rules! impl_tuple {
         }
 
         #[cfg(feature = "read")]
-        impl <$($ts: Readable),+> Readable for ($($ts),+) {
+        impl <$($ts: Readable + Send),+> Readable for ($($ts),+) {
             type ReaderArray=($($ts::ReaderArray),+);
-            fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
+            fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     DynRootBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
@@ -57,10 +109,16 @@ macro_rules! impl_tuple {
                             return Err(ReadError::SchemaMismatch)
                         }
                         let mut fields = fields.drain(..);
-                        Ok((
-                            // This unwrap is ok because we verified the len already. See alsoa abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                            $($ts::read(fields.next().unwrap())?),+
-                        ))
+
+                        // Move the fields out of the vec
+                        $(
+                            // This unwrap is ok because we verified the len already. See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
+                            let $ts = fields.next().unwrap();
+                        )+
+
+                        parallel_read!(options, $($ts),*);
+
+                        Ok(($($ts?),*))
                     },
                     _ => Err(ReadError::SchemaMismatch),
                 }
@@ -70,7 +128,7 @@ macro_rules! impl_tuple {
         #[cfg(feature = "read")]
         impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+) {
             type Read=($($ts::Read),+);
-            fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     DynArrayBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
@@ -78,10 +136,16 @@ macro_rules! impl_tuple {
                             return Err(ReadError::SchemaMismatch)
                         }
                         let mut fields = fields.drain(..);
-                        Ok((
-                            // This unwrap is ok because we verified the len already. See alsoa abb368f2-6c99-4c44-8f9f-4b00868adaaf
-                            $($ts::new(fields.next().unwrap())?),+
-                        ))
+
+                        // Move the fields out of the vec
+                        $(
+                            // This unwrap is ok because we verified the len already. See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
+                            let $ts = fields.next().unwrap();
+                        )+
+
+                        parallel_new!(options, $($ts),*);
+
+                        Ok(($($ts?),*))
                     },
                     _ => Err(ReadError::SchemaMismatch)
                 }
@@ -108,3 +172,4 @@ impl_tuple!(5, RootTypeId::Tuple5, ArrayTypeId::Tuple5, T0, 0, T1, 1, T2, 2, T3,
 impl_tuple!(6, RootTypeId::Tuple6, ArrayTypeId::Tuple6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
 
 // TODO: Support tuple structs in the macro
+

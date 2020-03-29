@@ -84,7 +84,7 @@ pub trait Writable<'a>: Sized {
 #[cfg(feature = "read")]
 pub trait Readable: Sized {
     type ReaderArray: ReaderArray<Read = Self>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self>;
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self>;
 }
 
 // TODO: Introduce a separate "Scratch" type to make eg: WriterArray re-usable.
@@ -101,10 +101,10 @@ pub trait WriterArray<'a>: Default {
 }
 
 #[cfg(feature = "read")]
-pub trait ReaderArray: Sized {
+pub trait ReaderArray: Sized + Send {
     type Read;
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
     // I think that may require GAT though the way things are setup so come back to this later.
-    fn new(sticks: DynArrayBranch<'_>) -> ReadResult<Self>;
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self>;
     fn read_next(&mut self) -> Self::Read;
 }

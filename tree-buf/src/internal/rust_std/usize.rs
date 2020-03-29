@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<usize> {
     type Read = usize;
-    fn new(_sticks: DynArrayBranch<'_>) -> ReadResult<Self> {
+    fn new(_sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         todo!("usize ReaderArray new");
     }
     fn read_next(&mut self) -> Self::Read {
@@ -24,8 +24,8 @@ pub fn read_usize(bytes: &[u8], offset: &mut usize) -> ReadResult<usize> {
 /*
 impl Readable for usize {
     type ReaderArray = IntoIter<usize>;
-    fn read(sticks: DynRootBranch<'_>) -> ReadResult<Self> {
-        Ok(u64::read(sticks)? as Self)
+    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        Ok(u64::read(sticks, options)? as Self)
     }
 }
 */

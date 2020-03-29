@@ -18,6 +18,20 @@ pub mod prelude {
 
     #[cfg(feature = "read")]
     pub(crate) type ReadResult<T> = Result<T, ReadError>;
+
+    #[derive(Default, Debug)]
+    pub(crate) struct Unowned<T: ?Sized> {
+        _marker: std::marker::PhantomData<*const T>,
+    }
+    impl<T> Unowned<T> {
+        pub fn new() -> Self {
+            Self {
+                _marker: std::marker::PhantomData,
+            }
+        }
+    }
+    unsafe impl<T> Send for Unowned<T> {}
+
 }
 
 #[cfg(feature = "read")]
@@ -35,7 +49,7 @@ pub use internal::options;
 pub use crate::prelude::*;
 
 pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
-    let options = DefaultEncodeOptions;
+    let options = EncodeOptionsDefault;
     write_with_options(value, &options)
 }
 
@@ -57,8 +71,14 @@ pub fn write_with_options<'a, 'b: 'a, T: Writable<'a>>(value: &'b T, options: &i
 
 #[cfg(feature = "read")]
 pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
+    let options = DecodeOptionsDefault;
+    read_with_options(bytes, &options)
+}
+
+#[cfg(feature = "read")]
+pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions) -> ReadResult<T> {
     let sticks = read_root(bytes)?;
-    T::read(sticks)
+    T::read(sticks, options)
 }
 
 // TODO: Figure out recursion, at least enough to handle this: https://docs.rs/serde_json/1.0.44/serde_json/value/enum.Value.html
@@ -84,3 +104,12 @@ pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
 // TODO: Evaluate TurboPFor https://github.com/powturbo/TurboPFor
 // or consider the best parts of it. The core differentiator here
 // is the ability to use this.
+
+
+// TODO: Automatic type extraction for json:
+// http://stevehanov.ca/blog/?id=104
+
+// TODO: Add decimal type
+// This seems a reasonable starting point: https://github.com/paupino/rust-decimal
+
+// TODO: Use rayon, crossbeam, or similar to parallelize read
