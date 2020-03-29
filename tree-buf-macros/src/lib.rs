@@ -354,8 +354,11 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     });
 
     let mut new_matches = Vec::new();
-    let mut new_defaults = Vec::new();
+    let mut new_inits = Vec::new();
     let mut read_nexts = Vec::new();
+    let mut new_unpacks = Vec::new();
+    let mut new_parallel_lhs = quote! { tree_buf_discriminant };
+    let mut new_parallel_rhs = quote! { ::tree_buf::internal::ReaderArray::new(tree_buf_discriminant, options) };
 
     let mut root_matches = Vec::new();
 
@@ -380,19 +383,27 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         array_fields.push(quote! {
                             #variant_ident: Option<(u64, <#ty as ::tree_buf::internal::Readable>::ReaderArray)>
                         });
+                        new_unpacks.push(quote! { #variant_ident: #variant_ident.transpose()?, });
+                        new_parallel_lhs = quote! { (#variant_ident, #new_parallel_lhs) };
+                        new_parallel_rhs = quote! {
+                            ::tree_buf::internal::parallel(
+                                || #variant_ident.map(|(i, d)| { ::tree_buf::internal::ReaderArray::new(d, options).map(|v| (i, v)) }),
+                                || #new_parallel_rhs,
+                                options
+                            )
+                        };
                         new_matches.push(quote! {
                             #discriminant => {
-                                if result.#variant_ident.is_some() {
+                                if #variant_ident.is_some() {
                                     return Err(::tree_buf::ReadError::InvalidFormat(::tree_buf::internal::error::InvalidFormat::DuplicateEnumDiscriminant));
                                 }
-                                result.#variant_ident = Some(
-                                    (index as u64,
-                                    ::tree_buf::internal::ReaderArray::new(data, options)?)
+                                #variant_ident = Some(
+                                    (index as u64, data)
                                 );
                             }
                         });
-                        new_defaults.push(quote! {
-                            #variant_ident: None
+                        new_inits.push(quote! {
+                            let mut #variant_ident = None;
                         });
                         read_nexts.push(quote! {
                             if let Some((d, r)) = &mut self.#variant_ident {
@@ -427,11 +438,9 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     let new = quote! {
         match sticks {
             ::tree_buf::internal::DynArrayBranch::Enum {discriminants, variants} => {
-                let tree_buf_discriminant = ::tree_buf::internal::ReaderArray::new(*discriminants, options)?;
-                let mut result = Self {
-                    tree_buf_discriminant,
-                    #(#new_defaults),*
-                };
+                let tree_buf_discriminant = *discriminants;
+                #(#new_inits)*;
+                
 
                 for (index, variant) in variants.into_iter().enumerate() {
                     let ::tree_buf::internal::ArrayEnumVariant { ident, data } = variant;
@@ -440,6 +449,13 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         _ => { return Err(::tree_buf::ReadError::SchemaMismatch); }
                     }
                 }
+
+                let #new_parallel_lhs = #new_parallel_rhs;
+
+                let result = Self {
+                    tree_buf_discriminant: tree_buf_discriminant?,
+                    #(#new_unpacks)*
+                };
 
                 // FIXME: Need to verify that the range of tree_buf_discriminant does
                 // not go beyond the number of variants listed (this would indicate a corrupt file)
