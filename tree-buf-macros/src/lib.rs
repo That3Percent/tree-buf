@@ -257,33 +257,37 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     let fields = get_named_fields(data_struct);
     let name = &ast.ident;
 
-    let read_inits = fields.iter().map(|NamedField { ident, ty, canon_str }| {
+    let inits = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
             let #ident = fields.remove(#canon_str).unwrap_or_default();
         }
-    });
-    let read_unwraps = fields.iter().map(|NamedField { ident, .. }| {
+    }).collect::<Vec<_>>();
+    let unwraps = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
             #ident: #ident?,
         }
-    });
+    }).collect::<Vec<_>>();
 
-    let mut reads_parallel_lhs = quote! {};
+    let mut parallel_lhs = quote! {};
     let mut reads_parallel_rhs = quote! {};
+    let mut news_parallel_rhs = quote! {};
     let mut is_first = true;
 
     for NamedField { ident, ty, .. } in fields.iter() {
         if is_first {
             is_first = false;
-            reads_parallel_lhs = quote! { #ident };
+            parallel_lhs = quote! { #ident };
             reads_parallel_rhs = quote! { 
                 <#ty as ::tree_buf::internal::Readable>::read(
                     #ident,
                     options,
                 )
             };
+            news_parallel_rhs = quote! {
+                ::tree_buf::internal::ReaderArray::new(#ident, options)
+            };
         } else {
-            reads_parallel_lhs = quote! { (#ident, #reads_parallel_lhs) };
+            parallel_lhs = quote! { (#ident, #parallel_lhs) };
             reads_parallel_rhs = quote! {
                 ::tree_buf::internal::parallel(
                     || <#ty as ::tree_buf::internal::Readable>::read(
@@ -294,14 +298,15 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
                     options
                 )
             };
+            news_parallel_rhs = quote! {
+                ::tree_buf::internal::parallel(
+                    || ::tree_buf::internal::ReaderArray::new(#ident, options),
+                    || #news_parallel_rhs,
+                    options
+                )
+            }
         }
     }
-
-    let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
-        quote! {
-            #ident: ::tree_buf::internal::ReaderArray::new(fields.remove(#canon_str).unwrap_or_default(), options)?,
-        }
-    });
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
@@ -321,12 +326,12 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
             _ => return Err(::tree_buf::ReadError::SchemaMismatch),
         };
 
-        #(#read_inits)*
+        #(#inits)*
 
-        let #reads_parallel_lhs = #reads_parallel_rhs;
+        let #parallel_lhs = #reads_parallel_rhs;
 
         Ok(Self {
-            #(#read_unwraps)*
+            #(#unwraps)*
         })
     };
     let new = quote! {
@@ -335,8 +340,12 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
             _ => return Err(::tree_buf::ReadError::SchemaMismatch),
         };
 
+        #(#inits)*
+
+        let #parallel_lhs = #news_parallel_rhs;
+
         Ok(Self {
-            #(#news)*
+            #(#unwraps)*
         })
     };
 
