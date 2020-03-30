@@ -18,7 +18,7 @@ impl<'a> Writable<'a> for bool {
 #[cfg(feature = "read")]
 impl Readable for bool {
     type ReaderArray = IntoIter<bool>;
-    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynRootBranch::Boolean(v) => Ok(v),
             _ => Err(ReadError::SchemaMismatch),
@@ -41,7 +41,7 @@ impl<'a> WriterArray<'a> for Vec<bool> {
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<bool> {
     type Read = bool;
-    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Boolean(bytes) => {
                 let v = decode_packed_bool(&bytes);

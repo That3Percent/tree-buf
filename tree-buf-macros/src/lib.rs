@@ -364,9 +364,9 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
     let array_reader_name = format_ident!("{}TreeBufReaderArray", name);
 
     quote! {
+        #[allow(non_snake_case)]
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
-            // TODO: Parallel
             fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
                 #read
             }
@@ -377,6 +377,7 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
             #(#array_fields,)*
         }
 
+        #[allow(non_snake_case)]
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {

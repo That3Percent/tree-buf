@@ -116,7 +116,7 @@ macro_rules! impl_float {
         #[cfg(feature = "read")]
         impl ReaderArray for IntoIter<$T> {
             type Read = $T;
-            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+            fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     DynArrayBranch::Float(float) => {
                         match float {

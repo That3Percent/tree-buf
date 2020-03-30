@@ -87,7 +87,7 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "read")]
         impl ReaderArray for IntoIter<$Ty> {
             type Read = $Ty;
-            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+            fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
                 match sticks {
                     // TODO: Support eg: delta/zigzag
                     DynArrayBranch::Integer(array_int) => {
@@ -218,51 +218,6 @@ fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
-
-#[cfg(feature = "write")]
-fn write_root_sint(value: i64, bytes: &mut Vec<u8>) -> RootTypeId {
-    if value > 0 {
-        return write_root_uint(value as u64, bytes);
-    }
-    todo!();
-    let le = value.to_le_bytes();
-    match value {
-        0 => RootTypeId::Zero,
-        1 => RootTypeId::One,
-        2..=255 => {
-            bytes.push(le[0]);
-            RootTypeId::IntU8
-        }
-        256..=65535 => {
-            bytes.extend_from_slice(&le[..2]);
-            RootTypeId::IntU16
-        }
-        65536..=16777215 => {
-            bytes.extend_from_slice(&le[..3]);
-            RootTypeId::IntU24
-        }
-        16777216..=4294967295 => {
-            bytes.extend_from_slice(&le[..4]);
-            RootTypeId::IntU32
-        }
-        4294967296..=1099511627775 => {
-            bytes.extend_from_slice(&le[..5]);
-            RootTypeId::IntU40
-        }
-        1099511627776..=281474976710655 => {
-            bytes.extend_from_slice(&le[..6]);
-            RootTypeId::IntU48
-        }
-        281474976710656..=72057594037927936 => {
-            bytes.extend_from_slice(&le[..7]);
-            RootTypeId::IntU56
-        }
-        _ => {
-            bytes.extend_from_slice(&le);
-            RootTypeId::IntU64
-        }
-    }
-}
 
 struct PrefixVarIntCompressor<T> {
     _marker: Unowned<T>,

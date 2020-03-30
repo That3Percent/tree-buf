@@ -1,7 +1,6 @@
 mod common;
 use common::round_trip;
 use tree_buf::prelude::*;
-use tree_buf::{Readable, Writable};
 
 // TODO: Get a code coverage checker
 

@@ -87,7 +87,7 @@ impl Readable for String {
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<String> {
     type Read = String;
-    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::String(bytes) => {
                 let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
