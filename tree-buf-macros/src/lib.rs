@@ -257,14 +257,45 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     let fields = get_named_fields(data_struct);
     let name = &ast.ident;
 
-    let reads = fields.iter().map(|NamedField { ident, ty, canon_str }| {
+    let read_inits = fields.iter().map(|NamedField { ident, ty, canon_str }| {
         quote! {
-            #ident: <#ty as ::tree_buf::internal::Readable>::read(
-                fields.remove(#canon_str).unwrap_or_default(),
-                options,
-            )?,
+            let #ident = fields.remove(#canon_str).unwrap_or_default();
         }
     });
+    let read_unwraps = fields.iter().map(|NamedField { ident, .. }| {
+        quote! {
+            #ident: #ident?,
+        }
+    });
+
+    let mut reads_parallel_lhs = quote! {};
+    let mut reads_parallel_rhs = quote! {};
+    let mut is_first = true;
+
+    for NamedField { ident, ty, .. } in fields.iter() {
+        if is_first {
+            is_first = false;
+            reads_parallel_lhs = quote! { #ident };
+            reads_parallel_rhs = quote! { 
+                <#ty as ::tree_buf::internal::Readable>::read(
+                    #ident,
+                    options,
+                )
+            };
+        } else {
+            reads_parallel_lhs = quote! { (#ident, #reads_parallel_lhs) };
+            reads_parallel_rhs = quote! {
+                ::tree_buf::internal::parallel(
+                    || <#ty as ::tree_buf::internal::Readable>::read(
+                        #ident,
+                        options,
+                    ),
+                    || #reads_parallel_rhs,
+                    options
+                )
+            };
+        }
+    }
 
     let news = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
@@ -290,8 +321,12 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
             _ => return Err(::tree_buf::ReadError::SchemaMismatch),
         };
 
+        #(#read_inits)*
+
+        let #reads_parallel_lhs = #reads_parallel_rhs;
+
         Ok(Self {
-            #(#reads)*
+            #(#read_unwraps)*
         })
     };
     let new = quote! {
@@ -335,7 +370,6 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
 
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
-            // TODO: Use parallel here
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
                 #new
             }
