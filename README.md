@@ -25,7 +25,7 @@ __Step 1__: Add the latest version tree-buf to your `cargo.toml`
 
 ```toml
 [dependencies]
-tree-buf = "0.5.0"
+tree-buf = "0.7.0"
 ```
 
 __Step 2__: Derive `Read` and / or `Write` on your structs.
