@@ -51,6 +51,11 @@ fn make_item() -> Bits {
 }
 
 #[test]
+fn broken_int() {
+    round_trip(&75339u64, 4, 10);
+}
+
+#[test]
 fn bools_root() {
     round_trip(&true, 1, 5);
     round_trip(&false, 1, 5);
