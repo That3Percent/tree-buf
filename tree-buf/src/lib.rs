@@ -47,6 +47,8 @@ pub use internal::options;
 
 pub use crate::prelude::*;
 
+pub use internal::Ignore;
+
 pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
     let options = EncodeOptionsDefault;
     write_with_options(value, &options)
@@ -109,5 +111,3 @@ pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions
 
 // TODO: Add decimal type
 // This seems a reasonable starting point: https://github.com/paupino/rust-decimal
-
-// TODO: Use rayon, crossbeam, or similar to parallelize read

@@ -186,6 +186,40 @@ fn visibility_modifiers() {
     round_trip_default::<Public>(4, 9);
 }
 
+#[test]
+fn ignores() {
+    use tree_buf::Ignore;
+    round_trip(&Ignore, 1, 3);
+
+    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
+    struct X {
+        i: Ignore,
+    }
+
+    let x = X {
+        i: Ignore,
+    };
+    round_trip(&x, 4, 6);
+
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum E {
+        A(Ignore),
+        B(Ignore),
+    }
+
+
+    let e = E::A(Ignore);
+    round_trip(&e, 4, 11);
+
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    struct N {
+        e: E
+    }
+
+    let o = vec![N {e:E::A(Ignore)}, N{e:E::B(Ignore)}];
+    round_trip(&o, 17, 21);
+}
+
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {
