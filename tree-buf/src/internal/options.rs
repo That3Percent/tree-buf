@@ -40,21 +40,13 @@ macro_rules! options {
     };
 }
 
+options!(EncodeOptions, EncodeOptionsDefault, EncodeOptionsOverride, EncodeOptionsHierarchy, {
+    lossy_float_tolerance: Option<i32> = None
+});
 
-options!(
-    EncodeOptions, EncodeOptionsDefault, EncodeOptionsOverride, EncodeOptionsHierarchy,
-    {
-        lossy_float_tolerance: Option<i32> = None
-    }
-);
-
-options!(
-    DecodeOptions, DecodeOptionsDefault, DecodeOptionsOverride, DecodeOptionsHierarchy,
-    {
-        parallel: bool = true
-    }
-);
-
+options!(DecodeOptions, DecodeOptionsDefault, DecodeOptionsOverride, DecodeOptionsHierarchy, {
+    parallel: bool = true
+});
 
 pub struct EnableParallel;
 impl DecodeOptionsOverride for EnableParallel {
@@ -87,7 +79,6 @@ impl EncodeOptionsOverride for LossyFloatTolerance {
         Some(Some(self.0))
     }
 }
-
 
 // TODO: Move the remainder here into the macro
 pub fn override_encode_options(options: impl EncodeOptions, overrides: impl EncodeOptionsOverride) -> impl EncodeOptions {

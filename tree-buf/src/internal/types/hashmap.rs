@@ -1,4 +1,3 @@
-use crate::encodings::varint::encode_prefix_varint;
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
@@ -8,7 +7,7 @@ use std::vec::IntoIter;
 impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a> for HashMap<K, V, S> {
     type WriterArray = HashMapArrayWriter<'a, K::WriterArray, V::WriterArray, S>;
     fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
-        encode_prefix_varint(self.len() as u64, stream.bytes());
+        write_usize(self.len(), stream);
         match self.len() {
             0 => {}
             1 => {
@@ -46,20 +45,12 @@ impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHashe
         match sticks {
             DynRootBranch::Map0 => Ok(v),
             DynRootBranch::Map1 { key, value } => {
-                let (key, value) = parallel(
-                    move || K::read(*key, options),
-                    move || V::read(*value, options),
-                    options,
-                );
+                let (key, value) = parallel(move || K::read(*key, options), move || V::read(*value, options), options);
                 v.insert(key?, value?);
                 Ok(v)
             }
             DynRootBranch::Map { len, keys, values } => {
-                let (keys, values) = parallel(
-                    || K::ReaderArray::new(keys, options),
-                    || V::ReaderArray::new(values, options),
-                    options,
-                );
+                let (keys, values) = parallel(|| K::ReaderArray::new(keys, options), || V::ReaderArray::new(values, options), options);
                 let mut keys = keys?;
                 let mut values = values?;
                 for _ in 0..len {
@@ -125,12 +116,8 @@ where
             DynArrayBranch::Map { len, keys, values } => {
                 let (keys, (values, len)) = parallel(
                     || K::new(*keys, options),
-                    || parallel(
-                        || V::new(*values, options),
-                        || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options),
-                        options,
-                    ),
-                    options
+                    || parallel(|| V::new(*values, options), || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options), options),
+                    options,
                 );
                 let keys = keys?;
                 let values = values?;

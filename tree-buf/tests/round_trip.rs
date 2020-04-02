@@ -64,7 +64,7 @@ fn opts_root() {
 
 #[test]
 fn bool_array() {
-    round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6, 12);
+    round_trip(&vec![false, true, true, false, true, true, true, false, false, true, false, true], 6, 9);
 }
 
 #[test]
@@ -85,25 +85,25 @@ fn ints_root() {
 // Special case for 1 element array encodes root object
 #[test]
 fn array1() {
-    round_trip(&vec![99u64], 3, 11);
-    round_trip(&vec![1u64], 2, 11);
+    round_trip(&vec![99u64], 3, 8);
+    round_trip(&vec![1u64], 2, 8);
 }
 
 #[test]
 fn int_vec() {
-    round_trip(&vec![99u64, 100], 6, 13);
+    round_trip(&vec![99u64, 100], 6, 10);
 }
 
 #[test]
 fn float64_vec() {
-    round_trip(&vec![0.99], 10, 19);
-    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 68);
+    round_trip(&vec![0.99], 10, 16);
+    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 65);
 }
 
 #[test]
 fn float32_vec() {
-    round_trip(&vec![0.99f32], 6, 17);
-    round_trip(&vec![0.01f32, 0.02, 0.03, 0.04], 20, 41);
+    round_trip(&vec![0.99f32], 6, 14);
+    round_trip(&vec![0.01f32, 0.02, 0.03, 0.04], 20, 38);
 }
 
 #[test]
@@ -133,30 +133,30 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 35);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 32);
 }
 
 #[test]
 fn array_tuple() {
-    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14, 25);
+    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14, 19);
 }
 
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 144, 226);
+    round_trip(&item, 144, 220);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 405, 708);
+    round_trip(&item, 395, 695);
 }
 
 #[test]
 fn nullable_array() {
-    round_trip(&vec![Some(1u32), Some(2)], 9, 16);
+    round_trip(&vec![Some(1u32), Some(2)], 9, 13);
 }
 
 #[test]
@@ -192,10 +192,10 @@ fn various_types() {
     round_trip_default::<(u64, u32)>(3, 11);
     round_trip_default::<f64>(1, 14);
     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
-    round_trip_default::<Vec<u32>>(1, 8);
+    round_trip_default::<Vec<u32>>(1, 5);
     round_trip_default::<Option<Vec<u32>>>(1, 3);
     round_trip_default::<Option<u32>>(1, 3);
-    round_trip_default::<Vec<Option<u32>>>(1, 8);
+    round_trip_default::<Vec<Option<u32>>>(1, 5);
     round_trip_default::<String>(1, 6);
 }
 
@@ -306,7 +306,7 @@ fn large_structs() {
 
 #[test]
 fn map_0_root() {
-     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
+    // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     let data = HashMap::<u32, u32>::new();
     round_trip(&data, 2, 9);
 }
@@ -336,7 +336,7 @@ fn maps_array() {
         h.insert(10, vec![10, 9, 8, 7]);
         data.push(h);
     }
-    round_trip(&data, 44, 69);
+    round_trip(&data, 44, 66);
 }
 
 #[test]
@@ -346,5 +346,11 @@ fn maps_void() {
         let h = HashMap::<String, String>::new();
         data.push(h);
     }
-    round_trip(&data, 13, 18);
+    round_trip(&data, 13, 15);
+}
+
+#[test]
+fn fixed_arrays() {
+    round_trip(&[0u32, 1, 2, 3], 8, 10);
+    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 14);
 }

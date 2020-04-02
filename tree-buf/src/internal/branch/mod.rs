@@ -85,8 +85,8 @@ pub fn read_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> ReadResult<Ident<'
 
 #[cfg(feature = "write")]
 #[inline]
-pub fn write_ident(value: &str, bytes: &mut Vec<u8>) {
-    write_str(value, bytes)
+pub fn write_ident(value: &str, stream: &mut impl WriterStream) {
+    write_str(value, stream)
 }
 
 pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {

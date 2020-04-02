@@ -1,5 +1,3 @@
-#[cfg(feature = "write")]
-use crate::internal::encodings::varint::encode_prefix_varint;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
@@ -18,7 +16,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
                 // and the bytes len. Though, it's not for obvious reasons.
                 // Maybe sometimes we can infer from context. Eg: bool always
                 // requires the same number of bits per item
-                encode_prefix_varint(self.len() as u64, stream.bytes());
+                write_usize(self.len(), stream);
 
                 // TODO: When there are types that are already
                 // primitive (eg: Vec<f64>) it doesn't make sense
@@ -75,10 +73,24 @@ pub struct VecArrayWriter<'a, T> {
     values: Option<T>,
 }
 
+// TODO: usize
+enum FixedOrVariableLength {
+    Fixed(usize),
+    Variable(IntoIter<u64>),
+}
+
+impl FixedOrVariableLength {
+    fn next(&mut self) -> usize {
+        match self {
+            Self::Fixed(v) => *v,
+            Self::Variable(i) => i.read_next() as usize,
+        }
+    }
+}
+
 #[cfg(feature = "read")]
 pub struct VecArrayReader<T> {
-    // TODO: usize
-    len: IntoIter<u64>,
+    len: FixedOrVariableLength,
     values: T,
 }
 
@@ -102,6 +114,11 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         let Self { len, values } = self;
         if let Some(values) = values {
+            if len.iter().all(|l| *l == len[0]) {
+                write_usize(len[0] as usize, stream);
+                stream.write_with_id(|stream| values.flush(stream));
+                return ArrayTypeId::ArrayFixed;
+            }
             // TODO: Consider an all-0 type // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
             stream.write_with_id(|stream| len.flush(stream));
             stream.write_with_id(|stream| values.flush(stream));
@@ -120,22 +137,25 @@ impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
         match sticks {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {
-                let (values, len) = parallel(
-                    || T::new(*values, options),
-                    || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options),
-                    options
-                );
+                let (values, len) = parallel(|| T::new(*values, options), || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options), options);
                 let values = values?;
-                let len = len?;
+                let len = FixedOrVariableLength::Variable(len?);
                 Ok(Some(VecArrayReader { len, values }))
             }
+            DynArrayBranch::ArrayFixed { len, values } => Ok(if len == 0 {
+                None
+            } else {
+                let len = FixedOrVariableLength::Fixed(len);
+                let values = T::new(*values, options)?;
+                Some(VecArrayReader { len, values })
+            }),
             _ => Err(ReadError::SchemaMismatch),
         }
     }
     fn read_next(&mut self) -> Self::Read {
         if let Some(inner) = self {
-            let len = inner.len.read_next();
-            let mut result = Vec::with_capacity(len as usize);
+            let len = inner.len.next();
+            let mut result = Vec::with_capacity(len);
             for _ in 0..len {
                 result.push(inner.values.read_next());
             }

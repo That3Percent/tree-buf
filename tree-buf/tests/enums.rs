@@ -4,7 +4,6 @@ use tree_buf::prelude::*;
 
 // TODO: Get a code coverage checker
 
-
 #[test]
 fn unnamed_field_one_variant() {
     #[derive(Read, Write, Debug, PartialEq, Clone)]
@@ -52,7 +51,6 @@ fn unused_variations_do_not_affect_size() {
     round_trip(&A::One(1), 6, 16);
     round_trip(&B::One(1), 6, 16);
 }
-
 
 // TODO: Other variations.
 /*

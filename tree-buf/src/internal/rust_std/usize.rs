@@ -1,5 +1,5 @@
 #[cfg(feature = "read")]
-use crate::internal::encodings::varint::decode_prefix_varint;
+use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint};
 use crate::prelude::*;
 use std::vec::IntoIter;
 
@@ -19,6 +19,11 @@ impl ReaderArray for IntoIter<usize> {
 #[cfg(feature = "read")]
 pub fn read_usize(bytes: &[u8], offset: &mut usize) -> ReadResult<usize> {
     Ok(decode_prefix_varint(bytes, offset)? as usize)
+}
+
+#[cfg(feature = "write")]
+pub fn write_usize(value: usize, stream: &mut impl WriterStream) {
+    encode_prefix_varint(value as u64, stream.bytes());
 }
 
 /*

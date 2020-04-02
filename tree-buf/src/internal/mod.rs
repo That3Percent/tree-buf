@@ -8,9 +8,9 @@ pub mod branch;
 pub mod encodings;
 pub mod error;
 pub mod options;
+pub mod parallel;
 pub mod reader_writer;
 pub mod rust_std;
 pub mod types;
-pub mod parallel;
 
-pub use {branch::*, encodings::*, options::*, reader_writer::*, rust_std::*, types::*, parallel::*};
+pub use {branch::*, encodings::*, options::*, parallel::*, reader_writer::*, rust_std::*, types::*};

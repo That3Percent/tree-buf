@@ -16,7 +16,7 @@ macro_rules! tuple_index {
 
 macro_rules! parallel_new_rhs {
     ($opts:ident, ) => {
-      ()  
+      ()
     };
     ($opts:ident, $ts:ident) => {
         $ts::new($ts, $opts)
@@ -28,7 +28,7 @@ macro_rules! parallel_new_rhs {
 
 macro_rules! parallel_read_rhs {
     ($opts: ident) => {
-      ()  
+      ()
     };
     ($opts: ident, $ts:ident) => {
         $ts::read($ts, $opts)
@@ -40,7 +40,7 @@ macro_rules! parallel_read_rhs {
 
 macro_rules! parallel_lhs {
     () => {
-      ()  
+      ()
     };
     ($ts:ident) => {
         $ts
@@ -61,10 +61,6 @@ macro_rules! parallel_read {
         let parallel_lhs!($($ts),*) = parallel_read_rhs!($opts, $($ts),*);
     };
 }
-
-
-
-
 
 macro_rules! impl_tuple {
     ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+) => {
@@ -172,4 +168,3 @@ impl_tuple!(5, RootTypeId::Tuple5, ArrayTypeId::Tuple5, T0, 0, T1, 1, T2, 2, T3,
 impl_tuple!(6, RootTypeId::Tuple6, ArrayTypeId::Tuple6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
 
 // TODO: Support tuple structs in the macro
-

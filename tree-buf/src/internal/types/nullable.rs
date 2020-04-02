@@ -65,11 +65,7 @@ impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
-                let (opts, values) = parallel(
-                    || decode_packed_bool(&opt).into_iter(),
-                    || T::new(*values, options),
-                    options
-                );
+                let (opts, values) = parallel(|| decode_packed_bool(&opt).into_iter(), || T::new(*values, options), options);
                 let values = values?;
                 Ok(Some(NullableReader { opts, values }))
             }

@@ -55,6 +55,10 @@ pub enum DynArrayBranch<'a> {
         len: Box<DynArrayBranch<'a>>,
         values: Box<DynArrayBranch<'a>>,
     },
+    ArrayFixed {
+        len: usize,
+        values: Box<DynArrayBranch<'a>>,
+    },
     Map0,
     Map {
         len: Box<DynArrayBranch<'a>>,
@@ -147,6 +151,12 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
                 }
             }
         }
+        ArrayFixed => {
+            let len = read_usize(bytes, offset)?;
+            let values = read_next_array(bytes, offset, lens)?;
+            let values = Box::new(values);
+            DynArrayBranch::ArrayFixed { len, values }
+        }
         Map => {
             let len = read_next_array(bytes, offset, lens)?;
             match len {
@@ -238,6 +248,7 @@ impl_type_id!(ArrayTypeId, [
     DoubleGorilla: 9,
     Map: 10,
     Enum: 11,
+    ArrayFixed: 12,
 ]);
 
 #[derive(Debug)]

@@ -8,9 +8,9 @@ use std::vec::IntoIter;
 // (Make sure that's true for SCSU, which may allow multiple encodings!)
 
 #[cfg(feature = "write")]
-pub fn write_str(value: &str, bytes: &mut Vec<u8>) {
-    encode_prefix_varint(value.len() as u64, bytes);
-    bytes.extend_from_slice(value.as_bytes());
+pub fn write_str(value: &str, stream: &mut impl WriterStream) {
+    write_usize(value.len(), stream);
+    stream.bytes().extend_from_slice(value.as_bytes());
 }
 
 #[cfg(feature = "read")]
@@ -64,7 +64,7 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         stream.write_with_len(|stream| {
             for s in self.iter() {
-                write_str(s, stream.bytes())
+                write_str(s, stream)
             }
         });
 

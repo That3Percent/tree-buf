@@ -37,7 +37,7 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     let writers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            ::tree_buf::internal::write_ident(#canon_str, stream.bytes());
+            ::tree_buf::internal::write_ident(#canon_str, stream);
             stream.write_with_id(|stream| self.#ident.write_root(stream));
         }
     });
@@ -56,7 +56,7 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     let flushers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            ::tree_buf::internal::write_ident(#canon_str, stream.bytes());
+            ::tree_buf::internal::write_ident(#canon_str, stream);
             let o = self.#ident;
             stream.write_with_id(|stream| o.flush(stream));
         }
@@ -172,7 +172,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         let ty = &unnamed[0].ty;
                         root_matches.push(quote! {
                             #ident::#variant_ident(_0) => {
-                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
+                                ::tree_buf::internal::write_ident(#discriminant, stream);
                                 stream.write_with_id(|stream| _0.write_root(stream));
                             }
                         });
@@ -199,7 +199,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             }
                             if matches {
                                 let mut buffer = self.#variant_ident.take().unwrap().1;
-                                ::tree_buf::internal::write_ident(#discriminant, stream.bytes());
+                                ::tree_buf::internal::write_ident(#discriminant, stream);
                                 stream.write_with_id(|stream| buffer.flush(stream));
                                 continue;
                             }

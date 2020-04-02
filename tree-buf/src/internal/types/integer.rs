@@ -218,7 +218,6 @@ fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
-
 struct PrefixVarIntCompressor<T> {
     _marker: Unowned<T>,
 }

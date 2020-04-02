@@ -31,7 +31,6 @@ pub mod prelude {
         }
     }
     unsafe impl<T> Send for Unowned<T> {}
-
 }
 
 #[cfg(feature = "read")]
@@ -104,7 +103,6 @@ pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions
 // TODO: Evaluate TurboPFor https://github.com/powturbo/TurboPFor
 // or consider the best parts of it. The core differentiator here
 // is the ability to use this.
-
 
 // TODO: Automatic type extraction for json:
 // http://stevehanov.ca/blog/?id=104

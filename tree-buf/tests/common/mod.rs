@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use tree_buf::prelude::*;
 use tree_buf::{Readable, Writable};
 
-
 /// Asserts that the serialized value deserializes to the same value.
 /// Asserts a specific size. If we get a number above this size, that's a fail.
 /// If we add compression and achieve lower, we can ratchet the number down.
@@ -18,8 +17,6 @@ pub fn round_trip<'a, 'b: 'a, T: Writable<'a> + Readable + Clone + std::fmt::Deb
     //let slice = &v;
     serialize_eq(slice, slice, array_size);
 }
-
-
 
 pub fn serialize_eq<'a, I: Writable<'a>, O: Readable + Debug + PartialEq>(i: &'a I, o: &'a O, size: usize) {
     let bytes = write(i);

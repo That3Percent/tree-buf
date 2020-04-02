@@ -3,7 +3,7 @@ use crate::prelude::*;
 // TODO: This is not yet used
 pub fn write_object_field<T: TypeId, S: WriterStream>(name: Ident<'_>, f: impl FnOnce(&mut S) -> T, stream: &mut S, num_fields_written: &mut usize) {
     let id = stream.restore_if_void(|stream| {
-        write_ident(name, stream.bytes());
+        write_ident(name, stream);
         f(stream)
     });
     if id != T::void() {

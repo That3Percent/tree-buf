@@ -41,3 +41,14 @@ fn canonical_idents_compatible() {
     serialize_eq(js, rust, 9);
     serialize_eq(rust, js, 9);
 }
+
+#[test]
+fn fixed_array_to_vec() {
+    let fixed = [0u8, 1, 2, 3, 4];
+    let vec: Vec<_> = fixed.iter().copied().collect();
+    serialize_eq(&fixed, &vec, 8);
+
+    let fixed = [fixed, fixed];
+    let vec: Vec<Vec<_>> = fixed.iter().map(|f| f.iter().copied().collect()).collect();
+    serialize_eq(&fixed, &vec, 14);
+}
