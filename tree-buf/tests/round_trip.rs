@@ -80,7 +80,7 @@ fn ints_root() {
         round_trip(&i, 2, 6);
     }
     for i in 128..=255u32 {
-        round_trip(&i, 2, 8);
+        round_trip(&i, 2, 6);
     }
     for i in 256..1024u32 {
         round_trip(&i, 3, 8);

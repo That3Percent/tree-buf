@@ -191,6 +191,7 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         }
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
+        U8 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::U8)?,
         F32 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F32(bytes))
@@ -249,6 +250,7 @@ impl_type_id!(ArrayTypeId, [
     Map: 10,
     Enum: 11,
     ArrayFixed: 12,
+    U8: 13,
 ]);
 
 #[derive(Debug)]
@@ -263,4 +265,5 @@ pub struct ArrayInteger<'a> {
 pub enum ArrayIntegerEncoding {
     PrefixVarInt,
     Simple16,
+    U8,
 }

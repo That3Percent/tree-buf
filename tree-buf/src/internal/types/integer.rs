@@ -109,6 +109,10 @@ macro_rules! impl_lowerable {
                                 let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
                                 let v = result.map_err(|_| ReadError::SchemaMismatch)?;
                                 Ok(v.into_iter())
+                            },
+                            ArrayIntegerEncoding::U8 => {
+                                let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
+                                Ok(v.into_iter())
                             }
                         }
                     },
@@ -175,7 +179,7 @@ macro_rules! impl_lowerable {
 impl_lowerable!(u64, write_u64, u32, write_u32, (u16), (PrefixVarIntCompressor::<u64>));
 impl_lowerable!(u32, write_u32, u16, write_u16, (), (Simple16Compressor::<u32>, PrefixVarIntCompressor::<u32>)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
 impl_lowerable!(u16, write_u16, u8, write_u8, (), (Simple16Compressor::<u16>, PrefixVarIntCompressor::<u16>));
-impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor::<u8>, PrefixVarIntCompressor::<u8>));
+impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor::<u8>, BytesCompressor));
 
 #[cfg(feature = "write")]
 fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -271,6 +275,24 @@ impl<T: Into<u32> + Copy> Compressor<'_> for Simple16Compressor<T> {
         compress_simple_16(&v, bytes).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
+    }
+}
+
+struct BytesCompressor;
+impl BytesCompressor {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Compressor<'_> for BytesCompressor {
+    type Data = u8;
+    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        bytes.extend_from_slice(data);
+        Ok(ArrayTypeId::U8)
+    }
+    fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+        Some(data.len())
     }
 }
 
