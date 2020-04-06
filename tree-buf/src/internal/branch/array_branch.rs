@@ -225,6 +225,9 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             }
 
             DynArrayBranch::Enum { discriminants, variants }
+        },
+        RLE => {
+            todo!()
         }
     };
 
@@ -251,6 +254,7 @@ impl_type_id!(ArrayTypeId, [
     Enum: 11,
     ArrayFixed: 12,
     U8: 13,
+    RLE: 14,
 ]);
 
 #[derive(Debug)]

@@ -1,6 +1,7 @@
 use crate::internal::encodings::varint::{size_for_varint, write_varint_into};
 use crate::prelude::*;
 
+
 #[cfg(feature = "write")]
 pub trait WriterStream {
     type Options: EncodeOptions;
@@ -45,6 +46,8 @@ impl<'a, O: EncodeOptions> VecWriterStream<'a, O> {
 
 impl<'a, O: EncodeOptions> WriterStream for VecWriterStream<'a, O> {
     type Options = O;
+    // See also: a0b1e0fa-e33c-4bda-8141-d184a1160143
+    // Duplicated code.
     fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let type_index = self.bytes.len();
         self.bytes.push(0);
