@@ -113,3 +113,5 @@ pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions
 // This seems a reasonable starting point: https://github.com/paupino/rust-decimal
 //
 // TODO: Consider RLE encoding and Dictionary encoding as pre-processors
+
+// TODO: illogiq/flame + ilogic/flamer

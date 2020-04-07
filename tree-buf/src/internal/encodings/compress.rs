@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
-pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compressors: &'b [Box<dyn Compressor<'a, Data = T>>]) -> ArrayTypeId {
+pub(crate) fn compress<T>(data: &[T], bytes: &mut Vec<u8>, compressors: &[Box<dyn Compressor<T>>]) -> ArrayTypeId {
     // TODO: If there aren't multiple compressors, no need to be dynamic
     // debug_assert!(compressors.len() > 1);
     if compressors.len() == 1 {
@@ -49,12 +49,11 @@ pub(crate) fn compress<'a: 'b, 'b, T>(data: &'a [T], bytes: &mut Vec<u8>, compre
 }
 
 #[cfg(feature = "write")]
-pub(crate) trait Compressor<'a> {
-    type Data;
+pub(crate) trait Compressor<T> {
     /// If it's possible to figure out how big the data will be without
     /// compressing it, implement that here.
-    fn fast_size_for(&self, _data: &[Self::Data]) -> Option<usize> {
+    fn fast_size_for(&self, _data: &[T]) -> Option<usize> {
         None
     }
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()>;
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()>;
 }

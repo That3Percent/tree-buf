@@ -1,13 +1,10 @@
-/*use crate::prelude::*;
-struct RLE<'a, T> {
+use crate::prelude::*;
+struct RLE<T> {
     // TODO: (Performance) Do not require the allocation of this Vec
-    sub_compressors: Vec<Box<dyn Compressor<'a, Data=T>>>,
+    sub_compressors: Vec<Box<dyn Compressor<T>>>,
 }
 
-impl<'a, T: 'static + PartialEq + Copy> Compressor<'a> for RLE<'a, T> {
-    type Data = T;
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-        // Prevent panic on indexing first item.
+impl<T: PartialEq + Copy> Compressor<T> for RLE<T> { fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> { // Prevent panic on indexing first item.
         if data.len() == 0 {
             return Err(());
         }
@@ -50,4 +47,3 @@ impl<'a, T: 'static + PartialEq + Copy> Compressor<'a> for RLE<'a, T> {
         Ok(ArrayTypeId::RLE)
     }
 }
-*/

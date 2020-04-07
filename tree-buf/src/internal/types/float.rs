@@ -179,7 +179,7 @@ macro_rules! impl_float {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
-                let mut compressors: Vec<Box<dyn Compressor<Data=$T>>> = vec![
+                let mut compressors: Vec<Box<dyn Compressor<$T>>> = vec![
                     Box::new($fixed),
                     $(Box::new($rest)),*
                 ];
@@ -194,12 +194,11 @@ macro_rules! impl_float {
         }
 
         struct $fixed;
-        impl Compressor<'_> for $fixed {
-            type Data=$T;
-            fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+        impl Compressor<$T> for $fixed {
+            fn fast_size_for(&self, data: &[$T]) -> Option<usize> {
                 Some(size_of::<$T>() * data.len())
             }
-            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+            fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
                 for item in data {
                     $write_item(*item, bytes);
                 }
@@ -212,9 +211,8 @@ macro_rules! impl_float {
         // double-stream (just joined time+double stream). Both of the implementations
         // aren't perfect for our API.
         struct $Gorilla;
-        impl Compressor<'_> for $Gorilla {
-            type Data = $T;
-            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        impl Compressor<$T> for $Gorilla {
+            fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
                 compress_gorilla(data.iter().map(|f| *f as f64), bytes)
             }
         }
@@ -222,9 +220,8 @@ macro_rules! impl_float {
         // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
         // before a real lossy compressor (Eg: fzip) is used.
         struct $LossyGorilla(i32);
-        impl Compressor<'_> for $LossyGorilla {
-            type Data = $T;
-            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        impl Compressor<$T> for $LossyGorilla {
+            fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
                 let multiplier = (2.0 as $T).powi(self.0);
                 let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                 compress_gorilla(data, bytes)
@@ -237,9 +234,8 @@ macro_rules! impl_float {
             tolerance: f64,
         }
 
-        impl Compressor<'_> for $zfp {
-            type Data=$T;
-            fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        impl Compressor<$%> for $zfp {
+            fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
                 // FIXME: This is terrible. Consider using zfp-sys directly
                 // Problems are needing copy of the data, needing to copy bytes again,
                 // the header storing redundant information.

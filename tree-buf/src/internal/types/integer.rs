@@ -144,7 +144,7 @@ macro_rules! impl_lowerable {
 
             fn write_inner(data: &[$Ty], stream: &mut impl WriterStream) -> ArrayTypeId {
                 // TODO: (Performance) Remove allocations
-                let compressors: Vec<Box<dyn Compressor<Data=$Ty>>> = vec![
+                let compressors: Vec<Box<dyn Compressor<$Ty>>> = vec![
                     $(Box::new(<$compressions>::new())),+
                 ];
                 stream.write_with_len(|stream|
@@ -232,16 +232,15 @@ impl<T: Into<u64> + Copy> PrefixVarIntCompressor<T> {
     }
 }
 
-impl<T: Into<u64> + Copy> Compressor<'_> for PrefixVarIntCompressor<T> {
-    type Data = T;
-    fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor<T> {
+    fn fast_size_for(&self, data: &[T]) -> Option<usize> {
         let mut size = 0;
         for item in data {
             size += size_for_varint((*item).into());
         }
         Some(size)
     }
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         for item in data {
             encode_prefix_varint((*item).into(), bytes);
         }
@@ -259,10 +258,8 @@ impl<T: Into<u32> + Copy> Simple16Compressor<T> {
     }
 }
 
-impl<T: Into<u32> + Copy> Compressor<'_> for Simple16Compressor<T> {
-    type Data = T;
-
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor<T> {
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
         let mut v = Vec::new();
@@ -285,13 +282,12 @@ impl BytesCompressor {
     }
 }
 
-impl Compressor<'_> for BytesCompressor {
-    type Data = u8;
-    fn compress(&self, data: &[Self::Data], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+impl Compressor<u8> for BytesCompressor {
+    fn compress(&self, data: &[u8], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         bytes.extend_from_slice(data);
         Ok(ArrayTypeId::U8)
     }
-    fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+    fn fast_size_for(&self, data: &[u8]) -> Option<usize> {
         Some(data.len())
     }
 }

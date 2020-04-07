@@ -103,9 +103,8 @@ impl ReaderArray for IntoIter<String> {
 
 
 #[cfg(feature = "write")]
-impl<'a> Compressor<'a> for Utf8Compressor {
-    type Data = &'a str;
-    fn fast_size_for(&self, data: &[Self::Data]) -> Option<usize> {
+impl<'a> Compressor<&'a str> for Utf8Compressor {
+    fn fast_size_for(&self, data: &[&'a str]) -> Option<usize> {
         let mut total = 0;
         for s in data {
             total += size_for_varint(s.len() as u64);
@@ -113,7 +112,7 @@ impl<'a> Compressor<'a> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, _data: &[Self::Data], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, _data: &[&'a str], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         todo!("utf8 compress");
     }
 }
