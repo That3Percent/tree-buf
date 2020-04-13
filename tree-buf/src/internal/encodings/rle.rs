@@ -4,7 +4,10 @@ struct RLE<T> {
     sub_compressors: Vec<Box<dyn Compressor<T>>>,
 }
 
-impl<T: PartialEq + Copy> Compressor<T> for RLE<T> { fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> { // Prevent panic on indexing first item.
+impl<T: PartialEq + Copy> Compressor<T> for RLE<T> {
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> { // Prevent panic on indexing first item.
+        profile!(&[T], "RLE::compress");
+
         if data.len() == 0 {
             return Err(());
         }

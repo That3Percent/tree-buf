@@ -1,8 +1,9 @@
+use crate::prelude::*;
 use std::ops::{Add, Sub};
 
 // FIXME: This may not be what is needed. Zigzag may be.
-
 pub fn delta_encode_in_place<T: Sub<Output = T> + Copy>(data: &mut [T]) {
+    profile!(T, "delta_encode_in_place");
     if data.len() == 0 {
         return;
     }
@@ -15,6 +16,7 @@ pub fn delta_encode_in_place<T: Sub<Output = T> + Copy>(data: &mut [T]) {
 }
 
 pub fn delta_decode_in_place<T: Add<Output = T> + Copy>(data: &mut [T]) {
+    profile!(T, "delta_decode_in_place");
     for i in 1..data.len() {
         data[i] = data[i] + data[i - 1];
     }

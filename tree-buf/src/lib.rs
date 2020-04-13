@@ -1,4 +1,32 @@
+#[cfg(feature="profile")]
+extern crate flame;
+
+#[cfg(feature="profile")]
+#[macro_use]
+#[macro_export]
+macro_rules! profile {
+    ($T:ty, $name:expr) => {
+        // TODO: This does heap allocations.
+        // Tried various things to make this const,
+        // but even lazy_static runs into issues around
+        // accessing the type generics.
+        let _profile_guard_name = format!("{} - {}", $name, ::std::any::type_name::<$T>());
+        let _profile_guard = ::flame::start_guard(_profile_guard_name);
+    };
+    ($name:expr) => {
+        profile!(Self, $name);
+    };
+}
+
+#[cfg(not(feature="profile"))]
+#[macro_use]
+#[macro_export]
+macro_rules! profile {
+    ($($arg:tt)*) => {};
+}
+
 pub mod internal;
+
 
 pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
@@ -31,6 +59,11 @@ pub mod prelude {
         }
     }
     unsafe impl<T> Send for Unowned<T> {}
+
+    #[cfg(feature="profile")]
+    pub(crate) use flame;
+
+    pub(crate) use profile;
 }
 
 #[cfg(feature = "read")]
@@ -56,6 +89,7 @@ pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
 
 #[cfg(feature = "write")]
 pub fn write_with_options<'a, 'b: 'a, T: Writable<'a>>(value: &'b T, options: &impl EncodeOptions) -> Vec<u8> {
+    profile!(T, "write_with_options");
     use internal::encodings::varint::encode_suffix_varint;
 
     let mut lens = Vec::new();
@@ -78,6 +112,7 @@ pub fn read<T: Readable>(bytes: &[u8]) -> ReadResult<T> {
 
 #[cfg(feature = "read")]
 pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions) -> ReadResult<T> {
+    profile!(T, "read_with_options");
     let sticks = read_root(bytes)?;
     T::read(sticks, options)
 }
@@ -113,5 +148,3 @@ pub fn read_with_options<T: Readable>(bytes: &[u8], options: &impl DecodeOptions
 // This seems a reasonable starting point: https://github.com/paupino/rust-decimal
 //
 // TODO: Consider RLE encoding and Dictionary encoding as pre-processors
-
-// TODO: illogiq/flame + ilogic/flamer

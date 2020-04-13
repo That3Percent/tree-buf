@@ -6,6 +6,7 @@ pub trait Visitor {
 }
 
 pub fn visit_all(root: &DynRootBranch<'_>, visitor: &mut impl Visitor) {
+    profile!(DynRootBranch, "visit_all");
     let mut roots = vec![root];
     let mut arrays = Vec::new();
     while !roots.is_empty() || !arrays.is_empty() {

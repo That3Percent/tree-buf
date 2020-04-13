@@ -7,6 +7,8 @@ use std::vec::IntoIter;
 impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a> for HashMap<K, V, S> {
     type WriterArray = HashMapArrayWriter<'a, K::WriterArray, V::WriterArray, S>;
     fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        profile!("write_root");
+
         write_usize(self.len(), stream);
         match self.len() {
             0 => {}
@@ -41,6 +43,8 @@ impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a
 impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHasher> Readable for HashMap<K, V, S> {
     type ReaderArray = Option<HashMapArrayReader<K::ReaderArray, V::ReaderArray, S>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("Readable::read");
+
         let mut v = Default::default(); // TODO: (Performance) Capacity
         match sticks {
             DynRootBranch::Map0 => Ok(v),
@@ -84,6 +88,7 @@ pub struct HashMapArrayReader<K, V, S> {
 impl<'a, K: WriterArray<'a>, V: WriterArray<'a>, S: Default + BuildHasher> WriterArray<'a> for HashMapArrayWriter<'a, K, V, S> {
     type Write = HashMap<K::Write, V::Write, S>;
     fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        profile!("WriterArray::buffer");
         self.len.buffer(&(value.len() as u64));
         let (keys, values) = self.items.get_or_insert_with(Default::default);
         for (key, value) in value.iter() {
@@ -92,6 +97,7 @@ impl<'a, K: WriterArray<'a>, V: WriterArray<'a>, S: Default + BuildHasher> Write
         }
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+        profile!("WriterArray::flush");
         let Self { len, items, _marker } = self;
         if let Some((keys, values)) = items {
             stream.write_with_id(|stream| len.flush(stream));
@@ -110,7 +116,10 @@ where
     K::Read: Hash + Eq,
 {
     type Read = HashMap<K::Read, V::Read, S>;
+    
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("ReaderArray::new");
+
         match sticks {
             DynArrayBranch::Map0 => Ok(None),
             DynArrayBranch::Map { len, keys, values } => {

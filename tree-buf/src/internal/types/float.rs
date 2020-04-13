@@ -3,6 +3,10 @@ use num_traits::AsPrimitive as _;
 use std::convert::TryInto;
 use std::mem::size_of;
 use std::vec::IntoIter;
+
+#[cfg(feature="profile")]
+use flame;
+
 // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
 //use ndarray_zfp_rs::Zfp;
 
@@ -73,6 +77,7 @@ macro_rules! impl_float {
         impl Readable for $T {
             type ReaderArray = IntoIter<$T>;
             fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!("Readable::read");
                 match sticks {
                     DynRootBranch::Integer(root_integer) => {
                         // FIXME: Fast and lose to get refactoring done. Double check here.
@@ -117,19 +122,30 @@ macro_rules! impl_float {
         impl ReaderArray for IntoIter<$T> {
             type Read = $T;
             fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!("ReaderArray::new");
+
                 match sticks {
                     DynArrayBranch::Float(float) => {
                         match float {
                             ArrayFloat::F64(bytes) => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("f64");
+
                                 // FIXME: Should do schema mismatch for f32 -> f64
                                 let values = read_all(&bytes, |bytes, offset| Ok(read_64(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("f32");
+
                                 let values = read_all(&bytes, |bytes, offset| Ok(read_32(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("DoubleGorilla");
+
                                 // FIXME: Should do schema mismatch for f32 -> f64
                                 let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
                                 let bytes = &bytes[..bytes.len()-1];
@@ -154,10 +170,18 @@ macro_rules! impl_float {
                                     Ok(result)
                                 })?;
                                 data.push(last);
+                                #[cfg(feature="profile")]
+                                flame::start("Construct");
                                 let reader = gibbon::vec_stream::VecReader::new(&data, *num_bits_last_elm);
                                 let iterator = gibbon::DoubleStreamIterator::new(reader);
+                                #[cfg(feature="profile")]
+                                flame::end("Construct");
                                 // FIXME: It seems like this collect can panic if the data is invalid.
+                                #[cfg(feature="profile")]
+                                flame::start("Collect");
                                 let values: Vec<_> = iterator.map(|v| v.as_()).collect();
+                                #[cfg(feature="profile")]
+                                flame::end("Collect");
                                 Ok(values.into_iter())
                             }
                         }
@@ -179,6 +203,7 @@ macro_rules! impl_float {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+                profile!("flush");
                 let mut compressors: Vec<Box<dyn Compressor<$T>>> = vec![
                     Box::new($fixed),
                     $(Box::new($rest)),*
@@ -199,6 +224,7 @@ macro_rules! impl_float {
                 Some(size_of::<$T>() * data.len())
             }
             fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                profile!("compress");
                 for item in data {
                     $write_item(*item, bytes);
                 }
@@ -213,6 +239,7 @@ macro_rules! impl_float {
         struct $Gorilla;
         impl Compressor<$T> for $Gorilla {
             fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                profile!("compress");
                 compress_gorilla(data.iter().map(|f| *f as f64), bytes)
             }
         }
@@ -222,6 +249,7 @@ macro_rules! impl_float {
         struct $LossyGorilla(i32);
         impl Compressor<$T> for $LossyGorilla {
             fn compress(&self, data: &[$T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                profile!("compress");
                 let multiplier = (2.0 as $T).powi(self.0);
                 let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                 compress_gorilla(data, bytes)
@@ -236,6 +264,7 @@ macro_rules! impl_float {
 
         impl Compressor<$%> for $zfp {
             fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+                profile!("compress");
                 // FIXME: This is terrible. Consider using zfp-sys directly
                 // Problems are needing copy of the data, needing to copy bytes again,
                 // the header storing redundant information.
@@ -256,6 +285,7 @@ impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64,
 impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32,);
 
 fn compress_gorilla(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    
     use gibbon::{vec_stream::VecWriter, DoubleStream};
     if data.len() == 0 {
         return Ok(ArrayTypeId::DoubleGorilla);

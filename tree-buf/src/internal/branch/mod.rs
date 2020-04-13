@@ -117,6 +117,7 @@ pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
 
 #[cfg(feature = "read")]
 pub fn read_root(bytes: &[u8]) -> ReadResult<DynRootBranch<'_>> {
+    profile!(&[u8], "read_root");
     if bytes.len() == 0 {
         return Ok(DynRootBranch::Void);
     }

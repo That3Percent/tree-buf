@@ -5,6 +5,8 @@
 // territory (eg: FlatBuffers). Though Flatbuffers by way of example doesn't allow for in-place encoding,
 //
 
+// TODO: Sample size for encode
+
 macro_rules! options {
     ($Options:ident, $Default:ident, $Override:ident, $Hierarchy:ident, {$($name:ident: $T:ty = $fallback:expr),*}) => {
         pub trait $Options: Send + Sync {

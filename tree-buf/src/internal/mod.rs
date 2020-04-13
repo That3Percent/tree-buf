@@ -14,3 +14,4 @@ pub mod rust_std;
 pub mod types;
 
 pub use {branch::*, encodings::*, options::*, parallel::*, reader_writer::*, rust_std::*, types::*};
+pub use crate::profile;

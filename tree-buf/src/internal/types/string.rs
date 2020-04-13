@@ -62,6 +62,7 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
         self.push(value.as_str());
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+        profile!("WriterArray::flush");
         stream.write_with_len(|stream| {
             for s in self.iter() {
                 write_str(s, stream)
@@ -77,6 +78,7 @@ impl Readable for String {
     // TODO: Use lifetimes to make this read lazy rather than IntoIter
     type ReaderArray = IntoIter<String>;
     fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("Readable::read");
         match sticks {
             DynRootBranch::String(s) => Ok(s.to_owned()),
             _ => Err(ReadError::SchemaMismatch),
@@ -87,9 +89,15 @@ impl Readable for String {
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<String> {
     type Read = String;
+    
     fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("ReaderArray::new");
+
         match sticks {
             DynArrayBranch::String(bytes) => {
+                #[cfg(feature="profile")]
+                let _g = flame::start_guard("String");
+
                 let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
             }
@@ -105,6 +113,7 @@ impl ReaderArray for IntoIter<String> {
 #[cfg(feature = "write")]
 impl<'a> Compressor<&'a str> for Utf8Compressor {
     fn fast_size_for(&self, data: &[&'a str]) -> Option<usize> {
+        profile!("Compressor::fast_size_for");
         let mut total = 0;
         for s in data {
             total += size_for_varint(s.len() as u64);
@@ -113,6 +122,7 @@ impl<'a> Compressor<&'a str> for Utf8Compressor {
         Some(total)
     }
     fn compress(&self, _data: &[&'a str], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        profile!("Compressor::compress");
         todo!("utf8 compress");
     }
 }

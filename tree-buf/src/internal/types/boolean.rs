@@ -19,6 +19,7 @@ impl<'a> Writable<'a> for bool {
 impl Readable for bool {
     type ReaderArray = IntoIter<bool>;
     fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("Readable::read");
         match sticks {
             DynRootBranch::Boolean(v) => Ok(v),
             _ => Err(ReadError::SchemaMismatch),
@@ -33,6 +34,7 @@ impl<'a> WriterArray<'a> for Vec<bool> {
         self.push(*value);
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+        profile!("flush");
         stream.write_with_len(|stream| encode_packed_bool(&self, stream.bytes()));
         ArrayTypeId::Boolean
     }
@@ -41,7 +43,10 @@ impl<'a> WriterArray<'a> for Vec<bool> {
 #[cfg(feature = "read")]
 impl ReaderArray for IntoIter<bool> {
     type Read = bool;
+    
     fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("ReaderArray::new");
+
         match sticks {
             DynArrayBranch::Boolean(bytes) => {
                 let v = decode_packed_bool(&bytes);

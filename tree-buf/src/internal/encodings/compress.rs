@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 #[cfg(feature = "write")]
 pub(crate) fn compress<T>(data: &[T], bytes: &mut Vec<u8>, compressors: &[Box<dyn Compressor<T>>]) -> ArrayTypeId {
+    profile!(T, "compress");
     // TODO: If there aren't multiple compressors, no need to be dynamic
     // debug_assert!(compressors.len() > 1);
     if compressors.len() == 1 {

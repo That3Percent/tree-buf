@@ -5,6 +5,7 @@ use std::vec::IntoIter;
 impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
     type WriterArray = VecArrayWriter<'a, T::WriterArray>;
     fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        profile!("write_root");
         match self.len() {
             0 => RootTypeId::Array0,
             1 => {
@@ -42,6 +43,7 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
 impl<T: Readable> Readable for Vec<T> {
     type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("Readable::read");
         match sticks {
             DynRootBranch::Array0 => Ok(Vec::new()),
             DynRootBranch::Array1(inner) => {
@@ -112,6 +114,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
         }
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+        profile!("flush");
         let Self { len, values } = self;
         if let Some(values) = values {
             if len.iter().all(|l| *l == len[0]) {
@@ -133,7 +136,10 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     type Read = Vec<T::Read>;
+    
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("ReaderArray::new");
+
         match sticks {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {

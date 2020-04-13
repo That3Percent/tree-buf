@@ -12,6 +12,7 @@ pub struct BoxWriterArray<T> {
 impl<'a, T: Writable<'a>> Writable<'a> for Box<T> {
     type WriterArray = BoxWriterArray<T::WriterArray>;
     fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+        profile!("write_root");
         self.deref().write_root(stream)
     }
 }
@@ -25,6 +26,7 @@ pub struct BoxReaderArray<T> {
 impl<T: Readable> Readable for Box<T> {
     type ReaderArray = BoxReaderArray<T::ReaderArray>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("Readable::read");
         Ok(Box::new(T::read(sticks, options)?))
     }
 }
@@ -44,6 +46,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for BoxWriterArray<T> {
 impl<T: ReaderArray> ReaderArray for BoxReaderArray<T> {
     type Read = Box<T::Read>;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        profile!("ReaderArray::new");
         Ok(BoxReaderArray { inner: T::new(sticks, options)? })
     }
     fn read_next(&mut self) -> Self::Read {

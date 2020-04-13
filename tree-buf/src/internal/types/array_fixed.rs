@@ -13,6 +13,7 @@ macro_rules! impl_fixed {
             impl<'a, T: Writable<'a>> Writable<'a> for [T; $size] {
                 type WriterArray = ArrayWriter<T::WriterArray>;
                 fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+                    profile!("write_root");
                     match self.len() {
                         0 => RootTypeId::Array0,
                         1 => {
@@ -50,6 +51,7 @@ macro_rules! impl_fixed {
             impl<T: Readable + Sized> Readable for [T; $size] {
                 type ReaderArray = ArrayReader<T::ReaderArray>;
                 fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+                    profile!("Readable::read");
                     match sticks {
                         DynRootBranch::Array0 => {
                             if $size != 0 {
@@ -126,6 +128,7 @@ macro_rules! impl_fixed {
                     }
                 }
                 fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+                    profile!("flush");
                     let Self { values } = self;
                     write_usize($size, stream);
                     if $size != 0 {
@@ -140,6 +143,8 @@ macro_rules! impl_fixed {
             impl<T: ReaderArray> ReaderArray for ArrayReader<T> {
                 type Read = [T::Read; $size];
                 fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+                    profile!("ReaderArray::new");
+
                     match sticks {
                         DynArrayBranch::ArrayFixed { len, values } => {
                             if len != $size {

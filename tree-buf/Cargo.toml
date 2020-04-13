@@ -22,6 +22,7 @@ num-traits = "0.2.11"
 gibbon = "0.1.1"
 rayon = "1.3.0"
 transmute = "0.1.1"
+flame = { version = "0.2.2", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"
@@ -36,3 +37,4 @@ default = ["read", "write", "macros"]
 read = []
 write = []
 macros = ["tree-buf-macros"]
+profile = ["flame"]

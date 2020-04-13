@@ -125,6 +125,9 @@ fn fill_write_skeleton<A: ToTokens>(
                 #buffer
             }
             fn flush(mut self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
+                // TODO: Re-enable profile here
+                // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
+                //::tree_buf::internal::profile!("WriterArray::flush");
                 #flush
             }
         }
@@ -132,7 +135,10 @@ fn fill_write_skeleton<A: ToTokens>(
         impl<'a> ::tree_buf::internal::Writable<'a> for #name {
             type WriterArray=#array_writer_name<'a>;
             fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
-               #write_root
+                // TODO: Re-enable profile here
+                // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
+                //::tree_buf::internal::profile!("WriterArray::write_root");
+                #write_root
             }
         }
     }
@@ -368,6 +374,9 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
         impl ::tree_buf::internal::Readable for #name {
             type ReaderArray = #array_reader_name;
             fn read(sticks: ::tree_buf::internal::DynRootBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
+                // TODO: Re-enable profile here
+                // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
+                //::tree_buf::internal::profile!("Readable::read");
                 #read
             }
         }
@@ -381,6 +390,9 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
+                // TODO: Re-enable profile here
+                // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
+                //::tree_buf::internal::profile!("ReaderArray::new");
                 #new
             }
             fn read_next(&mut self) -> Self::Read {

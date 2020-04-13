@@ -68,6 +68,7 @@ macro_rules! impl_tuple {
         impl <'a, $($ts: Writable<'a>),+> Writable<'a> for ($($ts),+) {
             type WriterArray=($($ts::WriterArray),+);
             fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+                profile!("Writable::write_root");
                 $(
                     stream.write_with_id(|stream| tuple_index!(self, $ti).write_root(stream));
                 )+
@@ -84,6 +85,7 @@ macro_rules! impl_tuple {
                 )+
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+                profile!("WriterArray::flush");
                 let ($($ts,)+) = self;
                 $(
                     stream.write_with_id(|stream|
@@ -98,6 +100,7 @@ macro_rules! impl_tuple {
         impl <$($ts: Readable + Send),+> Readable for ($($ts),+) {
             type ReaderArray=($($ts::ReaderArray),+);
             fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!("Readable::read");
                 match sticks {
                     DynRootBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
@@ -125,6 +128,8 @@ macro_rules! impl_tuple {
         impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+) {
             type Read=($($ts::Read),+);
             fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!("ReaderArray::new");
+
                 match sticks {
                     DynArrayBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf

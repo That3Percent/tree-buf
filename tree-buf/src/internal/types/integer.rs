@@ -59,6 +59,7 @@ macro_rules! impl_lowerable {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+                profile!("WriterArray::flush");
                 let max = self.iter().max();
                 if let Some(max) = max {
                     $fn(&self, *max, stream)
@@ -72,6 +73,7 @@ macro_rules! impl_lowerable {
         impl Readable for $Ty {
             type ReaderArray = IntoIter<$Ty>;
             fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!("Readable::read");
                 match sticks {
                     DynRootBranch::Integer(root_int) => {
                         match root_int {
@@ -88,12 +90,17 @@ macro_rules! impl_lowerable {
         impl ReaderArray for IntoIter<$Ty> {
             type Read = $Ty;
             fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+                profile!(Self::Read, "ReaderArray::new");
+
                 match sticks {
                     // TODO: Support eg: delta/zigzag
                     DynArrayBranch::Integer(array_int) => {
                         let ArrayInteger { bytes, encoding } = array_int;
                         match encoding {
                             ArrayIntegerEncoding::PrefixVarInt => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("PrefixVarInt");
+
                                 let v: Vec<$Ty> = read_all(
                                         &bytes,
                                         |bytes, offset| {
@@ -104,6 +111,9 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             }
                             ArrayIntegerEncoding::Simple16 => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("Simple16");
+
                                 let mut v = Vec::new();
                                 simple_16::decompress(&bytes, &mut v).map_err(|_| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
                                 let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
@@ -111,6 +121,9 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             },
                             ArrayIntegerEncoding::U8 => {
+                                #[cfg(feature="profile")]
+                                let _g = flame::start_guard("U8");
+
                                 let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
                                 Ok(v.into_iter())
                             }
@@ -134,6 +147,7 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "write")]
         fn $fn<T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>)*>
             (data: &[T], max: T, stream: &mut impl WriterStream) -> ArrayTypeId {
+            profile!($Ty, "lowering_fn");
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
 
             if let Ok(lower_max) = lower_max {
@@ -143,6 +157,7 @@ macro_rules! impl_lowerable {
             }
 
             fn write_inner(data: &[$Ty], stream: &mut impl WriterStream) -> ArrayTypeId {
+                profile!(&[$Ty], "write_inner");
                 // TODO: (Performance) Remove allocations
                 let compressors: Vec<Box<dyn Compressor<$Ty>>> = vec![
                     $(Box::new(<$compressions>::new())),+
@@ -222,6 +237,7 @@ fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
+// TODO: This does not need to be generic
 struct PrefixVarIntCompressor<T> {
     _marker: Unowned<T>,
 }
@@ -234,6 +250,7 @@ impl<T: Into<u64> + Copy> PrefixVarIntCompressor<T> {
 
 impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor<T> {
     fn fast_size_for(&self, data: &[T]) -> Option<usize> {
+        profile!("Compressor::fast_size_for");
         let mut size = 0;
         for item in data {
             size += size_for_varint((*item).into());
@@ -241,6 +258,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor<T> {
         Some(size)
     }
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        profile!("compress");
         for item in data {
             encode_prefix_varint((*item).into(), bytes);
         }
@@ -260,6 +278,7 @@ impl<T: Into<u32> + Copy> Simple16Compressor<T> {
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor<T> {
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        profile!("compress");
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
         let mut v = Vec::new();
@@ -284,6 +303,7 @@ impl BytesCompressor {
 
 impl Compressor<u8> for BytesCompressor {
     fn compress(&self, data: &[u8], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+        profile!("compress");
         bytes.extend_from_slice(data);
         Ok(ArrayTypeId::U8)
     }
