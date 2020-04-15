@@ -46,8 +46,8 @@ This test compares the serialization of a complex GraphQL response containing 10
 
 |                | Size in Bytes  | Round Trip CPU Time |
 | --------------:| --------------:| -------------------:|
-| Message Pack   |         200728 |               584µs |
-| Tree-Buf       |          95839 |               992µs |
+| Message Pack   |         200728 |               992µs |
+| Tree-Buf       |          95839 |               584µs |
 
 Tree-Buf is *1.7 times as fast* and creates a file that is less than *1/2* the size as compared to Message Pack.
 
