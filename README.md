@@ -6,15 +6,9 @@ It's key features are:
  * Compact representation
  * Very fast encode and decode
  * Flexible schemas
- * Backward and forward compatibility
  * Self-describing
- * Easy to use
- * Application-defined partial parsing and schema matching
-
-Tree-buf is built for scale. Its data layout enables the use of SIMD accelerated, bit-packed compression techniques under the hood.
 
 ## Benchmarks
-It's all hot air until we put some numbers on it. Here are a couple of benchmarks on real data sets.
 
 ### Tree-Buf vs MessagePack for GraphQL
 This test compares the serialization of a complex GraphQL response containing 1000 entities having several fields of different types. Entities look roughly like:
@@ -49,7 +43,7 @@ This test compares the serialization of a complex GraphQL response containing 10
 | Message Pack   |         200728 |               992µs |
 | Tree-Buf       |          95839 |               584µs |
 
-Tree-Buf is *1.7 times as fast* and creates a file that is less than *1/2* the size as compared to Message Pack.
+Tree-Buf is **1.7 times as fast** and creates a file that is less than **1/2 the size** as compared to Message Pack.
 
 ### Tree-Buf vs GeoJson
 This test compares the serialization of a GeoJson file containing a Feature Collection of MultiPolygon and Polygon Geometries for every country in the world.
@@ -60,11 +54,11 @@ This test compares the serialization of a GeoJson file containing a Feature Coll
 | Tree-Buf      |        6865300 |              54.9ms |
 | Tree-Buf 1m   |        2268041 |              52.3ms |
 
-In this test, Tree-Buf is *7.7x as fast* as GeoJson, while producing a file that is *2/7th the size*.
+In this test, Tree-Buf is **7.7x as fast** as GeoJson, while producing a file that is **2/7th the size**.
 
-There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::write_with_options(data, &encode_options! { options::LossyFloatTolerance(12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just *1/10th the size* of GeoJson, while being even faster to encode + decode.
+There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::write_with_options(data, &encode_options! { options::LossyFloatTolerance(12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, while being even faster to encode + decode.
 
-Another thing we can try is to selectively load some portion of the data using a modified schema. If we instruct Tree-Buf to only load the names and other attributes of the countries from the file without loading their geometries this takes 240µs - more than *1,500 times as fast* as loading the data as GeoJson because Tree-Buf does not need to parse fields that do not need to be loaded, whereas Json needs to parse this data in order to skip over it.
+Another thing we can try is to selectively load some portion of the data using a modified schema. If we instruct Tree-Buf to only load the names and other attributes of the countries from the file without loading their geometries this takes 240µs - more than **1,500 times as fast** as loading the data as GeoJson because Tree-Buf does not need to parse fields that do not need to be loaded, whereas Json needs to parse this data in order to skip over it.
 
 ## Warning!
 
