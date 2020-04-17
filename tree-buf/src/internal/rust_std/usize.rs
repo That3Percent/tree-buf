@@ -4,12 +4,12 @@ use crate::prelude::*;
 use std::vec::IntoIter;
 
 #[cfg(feature = "read")]
-impl ReaderArray for IntoIter<usize> {
+impl InfallibleReaderArray for IntoIter<usize> {
     type Read = usize;
-    fn new(_sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new_infallible(_sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         todo!("usize ReaderArray new");
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next_infallible(&mut self) -> Self::Read {
         self.next().unwrap_or_default()
     }
 }

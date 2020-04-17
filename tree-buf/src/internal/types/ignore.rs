@@ -29,12 +29,12 @@ impl<'a> WriterArray<'a> for Ignore {
 }
 
 #[cfg(feature = "read")]
-impl ReaderArray for Ignore {
+impl InfallibleReaderArray for Ignore {
     type Read = Ignore;
-    fn new(_sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new_infallible(_sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         Ok(Ignore)
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next_infallible(&mut self) -> Self::Read {
         Ignore
     }
 }

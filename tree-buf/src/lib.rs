@@ -19,7 +19,6 @@ macro_rules! profile {
 }
 
 #[cfg(not(feature="profile"))]
-#[macro_use]
 #[macro_export]
 macro_rules! profile {
     ($($arg:tt)*) => {};
@@ -64,6 +63,8 @@ pub mod prelude {
     pub(crate) use flame;
 
     pub(crate) use profile;
+
+    pub(crate) use std::convert::Infallible;
 }
 
 #[cfg(feature = "read")]

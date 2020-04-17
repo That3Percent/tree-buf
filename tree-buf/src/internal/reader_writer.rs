@@ -105,9 +105,38 @@ pub trait WriterArray<'a>: Default {
 
 #[cfg(feature = "read")]
 pub trait ReaderArray: Sized + Send {
+    type Error: Into<ReadError>;
     type Read;
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
     // I think that may require GAT though the way things are setup so come back to this later.
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self>;
-    fn read_next(&mut self) -> Self::Read;
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error>;
+}
+
+pub trait InfallibleReaderArray: Sized {
+    type Read;
+    /// This isn't actually infallable, it's just named this to not conflict.
+    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self>;
+    fn read_next_infallible(&mut self) -> Self::Read;
+}
+
+/// This trait exists to first reduce a little bit of boilerplate for the common
+/// case of not having fallibility, but also to automatically inline at least the Ok
+/// wrapping portion of the code to aid the optimizer in knowing that the Error path
+/// is impossible. Putting the inline here instead of on a read_next of a ReaderArray
+/// implementation allows for not necessarily inlining what may be a larger method.
+/// It may not be necessary, but why not.
+impl<T: InfallibleReaderArray + Send> ReaderArray for T {
+    type Read = <Self as InfallibleReaderArray>::Read;
+    type Error = Infallible;
+
+    #[inline(always)]
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
+        InfallibleReaderArray::new_infallible(sticks, options)
+    }
+
+    #[inline(always)]
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+        Ok(InfallibleReaderArray::read_next_infallible(self))
+    }
 }

@@ -40,7 +40,9 @@ impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
 }
 
 #[cfg(feature = "read")]
-impl<T: Readable> Readable for Vec<T> {
+impl<T: Readable> Readable for Vec<T>
+    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+    where ReadError : From<<<T as Readable>::ReaderArray as ReaderArray>::Error> {
     type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("Readable::read");
@@ -57,7 +59,7 @@ impl<T: Readable> Readable for Vec<T> {
                 // that we wanted in the first place. Specialization here would be nice.
                 let mut reader = T::ReaderArray::new(values, options)?;
                 for _ in 0..len {
-                    v.push(reader.read_next());
+                    v.push(reader.read_next()?);
                 }
                 Ok(v)
             }
@@ -85,7 +87,7 @@ impl FixedOrVariableLength {
     fn next(&mut self) -> usize {
         match self {
             Self::Fixed(v) => *v,
-            Self::Variable(i) => i.read_next() as usize,
+            Self::Variable(i) => i.read_next_infallible() as usize,
         }
     }
 }
@@ -136,6 +138,7 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     type Read = Vec<T::Read>;
+    type Error = T::Error;
     
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
@@ -158,16 +161,16 @@ impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
         if let Some(inner) = self {
             let len = inner.len.next();
             let mut result = Vec::with_capacity(len);
             for _ in 0..len {
-                result.push(inner.values.read_next());
+                result.push(inner.values.read_next()?);
             }
-            result
+            Ok(result)
         } else {
-            Vec::new()
+            Ok(Vec::new())
         }
     }
 }

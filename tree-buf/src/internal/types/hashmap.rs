@@ -40,7 +40,12 @@ impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a
 }
 
 #[cfg(feature = "read")]
-impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHasher> Readable for HashMap<K, V, S> {
+impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHasher> Readable for HashMap<K, V, S>
+    where
+        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+        ReadError : From<<<K as Readable>::ReaderArray as ReaderArray>::Error>,
+        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+        ReadError : From<<<V as Readable>::ReaderArray as ReaderArray>::Error> {
     type ReaderArray = Option<HashMapArrayReader<K::ReaderArray, V::ReaderArray, S>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("Readable::read");
@@ -58,8 +63,9 @@ impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHashe
                 let mut keys = keys?;
                 let mut values = values?;
                 for _ in 0..len {
-                    // TODO: This should not be infallable.
-                    v.insert(keys.read_next(), values.read_next());
+                    if v.insert(keys.read_next()?, values.read_next()?).is_some() {
+                        return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                    }
                 }
                 Ok(v)
             }
@@ -114,8 +120,13 @@ impl<'a, K: WriterArray<'a>, V: WriterArray<'a>, S: Default + BuildHasher> Write
 impl<K: ReaderArray, V: ReaderArray, S: Default + BuildHasher> ReaderArray for Option<HashMapArrayReader<K, V, S>>
 where
     K::Read: Hash + Eq,
+    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+    ReadError : From<K::Error>,
+    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+    ReadError : From<V::Error>,
 {
     type Read = HashMap<K::Read, V::Read, S>;
+    type Error = ReadError;
     
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
@@ -141,21 +152,23 @@ where
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
         if let Some(inner) = self {
-            let len = inner.len.read_next();
+            let len = inner.len.read_next_infallible();
             let mut result = <Self::Read as Default>::default(); // TODO: (Performance) capacity
             for _ in 0..len {
-                let key = inner.keys.read_next();
-                let value = inner.values.read_next();
+                let key = inner.keys.read_next()?;
+                let value = inner.values.read_next()?;
                 // TODO: read_next was made infallable for performance reasons,
                 // but duplicate keys would seem a reason to fail. Ideally this could
                 // have a Result<T, !> and perform well in the future.
-                result.insert(key, value);
+                if result.insert(key, value).is_some() {
+                    return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                };
             }
-            result
+            Ok(result)
         } else {
-            Default::default()
+            Ok(Default::default())
         }
     }
 }

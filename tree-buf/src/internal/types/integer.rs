@@ -87,9 +87,9 @@ macro_rules! impl_lowerable {
         }
 
         #[cfg(feature = "read")]
-        impl ReaderArray for IntoIter<$Ty> {
+        impl InfallibleReaderArray for IntoIter<$Ty> {
             type Read = $Ty;
-            fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+            fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
                 profile!(Self::Read, "ReaderArray::new");
 
                 match sticks {
@@ -139,7 +139,7 @@ macro_rules! impl_lowerable {
                     _ => Err(ReadError::SchemaMismatch),
                 }
             }
-            fn read_next(&mut self) -> Self::Read {
+            fn read_next_infallible(&mut self) -> Self::Read {
                 self.next().unwrap_or_default()
             }
         }

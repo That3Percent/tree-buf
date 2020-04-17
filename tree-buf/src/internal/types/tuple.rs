@@ -97,7 +97,9 @@ macro_rules! impl_tuple {
         }
 
         #[cfg(feature = "read")]
-        impl <$($ts: Readable + Send),+> Readable for ($($ts),+) {
+        impl <$($ts: Readable + Send),+> Readable for ($($ts),+)
+        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+        where $(ReadError : From<<$ts::ReaderArray as ReaderArray>::Error>),+ {
             type ReaderArray=($($ts::ReaderArray),+);
             fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 profile!("Readable::read");
@@ -125,8 +127,14 @@ macro_rules! impl_tuple {
         }
 
         #[cfg(feature = "read")]
-        impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+) {
+        impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+)
+        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+        where $(ReadError : From<$ts::Error>),+ {
             type Read=($($ts::Read),+);
+            // TODO: It would be nice to know somehow whether or not
+            // all the fields are infallible types. Perhaps specialization
+            // can achieve this.
+            type Error=ReadError;
             fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 profile!("ReaderArray::new");
 
@@ -151,10 +159,10 @@ macro_rules! impl_tuple {
                     _ => Err(ReadError::SchemaMismatch)
                 }
             }
-            fn read_next(&mut self) -> Self::Read {
-                ($(
-                    tuple_index!(self, $ti).read_next(),
-                )+)
+            fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+                Ok(($(
+                    tuple_index!(self, $ti).read_next()?,
+                )+))
             }
         }
     };

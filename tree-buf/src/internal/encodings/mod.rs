@@ -5,8 +5,6 @@ pub mod rle;
 pub use rle::*;
 mod compress;
 pub use compress::*;
-#[cfg(feature = "write")]
-use crate::internal::encodings::varint::size_for_varint;
 use crate::prelude::*;
 
 

@@ -47,8 +47,9 @@ macro_rules! impl_fixed {
                 }
             }
 
+            // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
             #[cfg(feature = "read")]
-            impl<T: Readable + Sized> Readable for [T; $size] {
+            impl<T: Readable + Sized> Readable for [T; $size] where ReadError : From<<T::ReaderArray as ReaderArray>::Error> {
                 type ReaderArray = ArrayReader<T::ReaderArray>;
                 fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                     profile!("Readable::read");
@@ -90,7 +91,7 @@ macro_rules! impl_fixed {
                             };
 
                             for elem in &mut data[..] {
-                                *elem = MaybeUninit::new(reader.read_next());
+                                *elem = MaybeUninit::new(reader.read_next()?);
                             }
 
                             Ok(unsafe { transmute(data) })
@@ -142,6 +143,7 @@ macro_rules! impl_fixed {
             #[cfg(feature = "read")]
             impl<T: ReaderArray> ReaderArray for ArrayReader<T> {
                 type Read = [T::Read; $size];
+                type Error = T::Error;
                 fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                     profile!("ReaderArray::new");
 
@@ -156,17 +158,17 @@ macro_rules! impl_fixed {
                         _ => Err(ReadError::SchemaMismatch),
                     }
                 }
-                fn read_next(&mut self) -> Self::Read {
+                fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
                     let mut data: [MaybeUninit<T::Read>; $size] = unsafe {
                         MaybeUninit::uninit().assume_init()
                     };
 
                     for elem in &mut data[..] {
-                        *elem = MaybeUninit::new(self.values.read_next());
+                        *elem = MaybeUninit::new(self.values.read_next()?);
                     }
 
                     // Safety - all elements initialized in loop
-                    unsafe { transmute(data) }
+                    Ok(unsafe { transmute(data) })
                 }
             }
 

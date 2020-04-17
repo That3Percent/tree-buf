@@ -63,6 +63,7 @@ pub struct NullableReader<T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
     type Read = Option<T::Read>;
+    type Error = T::Error;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 
@@ -76,15 +77,15 @@ impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Self::Read {
-        if let Some(inner) = self {
-            if inner.opts.read_next() {
-                Some(inner.values.read_next())
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+        Ok(if let Some(inner) = self {
+            if inner.opts.read_next_infallible() {
+                Some(inner.values.read_next()?)
             } else {
                 None
             }
         } else {
             None
-        }
+        })
     }
 }

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use std::fmt::{Debug, Display, Formatter};
 
 // These are mainly useful for debugging when writing the format
@@ -17,6 +18,13 @@ pub enum InvalidFormat {
 pub enum ReadError {
     SchemaMismatch,
     InvalidFormat(InvalidFormat),
+}
+
+impl From<Infallible> for ReadError {
+    #[inline(always)]
+    fn from(_: Infallible) -> ReadError {
+        unsafe { std::hint::unreachable_unchecked() }
+    }
 }
 
 #[cfg(feature = "read")]

@@ -41,10 +41,10 @@ impl<'a> WriterArray<'a> for Vec<bool> {
 }
 
 #[cfg(feature = "read")]
-impl ReaderArray for IntoIter<bool> {
+impl InfallibleReaderArray for IntoIter<bool> {
     type Read = bool;
     
-    fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 
         match sticks {
@@ -55,7 +55,7 @@ impl ReaderArray for IntoIter<bool> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next_infallible(&mut self) -> Self::Read {
         self.next().unwrap_or_default()
     }
 }

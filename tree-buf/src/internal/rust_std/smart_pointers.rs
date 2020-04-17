@@ -45,11 +45,12 @@ impl<'a, T: WriterArray<'a>> WriterArray<'a> for BoxWriterArray<T> {
 #[cfg(feature = "read")]
 impl<T: ReaderArray> ReaderArray for BoxReaderArray<T> {
     type Read = Box<T::Read>;
+    type Error = T::Error;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
         Ok(BoxReaderArray { inner: T::new(sticks, options)? })
     }
-    fn read_next(&mut self) -> Self::Read {
-        Box::new(self.inner.read_next())
+    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+        Ok(Box::new(self.inner.read_next()?))
     }
 }

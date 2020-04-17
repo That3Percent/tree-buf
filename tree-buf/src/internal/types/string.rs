@@ -87,10 +87,10 @@ impl Readable for String {
 }
 
 #[cfg(feature = "read")]
-impl ReaderArray for IntoIter<String> {
+impl InfallibleReaderArray for IntoIter<String> {
     type Read = String;
     
-    fn new(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+    fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 
         match sticks {
@@ -104,7 +104,7 @@ impl ReaderArray for IntoIter<String> {
             _ => Err(ReadError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Self::Read {
+    fn read_next_infallible(&mut self) -> Self::Read {
         self.next().unwrap_or_default()
     }
 }

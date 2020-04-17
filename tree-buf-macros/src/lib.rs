@@ -322,7 +322,8 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
 
     let read_nexts = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
-            #ident: self.#ident.read_next(),
+            // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+            #ident: match self.#ident.read_next() { Ok(v) => v, Err(e) => { return Err(e.into()); } },
         }
     });
 
@@ -356,9 +357,9 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     };
 
     let read_next = quote! {
-        #name {
+        Ok(#name {
             #(#read_nexts)*
-        }
+        })
     };
 
     fill_read_skeleton(ast, read, array_fields, new, read_next)
@@ -389,13 +390,15 @@ fn fill_read_skeleton<A: ToTokens>(ast: &DeriveInput, read: impl ToTokens, array
         #[allow(non_snake_case)]
         impl ::tree_buf::internal::ReaderArray for #array_reader_name {
             type Read=#name;
+            // TODO: See if sometimes we can use Infallible here.
+            type Error=::tree_buf::ReadError;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::ReadError> {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
                 //::tree_buf::internal::profile!("ReaderArray::new");
                 #new
             }
-            fn read_next(&mut self) -> Self::Read {
+            fn read_next(&mut self) -> ::std::result::Result<Self::Read, Self::Error> {
                 #read_next
             }
         }
@@ -464,7 +467,8 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         read_nexts.push(quote! {
                             if let Some((d, r)) = &mut self.#variant_ident {
                                 if *d == discriminant {
-                                    return #ident::#variant_ident(r.read_next());
+                                    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+                                    return Ok(#ident::#variant_ident(match r.read_next() { Ok(v) => v, Err(e) => return Err(e.into()) }));
                                 }
                             }
                         })
@@ -525,7 +529,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     };
 
     let read_next = quote! {
-        let discriminant = self.tree_buf_discriminant.read_next();
+        let discriminant = ::tree_buf::internal::InfallibleReaderArray::read_next_infallible(&mut self.tree_buf_discriminant);
         #(#read_nexts)*
 
         // See also: fb0a3c86-23be-4d4a-9dbf-9c83ae6e2f0f
