@@ -12,6 +12,17 @@ pub mod parallel;
 pub mod reader_writer;
 pub mod rust_std;
 pub mod types;
+pub mod markers;
 
-pub use {branch::*, encodings::*, options::*, parallel::*, reader_writer::*, rust_std::*, types::*};
+pub use {
+    branch::*,
+    encodings::*,
+    options::*,
+    parallel::*,
+    reader_writer::*,
+    rust_std::*,
+    types::*,
+    markers::*,
+};
+
 pub use crate::profile;

@@ -1,7 +1,15 @@
 use crate::prelude::*;
-struct RLE<T> {
+pub(crate) struct RLE<T> {
     // TODO: (Performance) Do not require the allocation of this Vec
     sub_compressors: Vec<Box<dyn Compressor<T>>>,
+}
+
+impl<T> RLE<T> {
+    pub fn new(sub_compressors: Vec<Box<dyn Compressor<T>>>) -> Self {
+        Self {
+            sub_compressors
+        }
+    }
 }
 
 impl<T: PartialEq + Copy> Compressor<T> for RLE<T> {

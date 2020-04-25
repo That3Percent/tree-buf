@@ -147,7 +147,7 @@ macro_rules! impl_float {
                                 let _g = flame::start_guard("DoubleGorilla");
 
                                 // FIXME: Should do schema mismatch for f32 -> f64
-                                let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
+                                let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat)?;
                                 let bytes = &bytes[..bytes.len()-1];
                                 let last = &bytes[bytes.len()-(bytes.len() % 8)..];
                                 let bytes = &bytes[..bytes.len() - last.len()];
@@ -158,7 +158,7 @@ macro_rules! impl_float {
                                 let last = u64::from_le_bytes(last_2);
                                 // TODO: Change this to check that num_bits_last_elm is correct
                                 if bytes.len() % size_of::<u64>() != 0 {
-                                    return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                                    return Err(ReadError::InvalidFormat);
                                 }
                                 // TODO: (Performance) The following can use unchecked, since we just verified the size is valid.
                                 let mut data = read_all(bytes, |bytes, offset| {

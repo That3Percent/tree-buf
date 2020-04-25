@@ -63,13 +63,12 @@ impl<'a> WriterArray<'a> for Vec<&'a str> {
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         profile!("WriterArray::flush");
-        stream.write_with_len(|stream| {
-            for s in self.iter() {
-                write_str(s, stream)
-            }
-        });
 
-        ArrayTypeId::Utf8
+        let compressors: Vec<Box<dyn Compressor<&'a str>>> = vec![
+            Box::new(Utf8Compressor),
+        ];
+
+        stream.write_with_len(|stream| compress(&self, stream.bytes(), &compressors[..]))
     }
 }
 
@@ -121,8 +120,13 @@ impl<'a> Compressor<&'a str> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, _data: &[&'a str], _bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[&'a str], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         profile!("Compressor::compress");
-        todo!("utf8 compress");
+        for value in data.iter() {
+            encode_prefix_varint(value.len() as u64, bytes);
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        Ok(ArrayTypeId::Utf8)
     }
 }

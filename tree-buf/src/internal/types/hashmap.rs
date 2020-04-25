@@ -64,7 +64,7 @@ impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHashe
                 let mut values = values?;
                 for _ in 0..len {
                     if v.insert(keys.read_next()?, values.read_next()?).is_some() {
-                        return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                        return Err(ReadError::InvalidFormat);
                     }
                 }
                 Ok(v)
@@ -163,7 +163,7 @@ where
                 // but duplicate keys would seem a reason to fail. Ideally this could
                 // have a Result<T, !> and perform well in the future.
                 if result.insert(key, value).is_some() {
-                    return Err(ReadError::InvalidFormat(InvalidFormat::DecompressionError));
+                    return Err(ReadError::InvalidFormat);
                 };
             }
             Ok(result)

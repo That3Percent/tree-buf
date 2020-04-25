@@ -169,12 +169,12 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
 
 #[cfg(feature = "read")]
 pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Check that the compiler does unchecked indexing after this
     if (*offset + (shift as usize)) >= bytes.len() {
-        return Err(ReadError::InvalidFormat(InvalidFormat::EndOfFile));
+        return Err(ReadError::InvalidFormat);
     }
 
     let result = match shift {
@@ -234,12 +234,12 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64>
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
 #[cfg(feature = "read")]
 pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
+    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Ensure unchecked indexing follows.
     if *offset < (shift as usize) {
-        return Err(ReadError::InvalidFormat(InvalidFormat::EndOfFile));
+        return Err(ReadError::InvalidFormat);
     }
 
     let result = match shift {

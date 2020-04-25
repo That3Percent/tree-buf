@@ -46,7 +46,7 @@ macro_rules! impl_type_id_inner {
             fn try_from(value: u8) -> ReadResult<Self> {
                 Ok(match value {
                     $($i => $T::$name,)+
-                    _ => return Err(ReadError::InvalidFormat(InvalidFormat::UnrecognizedTypeId)),
+                    _ => return Err(ReadError::InvalidFormat),
                 })
             }
         }
@@ -61,7 +61,7 @@ macro_rules! impl_type_id_inner {
 
         impl $T {
             fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
-                let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat(InvalidFormat::EndOfFile))?;
+                let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
                 *offset += 1;
                 (*next).try_into()
             }

@@ -105,7 +105,7 @@ pub trait WriterArray<'a>: Default {
 
 #[cfg(feature = "read")]
 pub trait ReaderArray: Sized + Send {
-    type Error: Into<ReadError>;
+    type Error: CoercibleWith<ReadError> + CoercibleWith<Never>;
     type Read;
     // TODO: It would be nice to be able to keep reference to the original byte array, especially for reading strings.
     // I think that may require GAT though the way things are setup so come back to this later.
@@ -128,7 +128,7 @@ pub trait InfallibleReaderArray: Sized {
 /// It may not be necessary, but why not.
 impl<T: InfallibleReaderArray + Send> ReaderArray for T {
     type Read = <Self as InfallibleReaderArray>::Read;
-    type Error = Infallible;
+    type Error = Never;
 
     #[inline(always)]
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {

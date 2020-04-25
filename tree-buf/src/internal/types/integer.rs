@@ -115,7 +115,7 @@ macro_rules! impl_lowerable {
                                 let _g = flame::start_guard("Simple16");
 
                                 let mut v = Vec::new();
-                                simple_16::decompress(&bytes, &mut v).map_err(|_| ReadError::InvalidFormat(InvalidFormat::DecompressionError))?;
+                                simple_16::decompress(&bytes, &mut v).map_err(|_| ReadError::InvalidFormat)?;
                                 let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
                                 let v = result.map_err(|_| ReadError::SchemaMismatch)?;
                                 Ok(v.into_iter())
@@ -148,6 +148,8 @@ macro_rules! impl_lowerable {
         fn $fn<T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>)*>
             (data: &[T], max: T, stream: &mut impl WriterStream) -> ArrayTypeId {
             profile!($Ty, "lowering_fn");
+            
+            // TODO: (Performance) When getting ranges, use SIMD
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
 
             if let Ok(lower_max) = lower_max {
@@ -173,7 +175,7 @@ macro_rules! impl_lowerable {
                 let data = unsafe { transmute(data) };
                 write_inner(data, stream)
             } else {
-                // TODO: Use second-stack
+                // TODO: (Performance) Use second-stack
                 let mut v = Vec::new();
                 for item in data.iter() {
                     v.push(item.as_());
@@ -191,10 +193,10 @@ macro_rules! impl_lowerable {
 // Broadly we only want to downcast if it allows for some other kind of compressor to be used.
 
 // Type, array writer, next lower, next lower writer, non-inferred lowers
-impl_lowerable!(u64, write_u64, u32, write_u32, (u16), (PrefixVarIntCompressor::<u64>));
-impl_lowerable!(u32, write_u32, u16, write_u16, (), (Simple16Compressor::<u32>, PrefixVarIntCompressor::<u32>)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
-impl_lowerable!(u16, write_u16, u8, write_u8, (), (Simple16Compressor::<u16>, PrefixVarIntCompressor::<u16>));
-impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor::<u8>, BytesCompressor));
+impl_lowerable!(u64, write_u64, u32, write_u32, (u16), (PrefixVarIntCompressor));
+impl_lowerable!(u32, write_u32, u16, write_u16, (), (Simple16Compressor, PrefixVarIntCompressor)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
+impl_lowerable!(u16, write_u16, u8, write_u8, (), (Simple16Compressor, PrefixVarIntCompressor));
+impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor, BytesCompressor));
 
 #[cfg(feature = "write")]
 fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -237,18 +239,15 @@ fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
-// TODO: This does not need to be generic
-struct PrefixVarIntCompressor<T> {
-    _marker: Unowned<T>,
-}
+struct PrefixVarIntCompressor;
 
-impl<T: Into<u64> + Copy> PrefixVarIntCompressor<T> {
+impl PrefixVarIntCompressor {
     pub fn new() -> Self {
-        Self { _marker: Unowned::new() }
+        Self
     }
 }
 
-impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor<T> {
+impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
     fn fast_size_for(&self, data: &[T]) -> Option<usize> {
         profile!("Compressor::fast_size_for");
         let mut size = 0;
@@ -266,17 +265,15 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor<T> {
     }
 }
 
-struct Simple16Compressor<T> {
-    _marker: Unowned<T>,
-}
+struct Simple16Compressor;
 
-impl<T: Into<u32> + Copy> Simple16Compressor<T> {
+impl Simple16Compressor {
     pub fn new() -> Self {
-        Self { _marker: Unowned::new() }
+        Self
     }
 }
 
-impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor<T> {
+impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         // TODO: (Performance) Use second-stack.
@@ -293,6 +290,8 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor<T> {
         Ok(ArrayTypeId::IntSimple16)
     }
 }
+
+
 
 struct BytesCompressor;
 impl BytesCompressor {

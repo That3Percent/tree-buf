@@ -46,25 +46,10 @@ pub mod prelude {
     #[cfg(feature = "read")]
     pub(crate) type ReadResult<T> = Result<T, ReadError>;
 
-    #[derive(Default, Debug)]
-    pub(crate) struct Unowned<T: ?Sized> {
-        _marker: std::marker::PhantomData<*const T>,
-    }
-    impl<T> Unowned<T> {
-        pub fn new() -> Self {
-            Self {
-                _marker: std::marker::PhantomData,
-            }
-        }
-    }
-    unsafe impl<T> Send for Unowned<T> {}
-
     #[cfg(feature="profile")]
     pub(crate) use flame;
 
     pub(crate) use profile;
-
-    pub(crate) use std::convert::Infallible;
 }
 
 #[cfg(feature = "read")]
