@@ -24,6 +24,7 @@ macro_rules! profile {
     ($($arg:tt)*) => {};
 }
 
+#[doc(hidden)]
 pub mod internal;
 
 
