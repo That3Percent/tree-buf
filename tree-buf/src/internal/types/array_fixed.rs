@@ -10,9 +10,9 @@ macro_rules! impl_fixed {
             use transmute::transmute;
 
             #[cfg(feature = "write")]
-            impl<'a, T: Writable<'a>> Writable<'a> for [T; $size] {
+            impl<T: Writable> Writable for [T; $size] {
                 type WriterArray = ArrayWriter<T::WriterArray>;
-                fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+                fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
                     profile!("write_root");
                     match self.len() {
                         0 => RootTypeId::Array0,
@@ -114,9 +114,8 @@ macro_rules! impl_fixed {
             }
 
             #[cfg(feature = "write")]
-            impl<'a, T: WriterArray<'a>> WriterArray<'a> for ArrayWriter<T> {
-                type Write = [T::Write; $size];
-                fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+            impl<T: Writable> WriterArray<[T; $size]> for ArrayWriter<T::WriterArray> {
+                fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b [T; $size]) {
                     // TODO: Consider whether buffer should actually just
                     // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
                     // and the flattening could happen later at flush time. This may reduce memory cost.

@@ -1,6 +1,6 @@
 use {
     crate::utils::{get_named_fields, NamedField, canonical_ident},
-    proc_macro2::{Ident, TokenStream},
+    proc_macro2::{Ident, TokenStream, Span},
     quote::ToTokens,
     syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed},
 };
@@ -25,7 +25,7 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as ::tree_buf::internal::Writable<'a>>::WriterArray
+            #ident: <#ty as ::tree_buf::internal::Writable>::WriterArray
         }
     });
 
@@ -35,11 +35,11 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
         }
     });
 
-    let flushers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
+    let flushers = fields.iter().map(|NamedField { ident, canon_str, ty }| {
         quote! {
             ::tree_buf::internal::write_ident(#canon_str, stream);
             let o = self.#ident;
-            stream.write_with_id(|stream| o.flush(stream));
+            stream.write_with_id(|stream| ::tree_buf::internal::WriterArray::<#ty>::flush(o, stream));
         }
     });
 
@@ -54,12 +54,12 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
     */
     // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
     let (prefix, suffix) = match num_fields {
-        0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), ast.ident.span().clone())),
+        0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), Span::call_site())),
         _ => (
             quote! {
                 ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes());
             },
-            Ident::new("ObjN", ast.ident.span().clone()),
+            Ident::new("ObjN", Span::call_site()),
         ),
     };
 
@@ -96,13 +96,12 @@ fn fill_write_skeleton<A: ToTokens>(
     quote! {
         #[derive(Default)]
         #[allow(non_snake_case)]
-        #vis struct #array_writer_name<'a> {
+        #vis struct #array_writer_name {
             #(#array_fields,)*
         }
 
-        impl<'a> ::tree_buf::internal::WriterArray<'a> for #array_writer_name<'a> {
-            type Write=#name;
-            fn buffer<'b : 'a>(&mut self, value: &'b Self::Write) {
+        impl ::tree_buf::internal::WriterArray<#name> for #array_writer_name {
+            fn buffer<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
                 #buffer
             }
             fn flush(mut self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
@@ -113,9 +112,9 @@ fn fill_write_skeleton<A: ToTokens>(
             }
         }
 
-        impl<'a> ::tree_buf::internal::Writable<'a> for #name {
-            type WriterArray=#array_writer_name<'a>;
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
+        impl ::tree_buf::internal::Writable for #name {
+            type WriterArray=#array_writer_name;
+            fn write_root(&self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
                 //::tree_buf::internal::profile!("WriterArray::write_root");
@@ -133,7 +132,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
 
     let mut array_fields = Vec::new();
     array_fields.push(quote! {
-        tree_buf_discriminant: <u64 as ::tree_buf::Writable<'a>>::WriterArray,
+        tree_buf_discriminant: <u64 as ::tree_buf::Writable>::WriterArray,
         tree_buf_next_discriminant: u64
     });
 
@@ -164,7 +163,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             }
                         });
                         array_fields.push(quote! {
-                            #variant_ident: Option<(u64, <#ty as ::tree_buf::Writable<'a>>::WriterArray)>
+                            #variant_ident: Option<(u64, <#ty as ::tree_buf::Writable>::WriterArray)>
                         });
                         array_matches.push(quote! {
                             #ident::#variant_ident(_0) => {
@@ -187,7 +186,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             if matches {
                                 let mut buffer = self.#variant_ident.take().unwrap().1;
                                 ::tree_buf::internal::write_ident(#discriminant, stream);
-                                stream.write_with_id(|stream| buffer.flush(stream));
+                                stream.write_with_id(|stream| ::tree_buf::internal::WriterArray::<#ty>:: flush(buffer, stream));
                                 continue;
                             }
                         });

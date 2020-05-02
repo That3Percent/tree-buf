@@ -26,9 +26,9 @@ pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a st
 }
 
 #[cfg(feature = "write")]
-impl<'a> Writable<'a> for String {
-    type WriterArray = Vec<&'a str>;
-    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+impl Writable for String {
+    type WriterArray = Vec<&'static str>;
+    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
         let value = self.as_str();
         match value.len() {
             0 => RootTypeId::Str0,
@@ -55,16 +55,17 @@ impl<'a> Writable<'a> for String {
 }
 
 #[cfg(feature = "write")]
-impl<'a> WriterArray<'a> for Vec<&'a str> {
-    type Write = String;
-
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
-        self.push(value.as_str());
+impl WriterArray<String> for Vec<&'static str> {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b String) {
+        // TODO: Working around lifetime issues for lack of GAT
+        // A quick check makes this appear to be sound, since the signature
+        // requires that the value outlive self.
+        self.push(unsafe { std::mem::transmute(value.as_str()) });
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
         profile!("WriterArray::flush");
 
-        let compressors: Vec<Box<dyn Compressor<&'a str>>> = vec![
+        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![
             Box::new(Utf8Compressor),
         ];
 

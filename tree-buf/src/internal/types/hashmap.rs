@@ -4,9 +4,9 @@ use std::hash::{BuildHasher, Hash};
 use std::vec::IntoIter;
 
 #[cfg(feature = "write")]
-impl<'a, K: Writable<'a>, V: Writable<'a>, S: Default + BuildHasher> Writable<'a> for HashMap<K, V, S> {
-    type WriterArray = HashMapArrayWriter<'a, K::WriterArray, V::WriterArray, S>;
-    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+impl<K: Writable, V: Writable, S: Default + BuildHasher> Writable for HashMap<K, V, S> {
+    type WriterArray = HashMapArrayWriter<K::WriterArray, V::WriterArray, S>;
+    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
         profile!("write_root");
 
         write_usize(self.len(), stream);
@@ -76,8 +76,8 @@ impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHashe
 
 #[cfg(feature = "write")]
 #[derive(Debug, Default)]
-pub struct HashMapArrayWriter<'a, K, V, S> {
-    len: <u64 as Writable<'a>>::WriterArray,
+pub struct HashMapArrayWriter<K, V, S> {
+    len: <u64 as Writable>::WriterArray,
     items: Option<(K, V)>,
     _marker: Unowned<S>,
 }
@@ -91,9 +91,8 @@ pub struct HashMapArrayReader<K, V, S> {
 }
 
 #[cfg(feature = "write")]
-impl<'a, K: WriterArray<'a>, V: WriterArray<'a>, S: Default + BuildHasher> WriterArray<'a> for HashMapArrayWriter<'a, K, V, S> {
-    type Write = HashMap<K::Write, V::Write, S>;
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+impl<K: Writable, V: Writable, S: Default + BuildHasher> WriterArray<HashMap<K, V, S>> for HashMapArrayWriter<K::WriterArray, V::WriterArray, S> {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b HashMap<K, V, S>) {
         profile!("WriterArray::buffer");
         self.len.buffer(&(value.len() as u64));
         let (keys, values) = self.items.get_or_insert_with(Default::default);

@@ -69,13 +69,13 @@ pub use crate::prelude::*;
 
 pub use internal::Ignore;
 
-pub fn write<'a, 'b: 'a, T: Writable<'a>>(value: &'b T) -> Vec<u8> {
+pub fn write<T: Writable>(value: &T) -> Vec<u8> {
     let options = EncodeOptionsDefault;
     write_with_options(value, &options)
 }
 
 #[cfg(feature = "write")]
-pub fn write_with_options<'a, 'b: 'a, T: Writable<'a>>(value: &'b T, options: &impl EncodeOptions) -> Vec<u8> {
+pub fn write_with_options<T: Writable>(value: &T, options: &impl EncodeOptions) -> Vec<u8> {
     profile!(T, "write_with_options");
     use internal::encodings::varint::encode_suffix_varint;
 

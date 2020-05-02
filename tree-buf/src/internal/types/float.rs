@@ -48,9 +48,9 @@ macro_rules! impl_float {
 
 
         #[cfg(feature = "write")]
-        impl<'a> Writable<'a> for $T {
+        impl Writable for $T {
             type WriterArray = Vec<$T>;
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+            fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
                 let value = *self;
 
                 // Check for positive sign so that -0.0 goes through
@@ -197,9 +197,8 @@ macro_rules! impl_float {
         }
 
         #[cfg(feature = "write")]
-        impl<'a> WriterArray<'a> for Vec<$T> {
-            type Write = $T;
-            fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        impl WriterArray<$T> for Vec<$T> {
+            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $T) {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {

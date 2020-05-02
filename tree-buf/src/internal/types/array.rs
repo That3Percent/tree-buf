@@ -2,9 +2,9 @@ use crate::prelude::*;
 use std::vec::IntoIter;
 
 #[cfg(feature = "write")]
-impl<'a, T: Writable<'a>> Writable<'a> for Vec<T> {
-    type WriterArray = VecArrayWriter<'a, T::WriterArray>;
-    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+impl<T: Writable> Writable for Vec<T> {
+    type WriterArray = VecArrayWriter<T::WriterArray>;
+    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
         profile!("write_root");
         match self.len() {
             0 => RootTypeId::Array0,
@@ -70,9 +70,9 @@ impl<T: Readable> Readable for Vec<T>
 
 #[cfg(feature = "write")]
 #[derive(Debug, Default)]
-pub struct VecArrayWriter<'a, T> {
+pub struct VecArrayWriter<T> {
     // TODO: usize
-    len: <u64 as Writable<'a>>::WriterArray,
+    len: <u64 as Writable>::WriterArray,
     // Using Option here enables recursion when necessary.
     values: Option<T>,
 }
@@ -99,9 +99,8 @@ pub struct VecArrayReader<T> {
 }
 
 #[cfg(feature = "write")]
-impl<'a, T: WriterArray<'a>> WriterArray<'a> for VecArrayWriter<'a, T> {
-    type Write = Vec<T::Write>;
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+impl<T: Writable> WriterArray<Vec<T>> for VecArrayWriter<T::WriterArray> {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Vec<T>) {
         // TODO: Consider whether buffer should actually just
         // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
         // and the flattening could happen later at flush time. This may reduce memory cost.

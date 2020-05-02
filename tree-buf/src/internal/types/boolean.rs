@@ -3,10 +3,10 @@ use crate::prelude::*;
 use std::vec::IntoIter;
 
 #[cfg(feature = "write")]
-impl<'a> Writable<'a> for bool {
+impl Writable for bool {
     type WriterArray = Vec<bool>;
     #[inline]
-    fn write_root<'b: 'a>(&'b self, _stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root(&self, _stream: &mut impl WriterStream) -> RootTypeId {
         if *self {
             RootTypeId::True
         } else {
@@ -28,9 +28,8 @@ impl Readable for bool {
 }
 
 #[cfg(feature = "write")]
-impl<'a> WriterArray<'a> for Vec<bool> {
-    type Write = bool;
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+impl WriterArray<bool> for Vec<bool> {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
         self.push(*value);
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {

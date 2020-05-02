@@ -1,7 +1,4 @@
-use crate::prelude::*;
 use std::fmt::{Debug, Display, Formatter};
-
-
 
 #[cfg(feature = "read")]
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -33,7 +30,7 @@ impl std::error::Error for ReadError {}
 
 #[cfg(feature = "read")]
 impl From<std::str::Utf8Error> for ReadError {
-    fn from(value: std::str::Utf8Error) -> Self {
+    fn from(_value: std::str::Utf8Error) -> Self {
         ReadError::InvalidFormat
     }
 }

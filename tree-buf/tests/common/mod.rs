@@ -9,7 +9,7 @@ use tree_buf::{Readable, Writable};
 /// If we add compression and achieve lower, we can ratchet the number down.
 /// This ensures the use of the format is improving.
 /// Works on both arrays and root values to hit both code paths.
-pub fn round_trip<'a, 'b: 'a, T: Writable<'a> + Readable + Clone + std::fmt::Debug + PartialEq + 'static>(value: &'b T, root_size: usize, array_size: usize)
+pub fn round_trip<T: Writable + Readable + Clone + std::fmt::Debug + PartialEq + 'static>(value: &T, root_size: usize, array_size: usize)
 // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
 where tree_buf::ReadError : From<<<T as Readable>::ReaderArray as tree_buf::internal::ReaderArray>::Error> {
     serialize_eq(value, value, root_size);
@@ -20,7 +20,7 @@ where tree_buf::ReadError : From<<<T as Readable>::ReaderArray as tree_buf::inte
     serialize_eq(slice, slice, array_size);
 }
 
-pub fn serialize_eq<'a, I: Writable<'a>, O: Readable + Debug + PartialEq>(i: &'a I, o: &'a O, size: usize)
+pub fn serialize_eq<I: Writable, O: Readable + Debug + PartialEq>(i: &I, o: &O, size: usize)
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
     where tree_buf::ReadError : From<<<O as Readable>::ReaderArray as tree_buf::internal::ReaderArray>::Error> {
     let bytes = write(i);
@@ -32,7 +32,7 @@ pub fn serialize_eq<'a, I: Writable<'a>, O: Readable + Debug + PartialEq>(i: &'a
     assert_eq!(bytes.len(), size);
 }
 
-pub fn round_trip_default<T: for<'a> Default + Readable + for<'a> Writable<'a> + Debug + PartialEq + Clone + 'static>(root_size: usize, array_size: usize)
+pub fn round_trip_default<T: Default + Readable + Writable + Debug + PartialEq + Clone + 'static>(root_size: usize, array_size: usize)
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
     where tree_buf::ReadError : From<<<T as Readable>::ReaderArray as tree_buf::internal::ReaderArray>::Error> {
     let data = T::default();

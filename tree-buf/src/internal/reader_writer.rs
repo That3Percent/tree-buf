@@ -74,14 +74,13 @@ impl<'a, O: EncodeOptions> WriterStream for VecWriterStream<'a, O> {
 }
 
 #[cfg(feature = "write")]
-pub trait Writable<'a>: Sized {
-    // TODO: What happens if we get rid of the Write = Self trait bound?
-    type WriterArray: WriterArray<'a, Write = Self>;
+pub trait Writable: Sized {
+    type WriterArray: WriterArray<Self>;
     // At the root level, there is no need to buffer/flush, just write. By not buffering, we may
     // significantly decrease total memory usage when there are multiple arrays at the root level,
     // by not requiring that both be fully buffered simultaneously.
     #[must_use]
-    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId;
+    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId;
 }
 
 #[cfg(feature = "read")]
@@ -97,9 +96,8 @@ pub trait Readable: Sized {
 // allocations further.
 
 #[cfg(feature = "write")]
-pub trait WriterArray<'a>: Default {
-    type Write: Writable<'a>;
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write);
+pub trait WriterArray<T: ?Sized>: Default {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b T);
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId;
 }
 

@@ -65,9 +65,9 @@ macro_rules! parallel_read {
 macro_rules! impl_tuple {
     ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+) => {
         #[cfg(feature = "write")]
-        impl <'a, $($ts: Writable<'a>),+> Writable<'a> for ($($ts),+) {
+        impl <$($ts: Writable),+> Writable for ($($ts),+) {
             type WriterArray=($($ts::WriterArray),+);
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+            fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
                 profile!("Writable::write_root");
                 $(
                     stream.write_with_id(|stream| tuple_index!(self, $ti).write_root(stream));
@@ -77,9 +77,8 @@ macro_rules! impl_tuple {
         }
 
         #[cfg(feature = "write")]
-        impl<'a, $($ts: WriterArray<'a>),+> WriterArray<'a> for ($($ts),+) {
-            type Write=($($ts::Write),+);
-            fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        impl<$($ts: Writable),+> WriterArray<($($ts),+)> for ($($ts::WriterArray),+) {
+            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b ($($ts),+)) {
                 $(
                     tuple_index!(self, $ti).buffer(&tuple_index!(value, $ti));
                 )+

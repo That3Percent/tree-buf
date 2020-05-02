@@ -4,9 +4,9 @@ use crate::prelude::*;
 pub struct Ignore;
 
 #[cfg(feature = "write")]
-impl<'a> Writable<'a> for Ignore {
+impl Writable for Ignore {
     type WriterArray = Ignore;
-    fn write_root<'b: 'a>(&'b self, _stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root(&self, _stream: &mut impl WriterStream) -> RootTypeId {
         RootTypeId::Void
     }
 }
@@ -20,9 +20,8 @@ impl Readable for Ignore {
 }
 
 #[cfg(feature = "write")]
-impl<'a> WriterArray<'a> for Ignore {
-    type Write = Ignore;
-    fn buffer<'b: 'a>(&mut self, _value: &'b Self::Write) {}
+impl WriterArray<Ignore> for Ignore {
+    fn buffer<'a, 'b: 'a>(&'a mut self, _value: &'b Ignore) {}
     fn flush(self, _stream: &mut impl WriterStream) -> ArrayTypeId {
         ArrayTypeId::Void
     }

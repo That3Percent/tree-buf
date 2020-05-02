@@ -3,9 +3,9 @@ use crate::internal::encodings::packed_bool::decode_packed_bool;
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
-impl<'a, T: Writable<'a>> Writable<'a> for Option<T> {
-    type WriterArray = NullableWriter<'a, T::WriterArray>;
-    fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+impl<T: Writable> Writable for Option<T> {
+    type WriterArray = NullableWriter<T::WriterArray>;
+    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
         if let Some(value) = self {
             T::write_root(value, stream)
         } else {
@@ -28,18 +28,17 @@ impl<T: Readable> Readable for Option<T> {
 
 #[cfg(feature = "write")]
 #[derive(Default)]
-pub struct NullableWriter<'a, V> {
-    opt: <bool as Writable<'a>>::WriterArray,
+pub struct NullableWriter<V> {
+    opt: <bool as Writable>::WriterArray,
     value: Option<V>,
 }
 
 #[cfg(feature = "write")]
-impl<'a, T: WriterArray<'a>> WriterArray<'a> for NullableWriter<'a, T> {
-    type Write = Option<T::Write>;
-    fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+impl<T: Writable> WriterArray<Option<T>> for NullableWriter<T::WriterArray> {
+    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Option<T>) {
         self.opt.buffer(&value.is_some());
         if let Some(value) = value {
-            self.value.get_or_insert_with(T::default).buffer(value);
+            self.value.get_or_insert_with(T::WriterArray::default).buffer(value);
         }
     }
     fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {

@@ -45,17 +45,16 @@ macro_rules! impl_lowerable {
         }
 
         #[cfg(feature = "write")]
-        impl<'a> Writable<'a> for $Ty {
+        impl Writable for $Ty {
             type WriterArray = Vec<$Ty>;
-            fn write_root<'b: 'a>(&'b self, stream: &mut impl WriterStream) -> RootTypeId {
+            fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
                 write_root_uint(*self as u64, stream.bytes())
             }
         }
 
         #[cfg(feature = "write")]
-        impl<'a> WriterArray<'a> for Vec<$Ty> {
-            type Write = $Ty;
-            fn buffer<'b: 'a>(&mut self, value: &'b Self::Write) {
+        impl WriterArray<$Ty> for Vec<$Ty> {
+            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
                 self.push(*value);
             }
             fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {

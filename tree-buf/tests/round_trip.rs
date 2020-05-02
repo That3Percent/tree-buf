@@ -393,3 +393,16 @@ fn fixed_arrays() {
     round_trip(&[0u32, 1, 2, 3], 8, 10);
     round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 14);
 }
+
+
+// This failed to compile at one point when moving generics for WriterArray out of associated type.
+#[test]
+fn enum_with_vec() {
+    #[derive(Write, Read, Debug, PartialEq, Clone)]
+    enum X {
+        X(Vec<u64>),
+    }
+
+    round_trip(&X::X(vec![25, 30, 0, 0, 0]), 11, 22);
+
+}

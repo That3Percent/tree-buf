@@ -2,9 +2,9 @@ pub mod delta;
 pub mod packed_bool;
 pub mod varint;
 pub mod rle;
-pub use rle::*;
+pub(crate) use rle::*;
 mod compress;
-pub use compress::*;
+pub(crate) use compress::*;
 use crate::prelude::*;
 
 
