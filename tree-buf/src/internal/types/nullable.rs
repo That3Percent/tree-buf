@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[cfg(feature = "write")]
 impl<T: Writable> Writable for Option<T> {
     type WriterArray = NullableWriter<T::WriterArray>;
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
         if let Some(value) = self {
             T::write_root(value, stream)
         } else {
@@ -41,7 +41,7 @@ impl<T: Writable> WriterArray<Option<T>> for NullableWriter<T::WriterArray> {
             self.value.get_or_insert_with(T::WriterArray::default).buffer(value);
         }
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         if let Some(value) = self.value {
             let opts_id = self.opt.flush(stream);
             debug_assert_eq!(opts_id, ArrayTypeId::Boolean);

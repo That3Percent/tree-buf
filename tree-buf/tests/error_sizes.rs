@@ -1,7 +1,4 @@
-use tree_buf::prelude::*;
 use std::mem::size_of;
-
-
 
 /// Verifies that the infallible tuple read has a zero-cost error
 #[test]

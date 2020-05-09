@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 #[cfg(feature = "write")]
 impl<K: Writable, V: Writable, S: Default + BuildHasher> Writable for HashMap<K, V, S> {
     type WriterArray = HashMapArrayWriter<K::WriterArray, V::WriterArray, S>;
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
         profile!("write_root");
 
         write_usize(self.len(), stream);
@@ -41,11 +41,12 @@ impl<K: Writable, V: Writable, S: Default + BuildHasher> Writable for HashMap<K,
 
 #[cfg(feature = "read")]
 impl<K: Readable + Hash + Eq + Send, V: Readable + Send, S: Default + BuildHasher> Readable for HashMap<K, V, S>
-    where
-        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-        ReadError : From<<<K as Readable>::ReaderArray as ReaderArray>::Error>,
-        // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-        ReadError : From<<<V as Readable>::ReaderArray as ReaderArray>::Error> {
+where
+    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+    ReadError: From<<<K as Readable>::ReaderArray as ReaderArray>::Error>,
+    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+    ReadError: From<<<V as Readable>::ReaderArray as ReaderArray>::Error>,
+{
     type ReaderArray = Option<HashMapArrayReader<K::ReaderArray, V::ReaderArray, S>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("Readable::read");
@@ -101,7 +102,7 @@ impl<K: Writable, V: Writable, S: Default + BuildHasher> WriterArray<HashMap<K, 
             values.buffer(value);
         }
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("WriterArray::flush");
         let Self { len, items, _marker } = self;
         if let Some((keys, values)) = items {
@@ -120,13 +121,13 @@ impl<K: ReaderArray, V: ReaderArray, S: Default + BuildHasher> ReaderArray for O
 where
     K::Read: Hash + Eq,
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    ReadError : From<K::Error>,
+    ReadError: From<K::Error>,
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    ReadError : From<V::Error>,
+    ReadError: From<V::Error>,
 {
     type Read = HashMap<K::Read, V::Read, S>;
     type Error = ReadError;
-    
+
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 

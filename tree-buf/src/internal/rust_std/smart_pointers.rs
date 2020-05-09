@@ -11,7 +11,7 @@ pub struct BoxWriterArray<T> {
 #[cfg(feature = "write")]
 impl<T: Writable> Writable for Box<T> {
     type WriterArray = BoxWriterArray<T::WriterArray>;
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
         profile!("write_root");
         self.deref().write_root(stream)
     }
@@ -36,7 +36,7 @@ impl<T: Writable> WriterArray<Box<T>> for BoxWriterArray<T::WriterArray> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Box<T>) {
         self.inner.buffer(&value)
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         self.inner.flush(stream)
     }
 }

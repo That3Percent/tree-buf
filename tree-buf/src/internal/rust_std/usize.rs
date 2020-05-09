@@ -22,8 +22,8 @@ pub fn read_usize(bytes: &[u8], offset: &mut usize) -> ReadResult<usize> {
 }
 
 #[cfg(feature = "write")]
-pub fn write_usize(value: usize, stream: &mut impl WriterStream) {
-    encode_prefix_varint(value as u64, stream.bytes());
+pub fn write_usize<O: EncodeOptions>(value: usize, stream: &mut WriterStream<'_, O>) {
+    encode_prefix_varint(value as u64, stream.bytes);
 }
 
 /*

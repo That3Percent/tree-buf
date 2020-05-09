@@ -85,7 +85,7 @@ pub fn read_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> ReadResult<Ident<'
 
 #[cfg(feature = "write")]
 #[inline]
-pub fn write_ident(value: &str, stream: &mut impl WriterStream) {
+pub fn write_ident<O: EncodeOptions>(value: &str, stream: &mut WriterStream<'_, O>) {
     write_str(value, stream)
 }
 

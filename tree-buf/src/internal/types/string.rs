@@ -1,5 +1,6 @@
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
+use rle::RLE;
 use std::vec::IntoIter;
 
 // TODO: Consider compressed unicode (SCSU?) for String in general,
@@ -8,9 +9,9 @@ use std::vec::IntoIter;
 // (Make sure that's true for SCSU, which may allow multiple encodings!)
 
 #[cfg(feature = "write")]
-pub fn write_str(value: &str, stream: &mut impl WriterStream) {
+pub fn write_str<O: EncodeOptions>(value: &str, stream: &mut WriterStream<'_, O>) {
     write_usize(value.len(), stream);
-    stream.bytes().extend_from_slice(value.as_bytes());
+    stream.bytes.extend_from_slice(value.as_bytes());
 }
 
 #[cfg(feature = "read")]
@@ -28,26 +29,26 @@ pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a st
 #[cfg(feature = "write")]
 impl Writable for String {
     type WriterArray = Vec<&'static str>;
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
         let value = self.as_str();
         match value.len() {
             0 => RootTypeId::Str0,
             1 => {
-                stream.bytes().push(value.as_bytes()[0]);
+                stream.bytes.push(value.as_bytes()[0]);
                 RootTypeId::Str1
             }
             2 => {
-                stream.bytes().extend_from_slice(value.as_bytes());
+                stream.bytes.extend_from_slice(value.as_bytes());
                 RootTypeId::Str2
             }
             3 => {
-                stream.bytes().extend_from_slice(value.as_bytes());
+                stream.bytes.extend_from_slice(value.as_bytes());
                 RootTypeId::Str3
             }
             _ => {
                 let b = value.as_bytes();
-                encode_prefix_varint(b.len() as u64, stream.bytes());
-                stream.bytes().extend_from_slice(b);
+                encode_prefix_varint(b.len() as u64, stream.bytes);
+                stream.bytes.extend_from_slice(b);
                 RootTypeId::Str
             }
         }
@@ -60,16 +61,18 @@ impl WriterArray<String> for Vec<&'static str> {
         // TODO: Working around lifetime issues for lack of GAT
         // A quick check makes this appear to be sound, since the signature
         // requires that the value outlive self.
+        //
+        // The big safety problem is that whe then give these references
+        // away when flushing. We happen to know that nothing saves the references,
+        // but when things like threading come into play it's hard to know.
         self.push(unsafe { std::mem::transmute(value.as_str()) });
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("WriterArray::flush");
 
-        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![
-            Box::new(Utf8Compressor),
-        ];
+        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![Box::new(Utf8Compressor), Box::new(RLE::new(vec![Box::new(Utf8Compressor)]))];
 
-        stream.write_with_len(|stream| compress(&self, stream.bytes(), &compressors[..]))
+        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
     }
 }
 
@@ -89,17 +92,22 @@ impl Readable for String {
 #[cfg(feature = "read")]
 impl InfallibleReaderArray for IntoIter<String> {
     type Read = String;
-    
-    fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+
+    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 
         match sticks {
             DynArrayBranch::String(bytes) => {
-                #[cfg(feature="profile")]
+                #[cfg(feature = "profile")]
                 let _g = flame::start_guard("String");
 
                 let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
+            }
+            DynArrayBranch::RLE { runs, values } => {
+                let rle = RleIterator::new(runs, values, options, |runs| Self::new_infallible(runs, options))?;
+                let all = rle.collect::<Vec<_>>();
+                Ok(all.into_iter())
             }
             _ => Err(ReadError::SchemaMismatch),
         }
@@ -108,7 +116,6 @@ impl InfallibleReaderArray for IntoIter<String> {
         self.next().unwrap_or_default()
     }
 }
-
 
 #[cfg(feature = "write")]
 impl<'a> Compressor<&'a str> for Utf8Compressor {
@@ -121,8 +128,9 @@ impl<'a> Compressor<&'a str> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, data: &[&'a str], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[&'a str], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         profile!("Compressor::compress");
+
         for value in data.iter() {
             encode_prefix_varint(value.len() as u64, bytes);
             bytes.extend_from_slice(value.as_bytes());

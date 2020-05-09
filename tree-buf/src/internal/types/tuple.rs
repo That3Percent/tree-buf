@@ -67,7 +67,7 @@ macro_rules! impl_tuple {
         #[cfg(feature = "write")]
         impl <$($ts: Writable),+> Writable for ($($ts),+) {
             type WriterArray=($($ts::WriterArray),+);
-            fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+            fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
                 profile!("Writable::write_root");
                 $(
                     stream.write_with_id(|stream| tuple_index!(self, $ti).write_root(stream));
@@ -83,7 +83,7 @@ macro_rules! impl_tuple {
                     tuple_index!(self, $ti).buffer(&tuple_index!(value, $ti));
                 )+
             }
-            fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+            fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!("WriterArray::flush");
                 let ($($ts,)+) = self;
                 $(

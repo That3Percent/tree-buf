@@ -12,7 +12,7 @@ macro_rules! impl_fixed {
             #[cfg(feature = "write")]
             impl<T: Writable> Writable for [T; $size] {
                 type WriterArray = ArrayWriter<T::WriterArray>;
-                fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+                fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
                     profile!("write_root");
                     match self.len() {
                         0 => RootTypeId::Array0,
@@ -127,7 +127,7 @@ macro_rules! impl_fixed {
                         self.values.buffer(item);
                     }
                 }
-                fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+                fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                     profile!("flush");
                     let Self { values } = self;
                     write_usize($size, stream);

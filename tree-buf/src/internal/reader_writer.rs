@@ -1,54 +1,44 @@
 use crate::internal::encodings::varint::{size_for_varint, write_varint_into};
 use crate::prelude::*;
 
+#[cfg(feature = "write")]
+pub struct WriterStream<'a, O> {
+    pub bytes: &'a mut Vec<u8>,
+    pub lens: &'a mut Vec<usize>,
+    pub options: &'a O,
+}
 
 #[cfg(feature = "write")]
-pub trait WriterStream {
-    type Options: EncodeOptions;
-    fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
-    fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T;
-    fn bytes(&mut self) -> &mut Vec<u8>;
-    fn options(&self) -> &Self::Options;
+impl<'a, O: EncodeOptions> WriterStream<'a, O> {
+    pub fn new(bytes: &'a mut Vec<u8>, lens: &'a mut Vec<usize>, options: &'a O) -> Self {
+        Self { bytes, lens, options }
+    }
+
     // TODO: Not yet used
-    fn restore_if_void<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let restore = self.bytes().len();
+    pub fn restore_if_void<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let restore = self.bytes.len();
         let id = f(self);
         if id == T::void() {
-            self.bytes().drain(restore..);
+            self.bytes.drain(restore..);
         }
         id
     }
     // TODO: Not yet used
-    fn reserve_and_write_with_varint(&mut self, max: u64, f: impl FnOnce(&mut Self) -> u64) {
+    pub fn reserve_and_write_with_varint(&mut self, max: u64, f: impl FnOnce(&mut Self) -> u64) {
         let reserved = size_for_varint(max);
-        let start = self.bytes().len();
+        let start = self.bytes.len();
         for _ in 0..reserved {
-            self.bytes().push(0);
+            self.bytes.push(0);
         }
-        let end = self.bytes().len();
+        let end = self.bytes.len();
         let v = f(self);
         debug_assert!(v <= max);
-        write_varint_into(v, &mut self.bytes()[start..end]);
+        write_varint_into(v, &mut self.bytes[start..end]);
     }
-}
 
-pub struct VecWriterStream<'a, O> {
-    bytes: &'a mut Vec<u8>,
-    lens: &'a mut Vec<usize>,
-    options: &'a O,
-}
-
-impl<'a, O: EncodeOptions> VecWriterStream<'a, O> {
-    pub fn new(bytes: &'a mut Vec<u8>, lens: &'a mut Vec<usize>, options: &'a O) -> Self {
-        Self { bytes, lens, options }
-    }
-}
-
-impl<'a, O: EncodeOptions> WriterStream for VecWriterStream<'a, O> {
-    type Options = O;
     // See also: a0b1e0fa-e33c-4bda-8141-d184a1160143
     // Duplicated code.
-    fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    pub fn write_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let type_index = self.bytes.len();
         self.bytes.push(0);
         let id = f(self);
@@ -56,20 +46,11 @@ impl<'a, O: EncodeOptions> WriterStream for VecWriterStream<'a, O> {
         self.bytes[type_index] = id.into();
         id
     }
-    fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    pub fn write_with_len<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let start = self.bytes.len();
         let result = f(self);
         self.lens.push(self.bytes.len() - start);
         result
-    }
-    // This is sort of a temporary patch while figuring out what the API of the WriterStream should be
-    #[inline]
-    fn bytes(&mut self) -> &mut Vec<u8> {
-        self.bytes
-    }
-    #[inline]
-    fn options(&self) -> &Self::Options {
-        self.options
     }
 }
 
@@ -80,7 +61,7 @@ pub trait Writable: Sized {
     // significantly decrease total memory usage when there are multiple arrays at the root level,
     // by not requiring that both be fully buffered simultaneously.
     #[must_use]
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId;
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId;
 }
 
 #[cfg(feature = "read")]
@@ -98,7 +79,7 @@ pub trait Readable: Sized {
 #[cfg(feature = "write")]
 pub trait WriterArray<T: ?Sized>: Default {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b T);
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId;
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId;
 }
 
 #[cfg(feature = "read")]

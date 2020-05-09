@@ -6,7 +6,7 @@ pub struct Ignore;
 #[cfg(feature = "write")]
 impl Writable for Ignore {
     type WriterArray = Ignore;
-    fn write_root(&self, _stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, _stream: &mut WriterStream<'_, O>) -> RootTypeId {
         RootTypeId::Void
     }
 }
@@ -22,7 +22,7 @@ impl Readable for Ignore {
 #[cfg(feature = "write")]
 impl WriterArray<Ignore> for Ignore {
     fn buffer<'a, 'b: 'a>(&'a mut self, _value: &'b Ignore) {}
-    fn flush(self, _stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, _stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         ArrayTypeId::Void
     }
 }

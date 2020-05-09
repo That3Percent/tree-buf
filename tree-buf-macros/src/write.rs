@@ -1,6 +1,6 @@
 use {
-    crate::utils::{get_named_fields, NamedField, canonical_ident},
-    proc_macro2::{Ident, TokenStream, Span},
+    crate::utils::{canonical_ident, get_named_fields, NamedField},
+    proc_macro2::{Ident, Span, TokenStream},
     quote::ToTokens,
     syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed},
 };
@@ -57,7 +57,7 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
         0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), Span::call_site())),
         _ => (
             quote! {
-                ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes());
+                ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes);
             },
             Ident::new("ObjN", Span::call_site()),
         ),
@@ -104,7 +104,7 @@ fn fill_write_skeleton<A: ToTokens>(
             fn buffer<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
                 #buffer
             }
-            fn flush(mut self, stream: &mut impl ::tree_buf::internal::WriterStream) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush<O: ::tree_buf::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::WriterStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
                 //::tree_buf::internal::profile!("WriterArray::flush");
@@ -114,7 +114,7 @@ fn fill_write_skeleton<A: ToTokens>(
 
         impl ::tree_buf::internal::Writable for #name {
             type WriterArray=#array_writer_name;
-            fn write_root(&self, stream: &mut impl ::tree_buf::internal::WriterStream) -> tree_buf::internal::RootTypeId {
+            fn write_root<O: ::tree_buf::options::EncodeOptions>(&self, stream: &mut ::tree_buf::internal::WriterStream<'_, O>) -> tree_buf::internal::RootTypeId {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
                 //::tree_buf::internal::profile!("WriterArray::write_root");
@@ -210,7 +210,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     };
     let flush = quote! {
         let variant_count = self.tree_buf_next_discriminant;
-        ::tree_buf::internal::encodings::varint::encode_prefix_varint(variant_count, stream.bytes());
+        ::tree_buf::internal::encodings::varint::encode_prefix_varint(variant_count, stream.bytes);
         let _0 = self.tree_buf_discriminant;
         stream.write_with_id(|stream| _0.flush(stream));
 

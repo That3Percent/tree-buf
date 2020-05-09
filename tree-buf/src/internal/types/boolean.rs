@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 impl Writable for bool {
     type WriterArray = Vec<bool>;
     #[inline]
-    fn write_root(&self, _stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, _stream: &mut WriterStream<'_, O>) -> RootTypeId {
         if *self {
             RootTypeId::True
         } else {
@@ -32,9 +32,9 @@ impl WriterArray<bool> for Vec<bool> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
         self.push(*value);
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
-        stream.write_with_len(|stream| encode_packed_bool(&self, stream.bytes()));
+        stream.write_with_len(|stream| encode_packed_bool(&self, stream.bytes));
         ArrayTypeId::Boolean
     }
 }
@@ -42,7 +42,7 @@ impl WriterArray<bool> for Vec<bool> {
 #[cfg(feature = "read")]
 impl InfallibleReaderArray for IntoIter<bool> {
     type Read = bool;
-    
+
     fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 

@@ -20,7 +20,7 @@ impl Bounded for U0 {
     }
 }
 
-fn write_u0<T>(_data: &[T], _max: T, _stream: &impl WriterStream) -> ArrayTypeId {
+fn write_u0<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
     unreachable!();
 }
 
@@ -47,8 +47,8 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "write")]
         impl Writable for $Ty {
             type WriterArray = Vec<$Ty>;
-            fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
-                write_root_uint(*self as u64, stream.bytes())
+            fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
+                write_root_uint(*self as u64, stream.bytes)
             }
         }
 
@@ -57,7 +57,7 @@ macro_rules! impl_lowerable {
             fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
                 self.push(*value);
             }
-            fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+            fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!("WriterArray::flush");
                 let max = self.iter().max();
                 if let Some(max) = max {
@@ -144,10 +144,10 @@ macro_rules! impl_lowerable {
         }
 
         #[cfg(feature = "write")]
-        fn $fn<T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>)*>
-            (data: &[T], max: T, stream: &mut impl WriterStream) -> ArrayTypeId {
+        fn $fn<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
+            (data: &[T], max: T, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
             profile!($Ty, "lowering_fn");
-            
+
             // TODO: (Performance) When getting ranges, use SIMD
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
 
@@ -157,14 +157,14 @@ macro_rules! impl_lowerable {
                 }
             }
 
-            fn write_inner(data: &[$Ty], stream: &mut impl WriterStream) -> ArrayTypeId {
+            fn write_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!(&[$Ty], "write_inner");
                 // TODO: (Performance) Remove allocations
                 let compressors: Vec<Box<dyn Compressor<$Ty>>> = vec![
                     $(Box::new(<$compressions>::new())),+
                 ];
                 stream.write_with_len(|stream|
-                    compress(data, stream.bytes(), &compressors[..])
+                    compress(data, stream.bytes, stream.lens, &compressors[..])
                 )
             }
 
@@ -255,7 +255,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         }
         Some(size)
     }
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         for item in data {
             encode_prefix_varint((*item).into(), bytes);
@@ -273,24 +273,28 @@ impl Simple16Compressor {
 }
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
-        let mut v = Vec::new();
-        for item in data {
-            let item = *item;
-            let item = item.try_into().map_err(|_| ())?;
-            v.push(item);
-        }
+
+        let v = {
+            #[cfg(feature = "profile")]
+            flame::start_guard("Needless copy to u32");
+            let mut v = Vec::new();
+            for item in data {
+                let item = *item;
+                let item = item.try_into().map_err(|_| ())?;
+                v.push(item);
+            }
+            v
+        };
 
         compress_simple_16(&v, bytes).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
     }
 }
-
-
 
 struct BytesCompressor;
 impl BytesCompressor {
@@ -300,7 +304,7 @@ impl BytesCompressor {
 }
 
 impl Compressor<u8> for BytesCompressor {
-    fn compress(&self, data: &[u8], bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[u8], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         bytes.extend_from_slice(data);
         Ok(ArrayTypeId::U8)

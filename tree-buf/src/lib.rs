@@ -1,8 +1,7 @@
-#[cfg(feature="profile")]
+#[cfg(feature = "profile")]
 extern crate flame;
 
-#[cfg(feature="profile")]
-#[macro_use]
+#[cfg(feature = "profile")]
 #[macro_export]
 macro_rules! profile {
     ($T:ty, $name:expr) => {
@@ -18,7 +17,7 @@ macro_rules! profile {
     };
 }
 
-#[cfg(not(feature="profile"))]
+#[cfg(not(feature = "profile"))]
 #[macro_export]
 macro_rules! profile {
     ($($arg:tt)*) => {};
@@ -26,7 +25,6 @@ macro_rules! profile {
 
 #[doc(hidden)]
 pub mod internal;
-
 
 pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
@@ -47,7 +45,7 @@ pub mod prelude {
     #[cfg(feature = "read")]
     pub(crate) type ReadResult<T> = Result<T, ReadError>;
 
-    #[cfg(feature="profile")]
+    #[cfg(feature = "profile")]
     pub(crate) use flame;
 
     pub(crate) use profile;
@@ -81,7 +79,7 @@ pub fn write_with_options<T: Writable>(value: &T, options: &impl EncodeOptions) 
 
     let mut lens = Vec::new();
     let mut bytes = Vec::new();
-    let mut stream = VecWriterStream::new(&mut bytes, &mut lens, options);
+    let mut stream = WriterStream::new(&mut bytes, &mut lens, options);
     stream.write_with_id(|stream| T::write_root(value, stream));
 
     for len in lens.iter().rev() {

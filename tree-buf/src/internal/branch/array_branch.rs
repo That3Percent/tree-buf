@@ -78,11 +78,14 @@ pub enum DynArrayBranch<'a> {
         discriminants: Box<DynArrayBranch<'a>>,
         variants: Vec<ArrayEnumVariant<'a>>,
     },
-    // TODO:
-    // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
-    // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
-    // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
-    // Dynamic(Bytes<'a>),
+    RLE {
+        runs: Box<DynArrayBranch<'a>>,
+        values: Box<DynArrayBranch<'a>>,
+    }, // TODO:
+       // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
+       // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
+       // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
+       // Dynamic(Bytes<'a>)
 }
 
 pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
@@ -225,9 +228,12 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             }
 
             DynArrayBranch::Enum { discriminants, variants }
-        },
+        }
         RLE => {
-            todo!()
+            let values = read_next_array(bytes, offset, lens)?.into();
+            let runs = read_next_array(bytes, offset, lens)?.into();
+
+            DynArrayBranch::RLE { runs, values }
         }
     };
 

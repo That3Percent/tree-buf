@@ -4,7 +4,7 @@ use std::vec::IntoIter;
 #[cfg(feature = "write")]
 impl<T: Writable> Writable for Vec<T> {
     type WriterArray = VecArrayWriter<T::WriterArray>;
-    fn write_root(&self, stream: &mut impl WriterStream) -> RootTypeId {
+    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
         profile!("write_root");
         match self.len() {
             0 => RootTypeId::Array0,
@@ -41,8 +41,10 @@ impl<T: Writable> Writable for Vec<T> {
 
 #[cfg(feature = "read")]
 impl<T: Readable> Readable for Vec<T>
-    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    where ReadError : From<<<T as Readable>::ReaderArray as ReaderArray>::Error> {
+// Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
+where
+    ReadError: From<<<T as Readable>::ReaderArray as ReaderArray>::Error>,
+{
     type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
     fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("Readable::read");
@@ -114,7 +116,7 @@ impl<T: Writable> WriterArray<Vec<T>> for VecArrayWriter<T::WriterArray> {
             values.buffer(item);
         }
     }
-    fn flush(self, stream: &mut impl WriterStream) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
         let Self { len, values } = self;
         if let Some(values) = values {
@@ -138,7 +140,7 @@ impl<T: Writable> WriterArray<Vec<T>> for VecArrayWriter<T::WriterArray> {
 impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
     type Read = Vec<T::Read>;
     type Error = T::Error;
-    
+
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
         profile!("ReaderArray::new");
 
