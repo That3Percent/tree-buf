@@ -31,7 +31,7 @@ where
         Err(e) => assert!(false, "{}", e),
     }
     if let Some(size) = size.into() {
-        assert_eq!(bytes.len() as i32, size);
+        assert_eq!(bytes.len() as i32, size, "Size Before: {}\nSize After: {}", size, bytes.len());
     }
 }
 

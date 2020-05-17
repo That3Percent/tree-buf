@@ -70,7 +70,9 @@ impl WriterArray<String> for Vec<&'static str> {
     fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("WriterArray::flush");
 
-        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![Box::new(Utf8Compressor), Box::new(RLE::new(vec![Box::new(Utf8Compressor)]))];
+        // TODO: Re-enable RLE
+        // See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
+        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![Box::new(Utf8Compressor) /*Box::new(RLE::new(vec![Box::new(Utf8Compressor)]))*/];
 
         stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
     }

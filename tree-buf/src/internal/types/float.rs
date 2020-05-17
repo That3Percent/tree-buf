@@ -1,3 +1,4 @@
+use crate::encodings::zfp;
 use crate::prelude::*;
 use num_traits::AsPrimitive as _;
 use std::convert::TryInto;
@@ -6,9 +7,6 @@ use std::vec::IntoIter;
 
 #[cfg(feature = "profile")]
 use flame;
-
-// TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
-//use ndarray_zfp_rs::Zfp;
 
 // Promising Compressors:
 // Gorilla - https://crates.io/crates/tsz   http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
@@ -31,7 +29,7 @@ use flame;
 // TODO: More compressors
 
 macro_rules! impl_float {
-    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $LossyGorilla:ident, $($rest:ident),*) => {
+    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $LossyGorilla:ident, $Zfp:ident, $($rest:ident),*) => {
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "write")]
         fn $write_item(item: $T, bytes: &mut Vec<u8>) {
@@ -143,6 +141,7 @@ macro_rules! impl_float {
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
+                                // TODO: Move this into a gorilla file
                                 #[cfg(feature="profile")]
                                 let _g = flame::start_guard("DoubleGorilla");
 
@@ -183,6 +182,18 @@ macro_rules! impl_float {
                                 #[cfg(feature="profile")]
                                 flame::end("Collect");
                                 Ok(values.into_iter())
+                            },
+                            ArrayFloat::Zfp32(bytes) => {
+                                let values = zfp::decompress::<f32>(&bytes)?;
+                                // TODO: (Performance) unnecessary copy in some cases
+                                let values: Vec<_> = values.iter().map(|v| v.as_()).collect();
+                                Ok(values.into_iter())
+                            }
+                            ArrayFloat::Zfp64(bytes) => {
+                                let values = zfp::decompress::<f64>(&bytes)?;
+                                // TODO: (Performance) unnecessary copy in some cases
+                                let values: Vec<_> = values.iter().map(|v| v.as_()).collect();
+                                Ok(values.into_iter())
                             }
                         }
                     }
@@ -205,14 +216,18 @@ macro_rules! impl_float {
                 profile!("flush");
                 let mut compressors: Vec<Box<dyn Compressor<$T>>> = vec![
                     Box::new($fixed),
+                    Box::new($Zfp { tolerance: stream.options.lossy_float_tolerance() }),
                     $(Box::new($rest)),*
                 ];
-                // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
+                // TODO: Re-enable Gorilla. Sometimes it panics at the moment, but sometimes it's better than Zfp
+                // especially for very small inputs it seems?
+                /*
                 if let Some(tolerance) = stream.options.lossy_float_tolerance() {
                     compressors.push(Box::new($LossyGorilla(tolerance)));
                 } else {
                     compressors.push(Box::new($Gorilla));
                 }
+                */
                 stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
             }
         }
@@ -249,39 +264,36 @@ macro_rules! impl_float {
         impl Compressor<$T> for $LossyGorilla {
             fn compress(&self, data: &[$T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
-                let multiplier = (2.0 as $T).powi(self.0);
+                let multiplier = (2.0 as $T).powi(self.0 * -1);
                 let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                 compress_gorilla(data, bytes)
             }
         }
-
-        // TODO: Zfp See also 6669608f-1441-4bdb-97c0-5260c7c4bf0f
-        /*
-        struct $zfp {
-            tolerance: f64,
-        }
-
-        impl Compressor<$%> for $zfp {
-            fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
-                profile!("compress");
-                // FIXME: This is terrible. Consider using zfp-sys directly
-                // Problems are needing copy of the data, needing to copy bytes again,
-                // the header storing redundant information.
-                let copy: Vec<_> = data.iter().copied().collect();
-                let arr = ndarray::Array1::from(copy);
-                let bin = arr.zfp_compress_with_header(self.tolerance);
-                let bin = if let Ok(bin) = bin { bin } else { return Err(()) };
-                bytes.extend_from_slice(&bin);
-                Ok(ArrayTypeId::Void) // FIXME
-            }
-        }
-        */
-
     };
 }
 
-impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, LossyGorillaCompressor64,);
-impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32,);
+struct Zfp64 {
+    tolerance: Option<i32>,
+}
+impl Compressor<f64> for Zfp64 {
+    fn compress(&self, data: &[f64], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        profile!("compress");
+        zfp::compress(data, bytes, self.tolerance)
+    }
+}
+
+struct Zfp32 {
+    tolerance: Option<i32>,
+}
+impl Compressor<f32> for Zfp32 {
+    fn compress(&self, data: &[f32], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        profile!("compress");
+        zfp::compress(data, bytes, self.tolerance)
+    }
+}
+
+impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, LossyGorillaCompressor64, Zfp64,);
+impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32, Zfp32,);
 
 fn compress_gorilla(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
     use gibbon::{vec_stream::VecWriter, DoubleStream};

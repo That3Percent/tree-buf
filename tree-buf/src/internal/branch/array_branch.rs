@@ -34,6 +34,8 @@ pub enum ArrayFloat<'a> {
     F64(Bytes<'a>),
     F32(Bytes<'a>),
     DoubleGorilla(Bytes<'a>),
+    Zfp32(Bytes<'a>),
+    Zfp64(Bytes<'a>),
 }
 
 #[derive(Debug)]
@@ -203,6 +205,14 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F64(bytes))
         }
+        Zfp32 => {
+            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            DynArrayBranch::Float(ArrayFloat::Zfp32(bytes))
+        }
+        Zfp64 => {
+            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            DynArrayBranch::Float(ArrayFloat::Zfp64(bytes))
+        }
         Utf8 => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::String(bytes)
@@ -261,6 +271,8 @@ impl_type_id!(ArrayTypeId, [
     ArrayFixed: 12,
     U8: 13,
     RLE: 14,
+    Zfp32: 15,
+    Zfp64: 16,
 ]);
 
 #[derive(Debug)]

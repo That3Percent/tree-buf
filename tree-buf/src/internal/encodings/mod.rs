@@ -1,16 +1,15 @@
 pub mod delta;
 pub mod packed_bool;
-pub mod varint;
 pub mod rle;
+pub mod varint;
 pub(crate) use rle::*;
 mod compress;
-pub(crate) use compress::*;
 use crate::prelude::*;
-
+pub(crate) use compress::*;
+pub mod zfp;
 
 #[cfg(feature = "write")]
 pub(crate) struct Utf8Compressor;
-
 
 #[cfg(feature = "read")]
 /// Reads all items from some byte aligned encoding

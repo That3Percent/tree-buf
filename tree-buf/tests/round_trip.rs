@@ -101,8 +101,8 @@ fn int_vec() {
 
 #[test]
 fn float64_vec() {
-    round_trip(&vec![0.99], 10, 16);
-    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 65);
+    round_trip(&vec![0.99], 10, 22);
+    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 64);
 }
 
 #[test]
@@ -117,10 +117,10 @@ fn lossy_f64_vec() {
     for i in 0..50 {
         data.push(0.01 * i as f64);
     }
-    let tolerance = 10;
+    let tolerance = -10;
     let options = encode_options! { options::LossyFloatTolerance(tolerance) };
     let binary = tree_buf::write_with_options(&data, &options);
-    assert_eq!(binary.len(), 104);
+    assert_eq!(binary.len(), 86);
     let decoded = read::<Vec<f64>>(&binary).unwrap();
     assert_eq!(data.len(), decoded.len());
     for (e, d) in data.iter().zip(decoded.iter()) {
@@ -130,7 +130,7 @@ fn lossy_f64_vec() {
     // Show how much smaller this is than lossless
     let options = encode_options! { options::LosslessFloat };
     let binary = tree_buf::write_with_options(&data, &options);
-    assert_eq!(binary.len(), 376);
+    assert_eq!(binary.len(), 351);
 
     // Show that this is much better than fixed, since this would be a minimum for exactly 0 schema overhead.
     assert_eq!(std::mem::size_of::<f64>() * data.len(), 400);
@@ -138,7 +138,7 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 32);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 34, 61);
 }
 
 #[test]
@@ -149,14 +149,14 @@ fn array_tuple() {
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 136, 212);
+    round_trip(&item, 136, 234);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 379, 659);
+    round_trip(&item, 493, 865);
 }
 
 #[test]
@@ -408,7 +408,10 @@ fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
     strs.iter().map(|s| String::from(*s)).collect()
 }
 
+// TODO: Re-enable RLE
+// See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
+#[ignore]
 fn strings_using_rle() {
     let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
     round_trip(&owned_vec(data), 26, 43);
@@ -423,7 +426,10 @@ fn strings_using_rle() {
     round_trip(&owned_vec(data), 21, 32);
 }
 
+// TODO: Re-enable RLE
+// See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
+#[ignore]
 fn nested_strings_using_rle() {
     //let data = vec![owned_vec(vec!["a", "a"])];
 
