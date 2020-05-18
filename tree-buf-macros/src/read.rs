@@ -1,5 +1,5 @@
 use {
-    crate::utils::{NamedField, canonical_ident, get_named_fields},
+    crate::utils::{canonical_ident, get_named_fields, NamedField},
     proc_macro2::TokenStream,
     quote::ToTokens,
     syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed},
@@ -17,16 +17,22 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
     let fields = get_named_fields(data_struct);
     let name = &ast.ident;
 
-    let inits = fields.iter().map(|NamedField { ident, canon_str, .. }| {
-        quote! {
-            let #ident = fields.remove(#canon_str).unwrap_or_default();
-        }
-    }).collect::<Vec<_>>();
-    let unwraps = fields.iter().map(|NamedField { ident, .. }| {
-        quote! {
-            #ident: #ident?,
-        }
-    }).collect::<Vec<_>>();
+    let inits = fields
+        .iter()
+        .map(|NamedField { ident, canon_str, .. }| {
+            quote! {
+                let #ident = fields.remove(#canon_str).unwrap_or_default();
+            }
+        })
+        .collect::<Vec<_>>();
+    let unwraps = fields
+        .iter()
+        .map(|NamedField { ident, .. }| {
+            quote! {
+                #ident: #ident?,
+            }
+        })
+        .collect::<Vec<_>>();
 
     let mut parallel_lhs = quote! {};
     let mut reads_parallel_rhs = quote! {};
@@ -37,7 +43,7 @@ fn impl_struct_read(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream 
         if is_first {
             is_first = false;
             parallel_lhs = quote! { #ident };
-            reads_parallel_rhs = quote! { 
+            reads_parallel_rhs = quote! {
                 <#ty as ::tree_buf::internal::Readable>::read(
                     #ident,
                     options,
@@ -180,7 +186,36 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         let discriminant = canonical_ident(variant_ident);
 
         match &variant.fields {
-            Fields::Unit => todo!("Unit enums not yet supported by tree-buf read"),
+            Fields::Unit => {
+                root_matches.push(quote! {
+                    // TODO: Verify that the branch is the void type?
+                    #discriminant => Self::#variant_ident,
+                });
+                array_fields.push(quote! {
+                    #variant_ident: Option<u64>
+                });
+                new_unpacks.push(quote! { #variant_ident: #variant_ident, });
+                new_matches.push(quote! {
+                    #discriminant => {
+                        if #variant_ident.is_some() {
+                            dbg!("Double variant ident", #variant_ident);
+                            return Err(::tree_buf::ReadError::InvalidFormat);
+                        }
+                        #variant_ident = Some(index as u64);
+                    }
+                });
+                new_inits.push(quote! {
+                    let mut #variant_ident = None;
+                });
+
+                read_nexts.push(quote! {
+                    if let Some(d) = &mut self.#variant_ident {
+                        if *d == discriminant {
+                            return Ok(#ident::#variant_ident);
+                        }
+                    }
+                });
+            }
             Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf read"),
             Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
                 match unnamed.len() {
@@ -190,7 +225,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         root_matches.push(quote! {
                             #discriminant => {
                                 Self::#variant_ident(::tree_buf::internal::Readable::read(*value, options)?)
-                            }
+                            },
                         });
                         let ty = &unnamed[0].ty;
                         array_fields.push(quote! {
@@ -240,7 +275,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                 // See if it's a variant we are aware of, and that the value
                 // matches the expected data.
                 match discriminant {
-                    #(#root_matches),*
+                    #(#root_matches)*
                     _ => { return Err(::tree_buf::ReadError::SchemaMismatch); },
                 }
             )
@@ -254,7 +289,7 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
             ::tree_buf::internal::DynArrayBranch::Enum {discriminants, variants} => {
                 let tree_buf_discriminant = *discriminants;
                 #(#new_inits)*;
-                
+
 
                 for (index, variant) in variants.into_iter().enumerate() {
                     let ::tree_buf::internal::ArrayEnumVariant { ident, data } = variant;

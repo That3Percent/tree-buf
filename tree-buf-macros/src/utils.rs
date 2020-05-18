@@ -4,6 +4,7 @@ use {
     syn::{DataStruct, Fields, Type},
 };
 
+// TODO: If we limit ourselves to ASCII characters, then it's possible to just do the same as prefix-varint and have a tag bit to save binary size
 // TODO: Semantically this is a sequence of case-folded canonically encoded utf-8 words (though, this is not quite implemented as such here)
 // This is prime for some kind of dictionary compression. Most applications won't ever need to ship the dictionary since it only
 // would happen in the proc-macro, except when introspection is required. (Reader for example just compares byte arrays)
@@ -15,7 +16,6 @@ pub fn canonical_ident(ident: &Ident) -> String {
     let ident_str = format!("{}", ident);
     to_camel_case(&ident_str)
 }
-
 
 pub struct NamedField<'a> {
     pub ident: &'a Ident,
@@ -44,4 +44,3 @@ pub fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
         })
         .collect()
 }
-

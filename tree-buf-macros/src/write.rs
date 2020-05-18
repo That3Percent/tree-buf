@@ -132,6 +132,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
 
     let mut array_fields = Vec::new();
     array_fields.push(quote! {
+        // TODO: (Performance) have the size scale to the number of variants
         tree_buf_discriminant: <u64 as ::tree_buf::Writable>::WriterArray,
         tree_buf_next_discriminant: u64
     });
@@ -146,7 +147,43 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         let discriminant = canonical_ident(variant_ident);
 
         match &variant.fields {
-            Fields::Unit => todo!("Unit enums not yet supported by tree-buf write"),
+            Fields::Unit => {
+                root_matches.push(quote! {
+                    #ident::#variant_ident => {
+                        ::tree_buf::internal::write_ident(#discriminant, stream);
+                        stream.write_with_id(|stream| ::tree_buf::internal::RootTypeId::Void);
+                    }
+                });
+                array_fields.push(quote! {
+                    #variant_ident: Option<u64>
+                });
+                array_matches.push(quote! {
+                    #ident::#variant_ident => {
+                        let t = if let Some(t) = self.#variant_ident {
+                            t
+                        } else {
+                            let current = self.tree_buf_next_discriminant;
+                            self.#variant_ident = Some(current);
+                            self.tree_buf_next_discriminant += 1;
+                            current
+                        };
+                        self.tree_buf_discriminant.buffer(&t);
+                    }
+                });
+                flushes.push(quote! {
+                    let mut matches = false;
+                    if let Some(d) = &self.#variant_ident {
+                        if *d == current_discriminant {
+                            matches = true;
+                        }
+                    }
+                    if matches {
+                        ::tree_buf::internal::write_ident(#discriminant, stream);
+                        stream.write_with_id(|stream| ::tree_buf::internal::ArrayTypeId::Void);
+                        continue;
+                    }
+                });
+            }
             Fields::Named(_named_fields) => todo!("Enums with named fields not yet supported by tree-buf"),
             Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
                 let unnamed: Vec<_> = unnamed.iter().collect();

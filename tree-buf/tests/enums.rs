@@ -52,20 +52,50 @@ fn unused_variations_do_not_affect_size() {
     round_trip(&B::One(1), 6, 14);
 }
 
-// TODO: Other variations.
-/*
-
 #[test]
 fn void_value() {
-    #[derive(Read, Write, Debug, PartialEq)]
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
     enum HasVoid {
         One,
-        Two
+        Two,
     }
 
-    round_trip(&HasVoid::One, 0, 0);
+    round_trip(&HasVoid::One, 6, 11);
 }
 
+#[test]
+fn mixed_void_and_single() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum Mixed {
+        Ex, // TODO: This can't be named None because of the macro
+        One(u32),
+    }
+
+    round_trip(&Mixed::Ex, 5, 10);
+    round_trip(&Mixed::One(10), 7, 14);
+
+    round_trip(&vec![Mixed::Ex, Mixed::One(2), Mixed::One(2), Mixed::One(3), Mixed::Ex], 23, 26);
+}
+
+/*
+// TODO: Enable test
+#[test]
+fn wierd_unit_variants() {
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum Unnamed {
+        One(),
+        Two(),
+    }
+
+    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    enum Named {
+        One{},
+        Two{},
+    }
+
+}
+
+// TODO: Enable test
 #[test]
 fn struct_value() {
     #[derive(Read, Write, Debug, PartialEq)]
