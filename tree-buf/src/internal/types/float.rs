@@ -29,7 +29,7 @@ use flame;
 // TODO: More compressors
 
 macro_rules! impl_float {
-    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $LossyGorilla:ident, $Zfp:ident, $($rest:ident),*) => {
+    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $Zfp:ident, $($rest:ident),*) => {
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "write")]
         fn $write_item(item: $T, bytes: &mut Vec<u8>) {
@@ -141,49 +141,10 @@ macro_rules! impl_float {
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
-                                // TODO: Move this into a gorilla file
-                                #[cfg(feature="profile")]
-                                let _g = flame::start_guard("DoubleGorilla");
-
-                                // FIXME: Should do schema mismatch for f32 -> f64
-                                let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat)?;
-                                let bytes = &bytes[..bytes.len()-1];
-                                let last = &bytes[bytes.len()-(bytes.len() % 8)..];
-                                let bytes = &bytes[..bytes.len() - last.len()];
-                                let mut last_2 = [0u8; 8];
-                                for (i, value) in last.iter().enumerate() {
-                                    last_2[i+(8-last.len())] = *value;
-                                }
-                                let last = u64::from_le_bytes(last_2);
-                                // TODO: Change this to check that num_bits_last_elm is correct
-                                if bytes.len() % size_of::<u64>() != 0 {
-                                    return Err(ReadError::InvalidFormat);
-                                }
-                                // TODO: (Performance) The following can use unchecked, since we just verified the size is valid.
-                                let mut data = read_all(bytes, |bytes, offset| {
-                                    let start = *offset;
-                                    let end = start + size_of::<u64>();
-                                    let le_bytes = &bytes[start..end];
-                                    *offset = end;
-                                    let result = u64::from_le_bytes(le_bytes.try_into().unwrap());
-                                    Ok(result)
-                                })?;
-                                data.push(last);
-                                #[cfg(feature="profile")]
-                                flame::start("Construct");
-                                let reader = gibbon::vec_stream::VecReader::new(&data, *num_bits_last_elm);
-                                let iterator = gibbon::DoubleStreamIterator::new(reader);
-                                #[cfg(feature="profile")]
-                                flame::end("Construct");
-                                // FIXME: It seems like this collect can panic if the data is invalid.
-                                #[cfg(feature="profile")]
-                                flame::start("Collect");
-                                let values: Vec<_> = iterator.map(|v| v.as_()).collect();
-                                #[cfg(feature="profile")]
-                                flame::end("Collect");
-                                Ok(values.into_iter())
+                                gorilla::decompress::<$T>(&bytes)
                             },
                             ArrayFloat::Zfp32(bytes) => {
+                                // FIXME: This is likely a bug switching between 32 and 64 might just get garbage data out
                                 let values = zfp::decompress::<f32>(&bytes)?;
                                 // TODO: (Performance) unnecessary copy in some cases
                                 let values: Vec<_> = values.iter().map(|v| v.as_()).collect();
@@ -214,20 +175,15 @@ macro_rules! impl_float {
             }
             fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!("flush");
+                let tolerance = stream.options.lossy_float_tolerance();
                 let mut compressors: Vec<Box<dyn Compressor<$T>>> = vec![
                     Box::new($fixed),
-                    Box::new($Zfp { tolerance: stream.options.lossy_float_tolerance() }),
+                    Box::new($Zfp { tolerance }),
+                    // TODO: Re-enable Gorilla. Sometimes it panics at the moment, but sometimes it's better than Zfp
+                    // especially for very small inputs it seems?
+                    // Box::new($Gorilla { tolerance }),
                     $(Box::new($rest)),*
                 ];
-                // TODO: Re-enable Gorilla. Sometimes it panics at the moment, but sometimes it's better than Zfp
-                // especially for very small inputs it seems?
-                /*
-                if let Some(tolerance) = stream.options.lossy_float_tolerance() {
-                    compressors.push(Box::new($LossyGorilla(tolerance)));
-                } else {
-                    compressors.push(Box::new($Gorilla));
-                }
-                */
                 stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
             }
         }
@@ -250,23 +206,24 @@ macro_rules! impl_float {
         // Alternatively, there is the tsz crate, but that doesn't offer a separate
         // double-stream (just joined time+double stream). Both of the implementations
         // aren't perfect for our API.
-        struct $Gorilla;
+        struct $Gorilla {
+            tolerance: Option<i32>,
+        }
         impl Compressor<$T> for $Gorilla {
             fn compress(&self, data: &[$T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
-                compress_gorilla(data.iter().map(|f| *f as f64), bytes)
-            }
-        }
 
-        // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
-        // before a real lossy compressor (Eg: fzip) is used.
-        struct $LossyGorilla(i32);
-        impl Compressor<$T> for $LossyGorilla {
-            fn compress(&self, data: &[$T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
-                profile!("compress");
-                let multiplier = (2.0 as $T).powi(self.0 * -1);
-                let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
-                compress_gorilla(data, bytes)
+                if let Some(tolerance) = self.tolerance {
+                    // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
+                    // before a real lossy compressor (Eg: fzip) is used.
+                    let multiplier = (2.0 as $T).powi(tolerance * -1);
+                    let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
+                    gorilla::compress(data, bytes)
+                } else {
+                    let data = data.iter().map(|f| *f as f64);
+                    gorilla::compress(data, bytes)
+                }
+
             }
         }
     };
@@ -292,35 +249,5 @@ impl Compressor<f32> for Zfp32 {
     }
 }
 
-impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, LossyGorillaCompressor64, Zfp64,);
-impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, LossyGorillaCompressor32, Zfp32,);
-
-fn compress_gorilla(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-    use gibbon::{vec_stream::VecWriter, DoubleStream};
-    if data.len() == 0 {
-        return Ok(ArrayTypeId::DoubleGorilla);
-    }
-
-    let mut writer = VecWriter::new();
-    let mut stream = DoubleStream::new();
-    for value in data {
-        stream.push(value, &mut writer);
-    }
-    let VecWriter {
-        mut bit_vector,
-        used_bits_last_elm,
-    } = writer;
-    let last = bit_vector.pop().unwrap(); // Does not panic because of early out
-                                          // TODO: It should be safe to do 1 extend and a transmute on le platforms
-    for value in bit_vector {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
-    let mut byte_count = used_bits_last_elm / 8;
-    if byte_count * 8 != used_bits_last_elm {
-        byte_count += 1;
-    }
-    let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
-    bytes.extend_from_slice(&last);
-    bytes.push(used_bits_last_elm);
-    Ok(ArrayTypeId::DoubleGorilla)
-}
+impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, Zfp64,);
+impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, Zfp32,);

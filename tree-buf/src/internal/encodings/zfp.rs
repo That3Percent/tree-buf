@@ -83,7 +83,7 @@ pub(crate) fn decompress<T: ZfpKind>(bytes: &[u8]) -> ReadResult<Vec<T>> {
         // TODO: (Performance)
         // Use an uninitialized vec
         let mut data = vec![T::default(); len as usize];
-        let (field, _field_guard) = field_1d(&data[..]).map_err(|_| ReadError::InvalidFormat)?;
+        let (field, _field_guard) = field_1d(&mut data[..]).map_err(|_| ReadError::InvalidFormat)?;
 
         // Allocate metadata for the compressed stream
         let (zfp, _zfp_guard) = open_zfp_stream();

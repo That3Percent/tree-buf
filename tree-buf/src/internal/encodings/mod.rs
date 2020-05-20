@@ -6,6 +6,7 @@ pub(crate) use rle::*;
 mod compress;
 use crate::prelude::*;
 pub(crate) use compress::*;
+pub mod gorilla;
 pub mod zfp;
 
 #[cfg(feature = "write")]
