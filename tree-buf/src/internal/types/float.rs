@@ -1,4 +1,4 @@
-use crate::encodings::zfp;
+//use crate::encodings::zfp;
 use crate::prelude::*;
 use num_traits::AsPrimitive as _;
 use std::convert::TryInto;
@@ -141,8 +141,9 @@ macro_rules! impl_float {
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
-                                gorilla::decompress::<$T>(&bytes)
+                                gorilla::decompress::<$T>(&bytes).map(|f| f.into_iter())
                             },
+                            /*
                             ArrayFloat::Zfp32(bytes) => {
                                 // FIXME: This is likely a bug switching between 32 and 64 might just get garbage data out
                                 let values = zfp::decompress::<f32>(&bytes)?;
@@ -155,6 +156,13 @@ macro_rules! impl_float {
                                 // TODO: (Performance) unnecessary copy in some cases
                                 let values: Vec<_> = values.iter().map(|v| v.as_()).collect();
                                 Ok(values.into_iter())
+                            }
+                            */
+                            ArrayFloat::Zfp32(bytes) => {
+                                unimplemented!("zfp32")
+                            }
+                            ArrayFloat::Zfp64(bytes) => {
+                                unimplemented!("zfp64")
                             }
                         }
                     }
@@ -176,12 +184,12 @@ macro_rules! impl_float {
             fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!("flush");
                 let tolerance = stream.options.lossy_float_tolerance();
-                let mut compressors: Vec<Box<dyn Compressor<$T>>> = vec![
+                let compressors: Vec<Box<dyn Compressor<$T>>> = vec![
                     Box::new($fixed),
-                    Box::new($Zfp { tolerance }),
+                    // Box::new($Zfp { tolerance }),
                     // TODO: Re-enable Gorilla. Sometimes it panics at the moment, but sometimes it's better than Zfp
                     // especially for very small inputs it seems?
-                    // Box::new($Gorilla { tolerance }),
+                    Box::new($Gorilla { tolerance }),
                     $(Box::new($rest)),*
                 ];
                 stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
@@ -229,6 +237,7 @@ macro_rules! impl_float {
     };
 }
 
+/*
 struct Zfp64 {
     tolerance: Option<i32>,
 }
@@ -248,6 +257,7 @@ impl Compressor<f32> for Zfp32 {
         zfp::compress(data, bytes, self.tolerance)
     }
 }
+*/
 
 impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, Zfp64,);
 impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, Zfp32,);

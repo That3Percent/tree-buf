@@ -7,7 +7,13 @@ mod compress;
 use crate::prelude::*;
 pub(crate) use compress::*;
 pub mod gorilla;
-pub mod zfp;
+/*
+mod gorilla2;
+pub mod gorilla {
+    pub use super::gorilla2::*;
+}
+*/
+//pub mod zfp;
 
 #[cfg(feature = "write")]
 pub(crate) struct Utf8Compressor;

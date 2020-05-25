@@ -1,14 +1,13 @@
 use crate::prelude::*;
 use gibbon::{
     vec_stream::{VecReader, VecWriter},
-    DoubleStream, DoubleStreamIterator,
+    DoubleStreamIterator, DoubleStreamWriter,
 };
 use num_traits::AsPrimitive;
 use std::convert::TryInto as _;
 use std::mem::size_of;
-use std::vec::IntoIter;
 
-pub fn decompress<T: 'static + Copy>(bytes: &[u8]) -> ReadResult<IntoIter<T>>
+pub fn decompress<T: 'static + Copy>(bytes: &[u8]) -> ReadResult<Vec<T>>
 where
     f64: AsPrimitive<T>,
 {
@@ -48,7 +47,7 @@ where
     let values: Vec<_> = iterator.map(|v| v.as_()).collect();
     #[cfg(feature = "profile")]
     flame::end("Collect");
-    Ok(values.into_iter())
+    Ok(values)
 }
 
 pub fn compress(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
@@ -57,7 +56,7 @@ pub fn compress(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut
     }
 
     let mut writer = VecWriter::new();
-    let mut stream = DoubleStream::new();
+    let mut stream = gibbon::DoubleStreamWriter::new();
     for value in data {
         stream.push(value, &mut writer);
     }
@@ -67,6 +66,7 @@ pub fn compress(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut
     } = writer;
     let last = bit_vector.pop().unwrap(); // Does not panic because of early out
                                           // TODO: It should be safe to do 1 extend and a transmute on le platforms
+
     for value in bit_vector {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
@@ -77,5 +77,6 @@ pub fn compress(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut
     let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
     bytes.extend_from_slice(&last);
     bytes.push(used_bits_last_elm);
+
     Ok(ArrayTypeId::DoubleGorilla)
 }

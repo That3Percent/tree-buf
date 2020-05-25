@@ -101,8 +101,8 @@ fn int_vec() {
 
 #[test]
 fn float64_vec() {
-    round_trip(&vec![0.99], 10, 22);
-    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 64);
+    round_trip(&vec![0.99], 10, 16);
+    round_trip(&vec![0.01, 0.02, 0.03, 0.04], 36, 65);
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn lossy_f64_vec() {
     let tolerance = -10;
     let options = encode_options! { options::LossyFloatTolerance(tolerance) };
     let binary = tree_buf::write_with_options(&data, &options);
-    assert_eq!(binary.len(), 86);
+    assert_eq!(binary.len(), 104);
     let decoded = read::<Vec<f64>>(&binary).unwrap();
     assert_eq!(data.len(), decoded.len());
     for (e, d) in data.iter().zip(decoded.iter()) {
@@ -130,7 +130,7 @@ fn lossy_f64_vec() {
     // Show how much smaller this is than lossless
     let options = encode_options! { options::LosslessFloat };
     let binary = tree_buf::write_with_options(&data, &options);
-    assert_eq!(binary.len(), 351);
+    assert_eq!(binary.len(), 376);
 
     // Show that this is much better than fixed, since this would be a minimum for exactly 0 schema overhead.
     assert_eq!(std::mem::size_of::<f64>() * data.len(), 400);
@@ -138,7 +138,7 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 34, 61);
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 32);
 }
 
 #[test]
@@ -149,14 +149,14 @@ fn array_tuple() {
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 136, 234);
+    round_trip(&item, 136, 212);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 493, 865);
+    round_trip(&item, 387, 687);
 }
 
 #[test]
@@ -441,3 +441,66 @@ fn nested_strings_using_rle() {
 
     round_trip(&data, None, None);
 }
+
+// This was useful for narrowing down a subset of a broken compressor.
+// It may be useful in the future
+/*
+#[test]
+fn broken_gorilla() {
+    use rand::Rng;
+    use std::convert::TryInto as _;
+    use tree_buf::internal::encodings::gorilla;
+
+    let broken = [-75.01536474599993, -75.00911189799993, 114.37647545700004];
+
+    let mut bytes = Vec::new();
+    gorilla::compress((&broken[..]).iter().copied(), &mut bytes).unwrap();
+    let out: Vec<f64> = gorilla::decompress(&bytes[..]).unwrap();
+    assert_eq!(&broken[..], &out[..]);
+
+    // 356301 - 356304
+
+    // 457009 - 457012
+
+    let data = std::fs::read("C:\\git\\floats.dat").unwrap();
+    let mut offset = 0;
+    let mut values = Vec::new();
+    while offset < data.len() {
+        let val = (&data[offset..(offset + 8)]).try_into().unwrap();
+        offset += 8;
+        let f = f64::from_le_bytes(val);
+        values.push(f);
+    }
+
+    dbg!(&values[356301..356304]);
+    return;
+
+    fn attempt(values: &[f64], min: usize, max: usize) -> bool {
+        let values = &values[min..max];
+        std::panic::catch_unwind(|| {
+            let mut bytes = Vec::new();
+            gorilla::compress(values.iter().copied(), &mut bytes).unwrap();
+            let out: Vec<f64> = gorilla::decompress(&bytes[..]).unwrap();
+            assert_eq!(values, &out[..]);
+        })
+        .is_ok()
+    }
+
+    let mut min = 0;
+    let mut max = values.len();
+
+    let mut rng = rand::thread_rng();
+    for _ in 0..100000 {
+        let try_min = rng.gen_range(min, max);
+        let try_max = rng.gen_range(try_min + 1, max + 1);
+        if try_min == min && try_max == max {
+            continue;
+        }
+        if !attempt(&values[..], try_min, try_max) {
+            min = try_min;
+            max = try_max;
+            dbg!(min, max);
+        }
+    }
+}
+*/
