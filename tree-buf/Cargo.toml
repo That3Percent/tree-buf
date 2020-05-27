@@ -1,6 +1,6 @@
 [package]
 name = "tree-buf"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Zac Burns <That3Percent@gmail.com>"]
 edition = "2018"
 description = "A prototype binary serialization protocol for data"

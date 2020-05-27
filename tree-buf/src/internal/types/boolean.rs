@@ -34,6 +34,8 @@ impl WriterArray<bool> for Vec<bool> {
     }
     fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
+        // TODO: Compressor (and renamed type) for PackedBool
+        // TODO: Special RLE encoder that just starts with false, and only encodes counts flopping back and forth each time
         stream.write_with_len(|stream| encode_packed_bool(&self, stream.bytes));
         ArrayTypeId::Boolean
     }

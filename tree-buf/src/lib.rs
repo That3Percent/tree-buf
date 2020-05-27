@@ -26,6 +26,8 @@ macro_rules! profile {
 #[doc(hidden)]
 pub mod internal;
 
+pub mod experimental;
+
 pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
 
