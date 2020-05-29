@@ -83,11 +83,16 @@ pub enum DynArrayBranch<'a> {
     RLE {
         runs: Box<DynArrayBranch<'a>>,
         values: Box<DynArrayBranch<'a>>,
-    }, // TODO:
-       // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
-       // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
-       // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
-       // Dynamic(Bytes<'a>)
+    },
+    Dictionary {
+        indices: Box<DynArrayBranch<'a>>,
+        values: Box<DynArrayBranch<'a>>,
+    },
+    // TODO:
+    // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
+    // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
+    // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
+    // Dynamic(Bytes<'a>)
 }
 
 pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
@@ -243,7 +248,20 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             let values = read_next_array(bytes, offset, lens)?.into();
             let runs = read_next_array(bytes, offset, lens)?.into();
 
+            // TODO: Yikes. This is just because of the write_with_len pattern around compress.
+            // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
+            let _hack = decode_suffix_varint(bytes, lens)?;
+
             DynArrayBranch::RLE { runs, values }
+        }
+        Dictionary => {
+            let values = read_next_array(bytes, offset, lens)?.into();
+            let indices = read_next_array(bytes, offset, lens)?.into();
+            // TODO: Yikes. This is just because of the write_with_len pattern around compress.
+            // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
+            let _hack = decode_suffix_varint(bytes, lens)?;
+
+            DynArrayBranch::Dictionary { values, indices }
         }
     };
 
@@ -273,6 +291,7 @@ impl_type_id!(ArrayTypeId, [
     RLE: 14,
     Zfp32: 15,
     Zfp64: 16,
+    Dictionary: 17,
 ]);
 
 #[derive(Debug)]

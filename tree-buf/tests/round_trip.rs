@@ -156,7 +156,7 @@ fn item() {
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 387, 687);
+    round_trip(&item, 380, 665);
 }
 
 #[test]
@@ -411,35 +411,35 @@ fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
 // TODO: Re-enable RLE
 // See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
-#[ignore]
-fn strings_using_rle() {
+fn strings_using_dictionary() {
     let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
-    round_trip(&owned_vec(data), 26, 43);
+    round_trip(&owned_vec(data), 23, 32);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd"];
-    round_trip(&owned_vec(data), 17, 19);
+    round_trip(&owned_vec(data), 18, 25);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 21, 32);
+    round_trip(&owned_vec(data), 24, 33);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 21, 32);
+    round_trip(&owned_vec(data), 24, 33);
 }
 
 // TODO: Re-enable RLE
 // See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
-#[ignore]
 fn nested_strings_using_rle() {
-    //let data = vec![owned_vec(vec!["a", "a"])];
-
     let data = (
         //owned_vec(vec![]),
         owned_vec(vec!["abc", "abc", "abc"]),
+        owned_vec(vec!["def", "def", "def"]),
         1u32,
     );
 
-    round_trip(&data, None, None);
+    //let data = owned_vec(vec!["abc", "abc", "abc"]);
+
+    // TODO: Add sizes
+    round_trip(&data, 32, 43);
 }
 
 // This was useful for narrowing down a subset of a broken compressor.

@@ -198,7 +198,6 @@ fn impl_enum_read(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                 new_matches.push(quote! {
                     #discriminant => {
                         if #variant_ident.is_some() {
-                            dbg!("Double variant ident", #variant_ident);
                             return Err(::tree_buf::ReadError::InvalidFormat);
                         }
                         #variant_ident = Some(index as u64);

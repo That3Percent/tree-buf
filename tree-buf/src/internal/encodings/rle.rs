@@ -5,6 +5,7 @@ use std::vec::IntoIter;
 // TODO: usize
 // TODO: Use ReaderArray or InfallableReaderArray
 pub struct RleIterator<T> {
+    // See also 522d2f4f-c5f7-478c-8d94-e7457ae45b29
     runs: IntoIter<u64>,
     values: IntoIter<T>,
     current_run: Option<u64>,
@@ -70,7 +71,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug> Compressor<T> for RLE<T> {
         // Prevent panic on indexing first item.
         profile!(&[T], "RLE::compress");
         // It will always be more efficient to just defer to another encoding. Also, this prevents a panic.
-        if data.len() == 0 {
+        if data.len() < 2 {
             return Err(());
         }
         let mut runs = Vec::new();

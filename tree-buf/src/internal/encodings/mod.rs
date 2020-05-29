@@ -1,18 +1,26 @@
+mod compress;
 pub mod delta;
+mod dictionary;
 pub mod packed_bool;
 pub mod rle;
 pub mod varint;
-pub(crate) use rle::*;
-mod compress;
+
 use crate::prelude::*;
 pub(crate) use compress::*;
+pub(crate) use dictionary::*;
+pub(crate) use rle::*;
+
 pub mod gorilla;
+
 /*
-mod gorilla2;
+mod gorilla_new;
+mod gorilla_old;
 pub mod gorilla {
-    pub use super::gorilla2::*;
+    pub use super::gorilla_new::compress;
+    pub use super::gorilla_old::decompress;
 }
 */
+
 //pub mod zfp;
 
 #[cfg(feature = "write")]

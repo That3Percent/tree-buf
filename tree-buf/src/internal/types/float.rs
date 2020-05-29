@@ -158,10 +158,10 @@ macro_rules! impl_float {
                                 Ok(values.into_iter())
                             }
                             */
-                            ArrayFloat::Zfp32(bytes) => {
+                            ArrayFloat::Zfp32(_bytes) => {
                                 unimplemented!("zfp32")
                             }
-                            ArrayFloat::Zfp64(bytes) => {
+                            ArrayFloat::Zfp64(_bytes) => {
                                 unimplemented!("zfp64")
                             }
                         }

@@ -72,8 +72,14 @@ impl WriterArray<String> for Vec<&'static str> {
 
         // TODO: Re-enable RLE
         // See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
-        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![Box::new(Utf8Compressor) /*Box::new(RLE::new(vec![Box::new(Utf8Compressor)]))*/];
+        let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![
+            Box::new(Utf8Compressor),
+            /*Box::new(RLE::new(vec![Box::new(Utf8Compressor)])),*/
+            Box::new(Dictionary::new(vec![Box::new(Utf8Compressor)])),
+        ];
 
+        // TODO: This write_with_len puts an unnecessary len
+        // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
         stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
     }
 }
@@ -107,8 +113,13 @@ impl InfallibleReaderArray for IntoIter<String> {
                 Ok(strs.into_iter())
             }
             DynArrayBranch::RLE { runs, values } => {
-                let rle = RleIterator::new(runs, values, options, |runs| Self::new_infallible(runs, options))?;
+                let rle = RleIterator::new(runs, values, options, |values| Self::new_infallible(values, options))?;
                 let all = rle.collect::<Vec<_>>();
+                Ok(all.into_iter())
+            }
+            DynArrayBranch::Dictionary { indices, values } => {
+                let dict = DictionaryIterator::new(indices, values, options, |values| Self::new_infallible(values, options))?;
+                let all = dict.collect::<Vec<_>>();
                 Ok(all.into_iter())
             }
             _ => Err(ReadError::SchemaMismatch),

@@ -137,6 +137,10 @@ fn visit_array(path: &Path, append: &impl fmt::Display, branch: &DynArrayBranch,
             visit_array(&path, &"runs", runs, breakdown);
             visit_array(&path, &"values", values, breakdown);
         }
+        DynArrayBranch::Dictionary { indices, values } => {
+            visit_array(&path, &"indices", indices, breakdown);
+            visit_array(&path, &"values", values, breakdown);
+        }
         DynArrayBranch::String(b) => breakdown.add(&path, "UTF-8", b),
         DynArrayBranch::Tuple { fields } => {
             for (i, field) in fields.iter().enumerate() {
