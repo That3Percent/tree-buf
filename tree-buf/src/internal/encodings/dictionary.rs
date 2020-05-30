@@ -109,7 +109,6 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> 
         bytes.push(0);
         let len = bytes.len();
         let id = compress(&values[..], bytes, lens, &self.sub_compressors[..]);
-        dbg!(bytes.len() - len);
         lens.push(bytes.len() - len);
         bytes[type_index] = id.into();
 
@@ -124,12 +123,12 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> 
         // encoder. This comes at a significant loss to compression in many cases,
         // since it is very likely that most values are small. This would be a problem
         // if we tried to use the compress fn here too.
+        // See also 490cf083-7fba-49ea-a14a-41c4ba91a656
         bytes.push(ArrayTypeId::IntPrefixVar.into());
         let len = bytes.len();
         for item in indices {
             encode_prefix_varint(item, bytes);
         }
-        dbg!(bytes.len() - len);
         lens.push(bytes.len() - len);
 
         Ok(ArrayTypeId::Dictionary)

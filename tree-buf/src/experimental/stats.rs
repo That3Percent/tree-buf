@@ -110,7 +110,10 @@ fn visit_array(path: &Path, append: &impl fmt::Display, branch: &DynArrayBranch,
                 visit_array(&path, &variant.ident, &variant.data, breakdown);
             }
         }
-        DynArrayBranch::Boolean(b) => breakdown.add(&path, "Packed Boolean", b),
+        DynArrayBranch::Boolean(enc) => match enc {
+            ArrayBool::Packed(b) => breakdown.add(&path, "Packed Boolean", b),
+            ArrayBool::RLE(_first, runs) => visit_array(&path, &"runs", runs, breakdown),
+        },
         DynArrayBranch::Float(f) => match f {
             ArrayFloat::DoubleGorilla(b) => breakdown.add(&path, "Gorilla", b),
             ArrayFloat::F32(b) => breakdown.add(&path, "Fixed F32", b),
@@ -148,7 +151,7 @@ fn visit_array(path: &Path, append: &impl fmt::Display, branch: &DynArrayBranch,
             }
         }
         DynArrayBranch::Nullable { opt, values } => {
-            breakdown.add(&path, "Packed Boolean", opt);
+            visit_array(&path, &"opt", opt, breakdown);
             visit_array(&path, &"values", values, breakdown);
         }
         DynArrayBranch::Void | DynArrayBranch::Map0 | DynArrayBranch::Array0 => {}

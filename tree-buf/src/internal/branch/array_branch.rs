@@ -39,6 +39,12 @@ pub enum ArrayFloat<'a> {
 }
 
 #[derive(Debug)]
+pub enum ArrayBool<'a> {
+    Packed(Bytes<'a>),
+    RLE(bool, Box<DynArrayBranch<'a>>),
+}
+
+#[derive(Debug)]
 pub struct ArrayEnumVariant<'a> {
     pub ident: Ident<'a>,
     pub data: DynArrayBranch<'a>,
@@ -69,10 +75,10 @@ pub enum DynArrayBranch<'a> {
     },
     Integer(ArrayInteger<'a>),
     Nullable {
-        opt: Bytes<'a>,
+        opt: Box<DynArrayBranch<'a>>,
         values: Box<DynArrayBranch<'a>>,
     },
-    Boolean(Bytes<'a>),
+    Boolean(ArrayBool<'a>),
     Float(ArrayFloat<'a>),
     Void,
     String(Bytes<'a>),
@@ -133,9 +139,8 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
 
     let branch = match id {
         Nullable => {
-            let opt = read_bytes_from_len(bytes, offset, lens)?;
-            let values = read_next_array(bytes, offset, lens)?;
-            let values = Box::new(values);
+            let opt = read_next_array(bytes, offset, lens)?.into();
+            let values = read_next_array(bytes, offset, lens)?.into();
             DynArrayBranch::Nullable { opt, values }
         }
         Void => DynArrayBranch::Void,
@@ -195,9 +200,14 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         Obj7 => read_obj(7, bytes, offset, lens)?,
         Obj8 => read_obj(8, bytes, offset, lens)?,
         ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
-        Boolean => {
+        PackedBool => {
             let bytes = read_bytes_from_len(bytes, offset, lens)?;
-            DynArrayBranch::Boolean(bytes)
+            DynArrayBranch::Boolean(ArrayBool::Packed(bytes))
+        }
+        RLEBoolTrue | RLEBoolFalse => {
+            let first = matches!(id, ArrayTypeId::RLEBoolTrue);
+            let runs = read_next_array(bytes, offset, lens)?;
+            DynArrayBranch::Boolean(ArrayBool::RLE(first, runs.into()))
         }
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
@@ -277,7 +287,7 @@ impl<'a> Default for DynArrayBranch<'a> {
 impl_type_id!(ArrayTypeId, [
     Nullable: 1,
     ArrayVar: 2,
-    Boolean: 3,
+    PackedBool: 3,
     IntSimple16: 4,
     IntPrefixVar: 5,
     F32: 6,
@@ -292,6 +302,8 @@ impl_type_id!(ArrayTypeId, [
     Zfp32: 15,
     Zfp64: 16,
     Dictionary: 17,
+    RLEBoolTrue: 18,
+    RLEBoolFalse: 19,
 ]);
 
 #[derive(Debug)]

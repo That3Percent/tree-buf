@@ -3,6 +3,7 @@ pub mod delta;
 mod dictionary;
 pub mod packed_bool;
 pub mod rle;
+pub mod rle_bool;
 pub mod varint;
 
 use crate::prelude::*;

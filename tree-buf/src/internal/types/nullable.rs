@@ -42,9 +42,9 @@ impl<T: Writable> WriterArray<Option<T>> for NullableWriter<T::WriterArray> {
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
-        if let Some(value) = self.value {
-            let opts_id = self.opt.flush(stream);
-            debug_assert_eq!(opts_id, ArrayTypeId::Boolean);
+        let Self { opt, value } = self;
+        if let Some(value) = value {
+            stream.write_with_id(|stream| opt.flush(stream));
             stream.write_with_id(|stream| value.flush(stream));
             ArrayTypeId::Nullable
         } else {
@@ -68,7 +68,8 @@ impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
 
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
-                let (opts, values) = parallel(|| decode_packed_bool(&opt).into_iter(), || T::new(*values, options), options);
+                let (opts, values) = parallel(|| <bool as Readable>::ReaderArray::new(*opt, options), || T::new(*values, options), options);
+                let opts = opts?;
                 let values = values?;
                 Ok(Some(NullableReader { opts, values }))
             }

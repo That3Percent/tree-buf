@@ -58,12 +58,12 @@ fn broken_int() {
 #[test]
 fn bools_root() {
     round_trip(&true, 1, 5);
-    round_trip(&false, 1, 5);
+    round_trip(&false, 1, 4);
 }
 
 #[test]
 fn opts_root() {
-    round_trip(&Some(true), 1, 8);
+    round_trip(&Some(true), 1, 9);
     round_trip(&Option::<bool>::None, 1, 3);
 }
 
@@ -149,19 +149,19 @@ fn array_tuple() {
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 136, 212);
+    round_trip(&item, 136, 213);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 380, 665);
+    round_trip(&item, 381, 666);
 }
 
 #[test]
 fn nullable_array() {
-    round_trip(&vec![Some(1u32), Some(2)], 9, 13);
+    round_trip(&vec![Some(1u32), Some(2)], 10, 14);
 }
 
 #[test]
@@ -442,6 +442,21 @@ fn nested_strings_using_rle() {
     round_trip(&data, 32, 43);
 }
 
+#[test]
+fn long_bool_runs() {
+    let mut data = Vec::new();
+    for i in 560..570 {
+        for _ in 0..i {
+            data.push(true);
+        }
+        data.push(false);
+    }
+    round_trip(&data, 36, 68);
+}
+
+// TODO: Use coverage marks to ensure all types are used
+// https://ferrous-systems.com/blog/coverage-marks/
+
 // This was useful for narrowing down a subset of a broken compressor.
 // It may be useful in the future
 /*
@@ -472,7 +487,6 @@ fn broken_gorilla() {
         values.push(f);
     }
 
-    dbg!(&values[356301..356304]);
     return;
 
     fn attempt(values: &[f64], min: usize, max: usize) -> bool {
@@ -499,7 +513,6 @@ fn broken_gorilla() {
         if !attempt(&values[..], try_min, try_max) {
             min = try_min;
             max = try_max;
-            dbg!(min, max);
         }
     }
 }

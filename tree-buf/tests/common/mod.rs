@@ -26,6 +26,7 @@ where
 {
     let bytes = write(i);
     let result = read(&bytes);
+    //dbg!(tree_buf::internal::read_root(&bytes));
     match result {
         Ok(parsed) => assert_eq!(o, &parsed),
         Err(e) => assert!(false, "{}", e),
