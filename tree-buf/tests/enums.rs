@@ -2,8 +2,6 @@ mod common;
 use common::round_trip;
 use tree_buf::prelude::*;
 
-// TODO: Get a code coverage checker
-
 #[test]
 fn unnamed_field_one_variant() {
     #[derive(Read, Write, Debug, PartialEq, Clone)]

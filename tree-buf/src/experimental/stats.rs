@@ -1,34 +1,38 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
+use std::default::Default;
 
+#[derive(Default)]
 struct Path {
-    value: String,
+    names: String,
+    types: String,
 }
 
 impl Path {
-    pub fn root() -> Self {
-        Self { value: String::new() }
+    fn c(s: &String, x: &impl fmt::Display) -> String {
+        let x = format!("{}", x);
+        if s.is_empty() {
+            x
+        } else {
+            if x.is_empty() {
+                s.clone()
+            } else {
+                format!("{}.{}", s, x)
+            }
+        }
     }
 
     #[must_use]
-    pub fn a(&self, p: &impl fmt::Display) -> Self {
-        let p = format!("{}", p);
-        let value = if self.value.is_empty() {
-            p
-        } else {
-            if p.is_empty() {
-                self.value.clone()
-            } else {
-                format!("{}.{}", self.value, p)
-            }
-        };
-        Self { value }
+    pub fn a(&self, name: &impl fmt::Display, type_id: &impl fmt::Display) -> Self {
+        let names = Self::c(&self.names, name);
+        let types = Self::c(&self.types, type_id);
+        Self { names, types }
     }
 }
 
 struct PathAggregation {
-    type_id: String,
+    types: String,
     size: usize,
 }
 
@@ -54,7 +58,7 @@ impl fmt::Display for SizeBreakdown {
 
         writeln!(f, "Largest by path:")?;
         for (path, agg) in by_path.iter() {
-            writeln!(f, "\t{} {} {}", agg.size, agg.type_id, path)?;
+            writeln!(f, "\t{}\n\t   {}\n\t   {}", agg.size, path, agg.types)?;
         }
 
         writeln!(f)?;
@@ -85,10 +89,13 @@ impl SizeBreakdown {
             },
         );
 
+        
+        let types = Path::c(&path.types, &type_id);
+
         let prev = self.by_path.insert(
-            path.value.to_owned(),
+            path.names.clone(),
             PathAggregation {
-                type_id: type_id.to_owned(),
+                types,
                 size: len,
             },
         );
@@ -96,23 +103,22 @@ impl SizeBreakdown {
     }
 }
 
-fn visit_array(path: &Path, append: &impl fmt::Display, branch: &DynArrayBranch, breakdown: &mut SizeBreakdown) {
-    let path = path.a(append);
+fn visit_array(path: Path, branch: &DynArrayBranch, breakdown: &mut SizeBreakdown) {
     match branch {
-        DynArrayBranch::ArrayFixed { values, len: _ } => visit_array(&path, &"", values, breakdown),
+        DynArrayBranch::ArrayFixed { values, len } => visit_array(path.a(&format!("[{}]", len), &"Array Fixed"), values, breakdown),
         DynArrayBranch::Array { len, values } => {
-            visit_array(&path, &"len", len, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"len", &"Array"), len, breakdown);
+            visit_array(path.a(&"values", &"Array"), values, breakdown);
         }
         DynArrayBranch::Enum { discriminants, variants } => {
-            visit_array(&path, &"", discriminants, breakdown);
+            visit_array(path.a(&"discriminants", &"Enum"), discriminants, breakdown);
             for variant in variants.iter() {
-                visit_array(&path, &variant.ident, &variant.data, breakdown);
+                visit_array(path.a(&variant.ident, &"Enum"), &variant.data, breakdown);
             }
         }
         DynArrayBranch::Boolean(enc) => match enc {
             ArrayBool::Packed(b) => breakdown.add(&path, "Packed Boolean", b),
-            ArrayBool::RLE(_first, runs) => visit_array(&path, &"runs", runs, breakdown),
+            ArrayBool::RLE(_first, runs) => visit_array(path.a(&"runs", &"Bool RLE"), runs, breakdown),
         },
         DynArrayBranch::Float(f) => match f {
             ArrayFloat::DoubleGorilla(b) => breakdown.add(&path, "Gorilla", b),
@@ -127,61 +133,60 @@ fn visit_array(path: &Path, append: &impl fmt::Display, branch: &DynArrayBranch,
             ArrayIntegerEncoding::U8 => breakdown.add(&path, "U8 Fixed", bytes),
         },
         DynArrayBranch::Map { len, keys, values } => {
-            visit_array(&path, &"len", len, breakdown);
-            visit_array(&path, &"keys", keys, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"len", &"Map"), len, breakdown);
+            visit_array(path.a(&"keys", &"Map"), keys, breakdown);
+            visit_array(path.a(&"values", &"Map"), values, breakdown);
         }
         DynArrayBranch::Object { fields } => {
             for (name, field) in fields {
-                visit_array(&path, name, field, breakdown);
+                visit_array(path.a(name, &"Object"), field, breakdown);
             }
         }
         DynArrayBranch::RLE { runs, values } => {
-            visit_array(&path, &"runs", runs, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"runs", &"RLE"), runs, breakdown);
+            visit_array(path.a(&"values", &"RLE"), values, breakdown);
         }
         DynArrayBranch::Dictionary { indices, values } => {
-            visit_array(&path, &"indices", indices, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"indices", &"Dictionary"), indices, breakdown);
+            visit_array(path.a(&"values", &"Dictionary"), values, breakdown);
         }
         DynArrayBranch::String(b) => breakdown.add(&path, "UTF-8", b),
         DynArrayBranch::Tuple { fields } => {
             for (i, field) in fields.iter().enumerate() {
-                visit_array(&path, &i, field, breakdown);
+                visit_array(path.a(&i, &"Tuple"), field, breakdown);
             }
         }
         DynArrayBranch::Nullable { opt, values } => {
-            visit_array(&path, &"opt", opt, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"opt", &"Nullable"), opt, breakdown);
+            visit_array(path.a(&"values", &"Nullable"), values, breakdown);
         }
         DynArrayBranch::Void | DynArrayBranch::Map0 | DynArrayBranch::Array0 => {}
     }
 }
 
-fn visit(path: &Path, append: impl fmt::Display, branch: &DynRootBranch<'_>, breakdown: &mut SizeBreakdown) {
-    let path = path.a(&append);
+fn visit(path: Path, branch: &DynRootBranch<'_>, breakdown: &mut SizeBreakdown) {
     match branch {
         DynRootBranch::Object { fields } => {
             for (name, value) in fields.iter() {
-                visit(&path, name, value, breakdown);
+                visit(path.a(name, &"Object"), value, breakdown);
             }
         }
-        DynRootBranch::Enum { discriminant, value } => visit(&path, discriminant, value, breakdown),
+        DynRootBranch::Enum { discriminant, value } => visit(path.a(discriminant, &"Enum"), value, breakdown),
         DynRootBranch::Map { len: _, keys, values } => {
-            visit_array(&path, &"keys", keys, breakdown);
-            visit_array(&path, &"values", values, breakdown);
+            visit_array(path.a(&"keys", &"Map"), keys, breakdown);
+            visit_array(path.a(&"values", &"Values"), values, breakdown);
         }
         DynRootBranch::Tuple { fields } => {
             for (i, field) in fields.iter().enumerate() {
-                visit(&path, i, field, breakdown);
+                visit(path.a(&i, &"Tuple"), field, breakdown);
             }
         }
         DynRootBranch::Map1 { key, value } => {
-            visit(&path, "key", key, breakdown);
-            visit(&path, "value", value, breakdown);
+            visit(path.a(&"key", &"Map1"), key, breakdown);
+            visit(path.a(&"value", &"Map1"), value, breakdown);
         }
-        DynRootBranch::Array { len: _, values } => visit_array(&path, &"", values, breakdown),
-        DynRootBranch::Array1(item) => visit(&path, "", item, breakdown),
+        DynRootBranch::Array { len, values } => visit_array(path.a(&format!("[{}]", len), &"Array"), values, breakdown),
+        DynRootBranch::Array1(item) => visit(path.a(&"1", &"Array1"), item, breakdown),
         DynRootBranch::Boolean(_)
         | DynRootBranch::Array0
         | DynRootBranch::Map0
@@ -200,7 +205,7 @@ pub fn size_breakdown(data: &[u8]) -> ReadResult<String> {
         by_type: HashMap::new(),
         total: data.len(),
     };
-    visit(&Path::root(), "", &root, &mut breakdown);
+    visit(Path::default(), &root, &mut breakdown);
 
     Ok(format!("{}", breakdown))
 }
