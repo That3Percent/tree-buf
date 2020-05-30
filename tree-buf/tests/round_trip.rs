@@ -58,7 +58,7 @@ fn broken_int() {
 #[test]
 fn bools_root() {
     round_trip(&true, 1, 5);
-    round_trip(&false, 1, 4);
+    round_trip(&false, 1, 5);
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn bool_array() {
 
 #[test]
 fn ints_root() {
-    round_trip(&0u32, 1, 4);
+    round_trip(&0u32, 1, 6);
     round_trip(&1u32, 1, 6);
     for i in 2..=127u32 {
         round_trip(&i, 2, 6);
@@ -149,14 +149,14 @@ fn array_tuple() {
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 136, 213);
+    round_trip(&item, 144, 221);
 }
 
 #[test]
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 381, 666);
+    round_trip(&item, 384, 655);
 }
 
 #[test]
@@ -181,9 +181,9 @@ fn visibility_modifiers() {
         a: u64,
     }
 
-    round_trip_default::<Inherited>(4, 7);
-    round_trip_default::<Crate>(4, 7);
-    round_trip_default::<Public>(4, 7);
+    round_trip_default::<Inherited>(4, 9);
+    round_trip_default::<Crate>(4, 9);
+    round_trip_default::<Public>(4, 9);
 }
 
 #[test]
@@ -206,7 +206,7 @@ fn ignores() {
     }
 
     let e = E::A(Ignore);
-    round_trip(&e, 4, 9);
+    round_trip(&e, 4, 11);
 
     #[derive(Read, Write, Debug, PartialEq, Clone)]
     struct N {
@@ -220,19 +220,19 @@ fn ignores() {
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {
-    round_trip_default::<u64>(1, 4);
-    round_trip_default::<u32>(1, 4);
-    round_trip_default::<u16>(1, 4);
-    round_trip_default::<u8>(1, 4);
-    round_trip_default::<(u64, u64)>(3, 7);
-    round_trip_default::<(u64, u32)>(3, 7);
-    round_trip_default::<f64>(1, 4);
+    round_trip_default::<u64>(1, 6);
+    round_trip_default::<u32>(1, 6);
+    round_trip_default::<u16>(1, 6);
+    round_trip_default::<u8>(1, 6);
+    round_trip_default::<(u64, u64)>(3, 11);
+    round_trip_default::<(u64, u32)>(3, 11);
+    round_trip_default::<f64>(1, 14);
     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     round_trip_default::<Vec<u32>>(1, 5);
     round_trip_default::<Option<Vec<u32>>>(1, 3);
     round_trip_default::<Option<u32>>(1, 3);
     round_trip_default::<Vec<Option<u32>>>(1, 5);
-    round_trip_default::<String>(1, 4);
+    round_trip_default::<String>(1, 6);
 }
 
 #[test]
@@ -252,7 +252,7 @@ fn small_structs() {
         a: u64,
     }
 
-    round_trip_default::<_1>(4, 7);
+    round_trip_default::<_1>(4, 9);
 }
 
 #[test]
@@ -334,17 +334,17 @@ fn large_structs() {
         q: f64,
     }
 
-    round_trip_default::<_14>(44, 60);
-    round_trip_default::<_15>(47, 64);
-    round_trip_default::<_16>(50, 68);
-    round_trip_default::<_17>(53, 72);
+    round_trip_default::<_14>(44, 200);
+    round_trip_default::<_15>(47, 214);
+    round_trip_default::<_16>(50, 228);
+    round_trip_default::<_17>(53, 242);
 }
 
 #[test]
 fn map_0_root() {
     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     let data = HashMap::<u32, u32>::new();
-    round_trip(&data, 2, 7);
+    round_trip(&data, 2, 9);
 }
 
 #[test]
@@ -384,13 +384,13 @@ fn maps_void() {
         let h = HashMap::<String, String>::new();
         data.push(h);
     }
-    round_trip(&data, 9, 11);
+    round_trip(&data, 13, 15);
 }
 
 #[test]
 fn fixed_arrays() {
     round_trip(&[0u32, 1, 2, 3], 8, 10);
-    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 4, 6);
+    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 14);
 }
 
 // This failed to compile at one point when moving generics for WriterArray out of associated type.
@@ -401,7 +401,7 @@ fn enum_with_vec() {
         X(Vec<u64>),
     }
 
-    round_trip(&X::X(vec![25, 30, 0, 0, 0]), 9, 19);
+    round_trip(&X::X(vec![25, 30, 0, 0, 0]), 11, 22);
 }
 
 fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
@@ -413,16 +413,16 @@ fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
 #[test]
 fn strings_using_dictionary() {
     let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
-    round_trip(&owned_vec(data), 23, 32);
+    round_trip(&owned_vec(data), 25, 34);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd"];
-    round_trip(&owned_vec(data), 18, 25);
+    round_trip(&owned_vec(data), 17, 19);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 24, 33);
+    round_trip(&owned_vec(data), 21, 32);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 24, 33);
+    round_trip(&owned_vec(data), 21, 32);
 }
 
 // TODO: Re-enable RLE
@@ -439,7 +439,7 @@ fn nested_strings_using_rle() {
     //let data = owned_vec(vec!["abc", "abc", "abc"]);
 
     // TODO: Add sizes
-    round_trip(&data, 32, 43);
+    round_trip(&data, 32, 39);
 }
 
 #[test]
@@ -451,7 +451,7 @@ fn long_bool_runs() {
         }
         data.push(false);
     }
-    round_trip(&data, 36, 68);
+    round_trip(&data, 37, 69);
 }
 
 // TODO: Use coverage marks to ensure all types are used

@@ -74,7 +74,7 @@ impl WriterArray<String> for Vec<&'static str> {
         // See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
         let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![
             Box::new(Utf8Compressor),
-            /*Box::new(RLE::new(vec![Box::new(Utf8Compressor)])),*/
+            Box::new(RLE::new(vec![Box::new(Utf8Compressor)])),
             Box::new(Dictionary::new(vec![Box::new(Utf8Compressor)])),
         ];
 

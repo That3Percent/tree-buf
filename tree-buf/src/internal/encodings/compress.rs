@@ -6,9 +6,13 @@ pub(crate) fn compress<T: PartialEq + Default>(mut data: &[T], bytes: &mut Vec<u
 
     // Remove trailing default values.
     // All the readers always generate defaults when values "run out".
+    // These cause problems with nested encodings like Dictionary and RLE
+    // TODO: Bring back in "root" compression schemes?
+    /*
     let default = T::default(); // TODO: (Performance) Minor benefit here by not allocating String and having an "IsDefault" trait.
     let trailing_defaults = data.iter().rev().take_while(|i| *i == &default);
     data = &data[0..data.len() - trailing_defaults.count()];
+    */
 
     // TODO: If there aren't multiple compressors, no need to be dynamic
     // debug_assert!(compressors.len() > 1);

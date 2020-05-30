@@ -88,7 +88,7 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "read")]
         impl InfallibleReaderArray for IntoIter<$Ty> {
             type Read = $Ty;
-            fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
+            fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
                 profile!(Self::Read, "ReaderArray::new");
 
                 match sticks {
@@ -128,6 +128,11 @@ macro_rules! impl_lowerable {
                             }
                         }
                     },
+                    DynArrayBranch::RLE { runs, values } => {
+                        let rle = RleIterator::new(runs, values, options, |values| Self::new_infallible(values, options))?;
+                        let all = rle.collect::<Vec<_>>();
+                        Ok(all.into_iter())
+                    },
                     // FIXME: This fixes a particular test.
                     // It is unclear if this is canon.
                     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
@@ -161,7 +166,8 @@ macro_rules! impl_lowerable {
                 profile!(&[$Ty], "write_inner");
                 // TODO: (Performance) Remove allocations
                 let compressors: Vec<Box<dyn Compressor<$Ty>>> = vec![
-                    $(Box::new(<$compressions>::new())),+
+                    $(Box::new(<$compressions>::new()),)+
+                    Box::new(RLE::new(vec![$(Box::new(<$compressions>::new())),+])),
                 ];
                 stream.write_with_len(|stream|
                     compress(data, stream.bytes, stream.lens, &compressors[..])

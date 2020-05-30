@@ -9,7 +9,7 @@ fn unnamed_field_one_variant() {
         St(String),
     }
 
-    round_trip(&K::St("s".to_owned()), 6, 15);
+    round_trip(&K::St("s".to_owned()), 6, 17);
 }
 
 #[test]
@@ -20,8 +20,8 @@ fn selects_correct_discriminant() {
         Two(u8),
     }
 
-    round_trip(&Opts::One(1), 6, 14);
-    round_trip(&Opts::Two(2), 7, 14);
+    round_trip(&Opts::One(1), 6, 16);
+    round_trip(&Opts::Two(2), 7, 16);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn pub_vis() {
         Val(u32),
     }
 
-    round_trip(&Pub::Val(10), 7, 14);
+    round_trip(&Pub::Val(10), 7, 16);
 }
 
 #[test]
@@ -46,8 +46,8 @@ fn unused_variations_do_not_affect_size() {
         Two(u32),
     }
 
-    round_trip(&A::One(1), 6, 14);
-    round_trip(&B::One(1), 6, 14);
+    round_trip(&A::One(1), 6, 16);
+    round_trip(&B::One(1), 6, 16);
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn void_value() {
         Two,
     }
 
-    round_trip(&HasVoid::One, 6, 11);
+    round_trip(&HasVoid::One, 6, 13);
 }
 
 #[test]
@@ -69,8 +69,8 @@ fn mixed_void_and_single() {
         One(u32),
     }
 
-    round_trip(&Mixed::Ex, 5, 10);
-    round_trip(&Mixed::One(10), 7, 14);
+    round_trip(&Mixed::Ex, 5, 12);
+    round_trip(&Mixed::One(10), 7, 16);
 
     round_trip(&vec![Mixed::Ex, Mixed::One(2), Mixed::One(2), Mixed::One(3), Mixed::Ex], 23, 26);
 }
