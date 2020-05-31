@@ -192,7 +192,7 @@ macro_rules! impl_float {
                     Box::new($Gorilla { tolerance }),
                     $(Box::new($rest)),*
                 ];
-                stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
+                stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
             }
         }
 

@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use simple_16;
 use std::vec::IntoIter;
 
-// TODO: usize
 // TODO: Use ReaderArray or InfallableReaderArray
 pub struct RleIterator<T> {
     // See also 522d2f4f-c5f7-478c-8d94-e7457ae45b29
@@ -55,18 +53,18 @@ impl<T: Send + Clone> RleIterator<T> {
     }
 }
 
-pub(crate) struct RLE<T> {
+pub(crate) struct RLE<S> {
     // TODO: (Performance) Do not require the allocation of this Vec
-    sub_compressors: Vec<Box<dyn Compressor<T>>>,
+    sub_compressors: S,
 }
 
-impl<T> RLE<T> {
-    pub fn new(sub_compressors: Vec<Box<dyn Compressor<T>>>) -> Self {
+impl<S> RLE<S> {
+    pub fn new(sub_compressors: S) -> Self {
         Self { sub_compressors }
     }
 }
 
-impl<T: PartialEq + Copy + Default + std::fmt::Debug> Compressor<T> for RLE<T> {
+impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
         profile!(&[T], "RLE::compress");
@@ -107,7 +105,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug> Compressor<T> for RLE<T> {
         let type_index = bytes.len();
         bytes.push(0);
         let len = bytes.len();
-        let id = compress(&values[..], bytes, lens, &self.sub_compressors[..]);
+        let id = compress(&values[..], bytes, lens, &self.sub_compressors);
         lens.push(bytes.len() - len);
         bytes[type_index] = id.into();
 

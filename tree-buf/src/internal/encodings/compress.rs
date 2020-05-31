@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
-pub(crate) fn compress<T: PartialEq + Default>(mut data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>, compressors: &[Box<dyn Compressor<T>>]) -> ArrayTypeId {
+pub(crate) fn compress<T: PartialEq + Default>(data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "compress");
 
     // Remove trailing default values.
@@ -11,13 +11,13 @@ pub(crate) fn compress<T: PartialEq + Default>(mut data: &[T], bytes: &mut Vec<u
     /*
     let default = T::default(); // TODO: (Performance) Minor benefit here by not allocating String and having an "IsDefault" trait.
     let trailing_defaults = data.iter().rev().take_while(|i| *i == &default);
-    data = &data[0..data.len() - trailing_defaults.count()];
+    let data = &data[0..data.len() - trailing_defaults.count()];
     */
 
     // TODO: If there aren't multiple compressors, no need to be dynamic
     // debug_assert!(compressors.len() > 1);
     if compressors.len() == 1 {
-        return compressors[0].compress(data, bytes, lens).unwrap();
+        return compressors.compress(0, data, bytes, lens).unwrap();
     }
 
     let restore_bytes = bytes.len();
@@ -34,11 +34,10 @@ pub(crate) fn compress<T: PartialEq + Default>(mut data: &[T], bytes: &mut Vec<u
     // is at the end, then we can just keep it in the case where it wins
     let mut by_size = Vec::new();
     for i in 0..compressors.len() {
-        let compressor = &compressors[i];
-        if let Some(size) = compressor.fast_size_for(sample) {
+        if let Some(size) = compressors.fast_size_for(i, sample) {
             by_size.push((i, size));
         } else {
-            if compressor.compress(sample, bytes, lens).is_ok() {
+            if compressors.compress(i, sample, bytes, lens).is_ok() {
                 let mut size = bytes.len() - restore_bytes;
                 for len in &lens[restore_lens..lens.len()] {
                     size += crate::internal::encodings::varint::size_for_varint(*len as u64);
@@ -55,8 +54,7 @@ pub(crate) fn compress<T: PartialEq + Default>(mut data: &[T], bytes: &mut Vec<u
 
     // Return the first compressor that succeeds
     for ranked in by_size.iter() {
-        let compressor = &compressors[ranked.0];
-        if let Ok(ok) = compressor.compress(data, bytes, lens) {
+        if let Ok(ok) = compressors.compress(ranked.0, data, bytes, lens) {
             return ok;
         }
         // If the compressor failed, clear out whatever it wrote to try again.
@@ -76,4 +74,24 @@ pub(crate) trait Compressor<T> {
         None
     }
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()>;
+}
+
+
+// TODO: Remove the ?Sized and the impl for [Box<dyn Compressor<T>>]
+pub (crate) trait CompressorSet<T> {
+    fn len(&self) -> usize;
+    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize>;
+    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()>;
+}
+
+impl<T> CompressorSet<T> for Vec<Box<dyn Compressor<T>>> {
+    fn len(&self) -> usize {
+        <[Box<dyn Compressor<T>>]>::len(self)
+    }
+    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+        self[compressor].fast_size_for(data)
+    }
+    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        self[compressor].compress(data, bytes, lens)
+    }
 }

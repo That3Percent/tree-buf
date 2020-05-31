@@ -1,5 +1,3 @@
-#[cfg(feature = "read")]
-use crate::internal::encodings::packed_bool::decode_packed_bool;
 use crate::prelude::*;
 
 #[cfg(feature = "write")]

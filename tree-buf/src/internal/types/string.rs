@@ -70,15 +70,18 @@ impl WriterArray<String> for Vec<&'static str> {
     fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("WriterArray::flush");
 
+        let rle_inner: Vec<Box<dyn Compressor<&'static str>>> = vec![Box::new(Utf8Compressor)];
+        let rle = RLE::new(rle_inner);
+
         let compressors: Vec<Box<dyn Compressor<&'static str>>> = vec![
             Box::new(Utf8Compressor),
-            Box::new(RLE::new(vec![Box::new(Utf8Compressor)])),
+            Box::new(rle),
             Box::new(Dictionary::new(vec![Box::new(Utf8Compressor)])),
         ];
 
         // TODO: This write_with_len puts an unnecessary len
         // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
-        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
+        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
     }
 }
 

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use encodings::varint::encode_prefix_varint;
 use std::collections::HashMap;
 use std::convert::TryInto as _;
 use std::hash::Hash;
@@ -108,7 +107,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> 
         let type_index = bytes.len();
         bytes.push(0);
         let len = bytes.len();
-        let id = compress(&values[..], bytes, lens, &self.sub_compressors[..]);
+        let id = compress(&values[..], bytes, lens, &self.sub_compressors);
         lens.push(bytes.len() - len);
         bytes[type_index] = id.into();
 

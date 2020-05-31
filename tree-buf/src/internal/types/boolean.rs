@@ -38,7 +38,7 @@ impl WriterArray<bool> for Vec<bool> {
 
         let compressors: Vec<Box<dyn Compressor<bool>>> = vec![Box::new(PackedBoolCompressor), Box::new(RLEBoolCompressor)];
 
-        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors[..]))
+        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
     }
 }
 
@@ -47,7 +47,7 @@ impl Compressor<bool> for PackedBoolCompressor {
     fn fast_size_for(&self, data: &[bool]) -> Option<usize> {
         Some((data.len() + 7) / 8)
     }
-    fn compress(&self, data: &[bool], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress(&self, data: &[bool], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         encode_packed_bool(data, bytes);
         Ok(ArrayTypeId::PackedBool)
     }
