@@ -74,8 +74,8 @@ fn bool_array() {
 
 #[test]
 fn ints_root() {
-    round_trip(&0u32, 1, 6);
-    round_trip(&1u32, 1, 6);
+    round_trip(&0u32, 1, 5);
+    round_trip(&1u32, 1, 5);
     for i in 2..=127u32 {
         round_trip(&i, 2, 6);
     }
@@ -91,7 +91,7 @@ fn ints_root() {
 #[test]
 fn array1() {
     round_trip(&vec![99u64], 3, 8);
-    round_trip(&vec![1u64], 2, 8);
+    round_trip(&vec![1u64], 2, 7);
 }
 
 #[test]
@@ -181,9 +181,9 @@ fn visibility_modifiers() {
         a: u64,
     }
 
-    round_trip_default::<Inherited>(4, 9);
-    round_trip_default::<Crate>(4, 9);
-    round_trip_default::<Public>(4, 9);
+    round_trip_default::<Inherited>(4, 8);
+    round_trip_default::<Crate>(4, 8);
+    round_trip_default::<Public>(4, 8);
 }
 
 #[test]
@@ -206,7 +206,7 @@ fn ignores() {
     }
 
     let e = E::A(Ignore);
-    round_trip(&e, 4, 11);
+    round_trip(&e, 4, 10);
 
     #[derive(Read, Write, Debug, PartialEq, Clone)]
     struct N {
@@ -214,18 +214,18 @@ fn ignores() {
     }
 
     let o = vec![N { e: E::A(Ignore) }, N { e: E::B(Ignore) }];
-    round_trip(&o, 17, 21);
+    round_trip(&o, 16, 18);
 }
 
 // TODO: Using Quickcheck and Arbitrary with quickcheck_derive.
 #[test]
 fn various_types() {
-    round_trip_default::<u64>(1, 6);
-    round_trip_default::<u32>(1, 6);
-    round_trip_default::<u16>(1, 6);
-    round_trip_default::<u8>(1, 6);
-    round_trip_default::<(u64, u64)>(3, 11);
-    round_trip_default::<(u64, u32)>(3, 11);
+    round_trip_default::<u64>(1, 5);
+    round_trip_default::<u32>(1, 5);
+    round_trip_default::<u16>(1, 5);
+    round_trip_default::<u8>(1, 5);
+    round_trip_default::<(u64, u64)>(3, 9);
+    round_trip_default::<(u64, u32)>(3, 9);
     round_trip_default::<f64>(1, 14);
     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     round_trip_default::<Vec<u32>>(1, 5);
@@ -252,7 +252,7 @@ fn small_structs() {
         a: u64,
     }
 
-    round_trip_default::<_1>(4, 9);
+    round_trip_default::<_1>(4, 8);
 }
 
 #[test]
@@ -344,14 +344,14 @@ fn large_structs() {
 fn map_0_root() {
     // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
     let data = HashMap::<u32, u32>::new();
-    round_trip(&data, 2, 9);
+    round_trip(&data, 2, 8);
 }
 
 #[test]
 fn map_1_root() {
     let mut data = HashMap::new();
     data.insert("test".to_owned(), 5u32);
-    round_trip(&data, 10, 23);
+    round_trip(&data, 10, 22);
 }
 
 #[test]
@@ -384,13 +384,13 @@ fn maps_void() {
         let h = HashMap::<String, String>::new();
         data.push(h);
     }
-    round_trip(&data, 13, 15);
+    round_trip(&data, 10, 13);
 }
 
 #[test]
 fn fixed_arrays() {
     round_trip(&[0u32, 1, 2, 3], 8, 10);
-    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 12);
+    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 6, 9);
 }
 
 // This failed to compile at one point when moving generics for WriterArray out of associated type.
@@ -401,7 +401,7 @@ fn enum_with_vec() {
         X(Vec<u64>),
     }
 
-    round_trip(&X::X(vec![25, 30, 0, 0, 0]), 11, 22);
+    round_trip(&X::X(vec![25, 30, 0, 0, 0]), 11, 21);
 }
 
 fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
@@ -417,10 +417,10 @@ fn strings_using_dictionary() {
     round_trip(&owned_vec(data), 14, 16);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 19, 23);
+    round_trip(&owned_vec(data), 18, 21);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 19, 23);
+    round_trip(&owned_vec(data), 18, 21);
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn nested_strings_using_rle() {
     //let data = owned_vec(vec!["abc", "abc", "abc"]);
 
     // TODO: Add sizes
-    round_trip(&data, 28, 33);
+    round_trip(&data, 28, 32);
 }
 
 #[test]
@@ -456,14 +456,14 @@ fn int_to_bool_nested() {
         vec![0u32,0,1,1,0],
         vec![0u32,0,0,1,1,1,1],
     );
-    round_trip(&data, 17, 19);
+    round_trip(&data, 11, 15);
 
     let data = vec![
         vec![0u32, 0, 1, 1,0],
         vec![1u32, 1, 1, 1, 1, 1, 0],
         vec![1u32, 0, 0, 0, 0, 0, 1],
     ];
-    round_trip(&data, 14, 21);
+    round_trip(&data, 13, 18);
 }
 
 // TODO: Use coverage marks to ensure all types are used
