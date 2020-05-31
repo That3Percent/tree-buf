@@ -182,9 +182,7 @@ macro_rules! impl_lowerable {
                     $(<$compressions>::new(),)+
                     RLE::new(($(<$compressions>::new(),)+))
                 );
-                stream.write_with_len(|stream|
-                    compress(data, stream, &compressors)
-                )
+                compress(data, stream, &compressors)
             }
 
             // Convert data to as<T>, using a transmute if that's already correct
@@ -276,9 +274,11 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        for item in data {
-            encode_prefix_varint((*item).into(), &mut stream.bytes);
-        }
+        stream.write_with_len(|stream| {
+            for item in data {
+                encode_prefix_varint((*item).into(), &mut stream.bytes);
+            }
+        });
         Ok(ArrayTypeId::IntPrefixVar)
     }
 }
@@ -309,7 +309,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
             v
         };
 
-        compress_simple_16(&v, stream.bytes).map_err(|_| ())?;
+        stream.write_with_len(|stream| compress_simple_16(&v, stream.bytes)).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
     }
@@ -325,7 +325,7 @@ impl BytesCompressor {
 impl Compressor<u8> for BytesCompressor {
     fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        stream.bytes.extend_from_slice(data);
+        stream.write_with_len(|stream| stream.bytes.extend_from_slice(data));
         Ok(ArrayTypeId::U8)
     }
     fn fast_size_for(&self, data: &[u8]) -> Option<usize> {

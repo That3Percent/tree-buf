@@ -100,7 +100,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorS
             return Err(());
         }
 
-        stream.write_with_id(|stream| stream.write_with_len(|stream| compress(&values[..], stream, &self.sub_compressors)));
+        stream.write_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
         stream.write_with_id(|stream| indices.flush(stream));
 
         Ok(ArrayTypeId::Dictionary)

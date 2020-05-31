@@ -192,7 +192,7 @@ macro_rules! impl_float {
                     $($rest,)*
                 );
 
-                stream.write_with_len(|stream| compress(&self, stream, &compressors))
+                compress(&self, stream, &compressors)
             }
         }
 
@@ -203,9 +203,11 @@ macro_rules! impl_float {
             }
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
-                for item in data {
-                    $write_item(*item, &mut stream.bytes);
-                }
+                stream.write_with_len(|stream| {
+                    for item in data {
+                        $write_item(*item, &mut stream.bytes);
+                    }
+                });
                 Ok(ArrayTypeId::$id)
             }
         }
@@ -221,16 +223,18 @@ macro_rules! impl_float {
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
 
-                if let Some(tolerance) = self.tolerance {
-                    // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
-                    // before a real lossy compressor (Eg: fzip) is used.
-                    let multiplier = (2.0 as $T).powi(tolerance * -1);
-                    let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
-                    gorilla::compress(data, stream.bytes)
-                } else {
-                    let data = data.iter().map(|f| *f as f64);
-                    gorilla::compress(data, stream.bytes)
-                }
+                stream.write_with_len(|stream| {
+                    if let Some(tolerance) = self.tolerance {
+                        // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
+                        // before a real lossy compressor (Eg: fzip) is used.
+                        let multiplier = (2.0 as $T).powi(tolerance * -1);
+                        let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
+                        gorilla::compress(data, stream.bytes)
+                    } else {
+                        let data = data.iter().map(|f| *f as f64);
+                        gorilla::compress(data, stream.bytes)
+                    }
+                })
 
             }
         }
@@ -244,7 +248,7 @@ struct Zfp64 {
 impl Compressor<f64> for Zfp64 {
     fn compress<O: EncodeOptions>(&self, data: &[f64], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        zfp::compress(data, &mut stream.bytes, self.tolerance)
+        stream.write_with_len(|stream| zfp::compress(data, &mut stream.bytes, self.tolerance));
     }
 }
 
@@ -254,7 +258,7 @@ struct Zfp32 {
 impl Compressor<f32> for Zfp32 {
     fn compress<O: EncodeOptions>(&self, data: &[f32], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        zfp::compress(data, bytes, self.tolerance)
+        stream.write_with_len(|stream| zfp::compress(data, bytes, self.tolerance));
     }
 }
 */

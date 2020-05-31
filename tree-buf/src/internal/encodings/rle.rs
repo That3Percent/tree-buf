@@ -98,7 +98,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compr
             return Err(());
         }
 
-        stream.write_with_id(|stream| stream.write_with_len(|stream| compress(&values[..], stream, &self.sub_compressors)));
+        stream.write_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
         stream.write_with_id(|stream| runs.flush(stream));
 
         Ok(ArrayTypeId::RLE)

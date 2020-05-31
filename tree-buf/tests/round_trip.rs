@@ -156,7 +156,7 @@ fn item() {
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 381, 649);
+    round_trip(&item, 379, 645);
 }
 
 #[test]
@@ -390,7 +390,7 @@ fn maps_void() {
 #[test]
 fn fixed_arrays() {
     round_trip(&[0u32, 1, 2, 3], 8, 10);
-    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 6, 9);
+    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 6, 8);
 }
 
 // This failed to compile at one point when moving generics for WriterArray out of associated type.
@@ -411,16 +411,16 @@ fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
 #[test]
 fn strings_using_dictionary() {
     let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
-    round_trip(&owned_vec(data), 22, 24);
+    round_trip(&owned_vec(data), 21, 23);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd"];
-    round_trip(&owned_vec(data), 14, 16);
+    round_trip(&owned_vec(data), 13, 15);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 18, 21);
+    round_trip(&owned_vec(data), 17, 20);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 18, 21);
+    round_trip(&owned_vec(data), 17, 20);
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn nested_strings_using_rle() {
     //let data = owned_vec(vec!["abc", "abc", "abc"]);
 
     // TODO: Add sizes
-    round_trip(&data, 28, 32);
+    round_trip(&data, 26, 30);
 }
 
 #[test]
@@ -447,7 +447,7 @@ fn long_bool_runs() {
         }
         data.push(false);
     }
-    round_trip(&data, 37, 69);
+    round_trip(&data, 36, 68);
 }
 
 #[test]
