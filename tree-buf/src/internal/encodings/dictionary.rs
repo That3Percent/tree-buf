@@ -104,7 +104,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> 
         // Can't use write_with_id and write_with_len directly, because that would cause problems
         // with object safety.
         // See also f4aba341-af61-490f-b113-380cb4c38a77
-        //
+
         let type_index = bytes.len();
         bytes.push(0);
         let len = bytes.len();
@@ -112,24 +112,15 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> 
         lens.push(bytes.len() - len);
         bytes[type_index] = id.into();
 
-        // TODO: FIXME: Because of the traits and such, can't compress to a
-        // a stream and re-use the existing code.
-        // See also 57b5623b-5222-4087-bc4b-0cd196adff07
-        //
-        // TODO: We would probably prefer Simple16 here, but because of a subtle
-        // issue we have to use PrefixVar instead. The problem is that compress removes
-        // default values from the end of the array, but with Simple16 we don't know
-        // for sure if a 0 at the end is a default value or just "padding" from the
-        // encoder. This comes at a significant loss to compression in many cases,
-        // since it is very likely that most values are small. This would be a problem
-        // if we tried to use the compress fn here too.
-        // See also 490cf083-7fba-49ea-a14a-41c4ba91a656
-        bytes.push(ArrayTypeId::IntPrefixVar.into());
-        let len = bytes.len();
-        for item in indices {
-            encode_prefix_varint(item, bytes);
-        }
-        lens.push(bytes.len() - len);
+        // HACK: FIXME: We happen to know that writing ints doesn't use options (at least right now)
+        // so, that means we can whip up the default options to be able to call a trait method. :/
+        // The thing that needs to happen here is not use dyn for compressors so methods can be generic
+        // See also a6a01d5f-c49f-45ae-a57e-a018c5822c21
+        let mut stream = WriterStream {
+            bytes, lens,
+            options: &crate::options::EncodeOptionsDefault
+        };
+        stream.write_with_id(|stream| indices.flush(stream));
 
         Ok(ArrayTypeId::Dictionary)
     }

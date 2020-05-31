@@ -156,7 +156,7 @@ fn item() {
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 384, 655);
+    round_trip(&item, 381, 649);
 }
 
 #[test]
@@ -390,7 +390,7 @@ fn maps_void() {
 #[test]
 fn fixed_arrays() {
     round_trip(&[0u32, 1, 2, 3], 8, 10);
-    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 14);
+    round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 12);
 }
 
 // This failed to compile at one point when moving generics for WriterArray out of associated type.
@@ -408,25 +408,21 @@ fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
     strs.iter().map(|s| String::from(*s)).collect()
 }
 
-// TODO: Re-enable RLE
-// See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
 fn strings_using_dictionary() {
     let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
-    round_trip(&owned_vec(data), 25, 34);
+    round_trip(&owned_vec(data), 22, 24);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd"];
-    round_trip(&owned_vec(data), 17, 19);
+    round_trip(&owned_vec(data), 14, 16);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 21, 32);
+    round_trip(&owned_vec(data), 19, 23);
 
     let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 21, 32);
+    round_trip(&owned_vec(data), 19, 23);
 }
 
-// TODO: Re-enable RLE
-// See also dba7eb4f-fe8d-474f-9a91-549fa91161bf
 #[test]
 fn nested_strings_using_rle() {
     let data = (
@@ -439,7 +435,7 @@ fn nested_strings_using_rle() {
     //let data = owned_vec(vec!["abc", "abc", "abc"]);
 
     // TODO: Add sizes
-    round_trip(&data, 32, 39);
+    round_trip(&data, 28, 33);
 }
 
 #[test]
@@ -452,6 +448,22 @@ fn long_bool_runs() {
         data.push(false);
     }
     round_trip(&data, 37, 69);
+}
+
+#[test]
+fn int_to_bool_nested() {
+    let data = (
+        vec![0u32,0,1,1,0],
+        vec![0u32,0,0,1,1,1,1],
+    );
+    round_trip(&data, 17, 19);
+
+    let data = vec![
+        vec![0u32, 0, 1, 1,0],
+        vec![1u32, 1, 1, 1, 1, 1, 0],
+        vec![1u32, 0, 0, 0, 0, 0, 1],
+    ];
+    round_trip(&data, 14, 21);
 }
 
 // TODO: Use coverage marks to ensure all types are used

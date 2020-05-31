@@ -75,14 +75,11 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug> Compressor<T> for RLE<T> {
             return Err(());
         }
         let mut runs = Vec::new();
-        let mut current_run = 0u32;
+        let mut current_run = 0u64;
         let mut current_value = data[0];
         let mut values = vec![];
-        // This limit is imposed by Simple16.
-        // See also 57b5623b-5222-4087-bc4b-0cd196adff07
-        const MAX_RUN: u32 = (1u32 << 28) - 1;
         for item in data[1..].iter() {
-            if current_value == *item && current_run < MAX_RUN {
+            if current_value == *item {
                 current_run += 1;
             } else {
                 runs.push(current_run);
@@ -114,14 +111,19 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug> Compressor<T> for RLE<T> {
         lens.push(bytes.len() - len);
         bytes[type_index] = id.into();
 
-        // TODO: FIXME: Because of the traits and such, can't compress to a
-        // a stream and re-use the existing code. So, assume Simple16 for the runs for now.
+        // TODO: FIXME: Because of the traits and such, can't compress to a stream and re-use integer code
         // See also 57b5623b-5222-4087-bc4b-0cd196adff07
         // TODO: Impl Error trait for ValueOutOfRange in Simple16
-        bytes.push(ArrayTypeId::IntSimple16.into());
-        let len = bytes.len();
-        simple_16::compress(&runs, bytes).map_err(|_| panic!("All values should be in range")).unwrap();
-        lens.push(bytes.len() - len);
+        //
+        // HACK: FIXME: We happen to know that writing ints doesn't use options (at least right now)
+        // so, that means we can whip up the default options to be able to call a trait method. :/
+        // The thing that needs to happen here is not use dyn for compressors so methods can be generic
+        // See also a6a01d5f-c49f-45ae-a57e-a018c5822c21
+        let mut stream = WriterStream {
+            bytes, lens,
+            options: &crate::options::EncodeOptionsDefault
+        };
+        stream.write_with_id(|stream| runs.flush(stream));
 
         Ok(ArrayTypeId::RLE)
     }
