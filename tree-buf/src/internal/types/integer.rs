@@ -61,7 +61,16 @@ macro_rules! impl_lowerable {
                 profile!("WriterArray::flush");
                 let max = self.iter().max();
                 if let Some(max) = max {
-                    $fn(&self, *max, stream)
+                    // TODO: (Performance) Use second-stack
+                    // Lower to bool if possible. This is especially nice for enums
+                    // with 2 variants.
+                    // TODO: Lowering to bool works in all tests, but not benchmarks
+                    if *max < 2 {
+                        let bools = self.iter().map(|i| *i == 1).collect::<Vec<_>>();
+                        bools.flush(stream)
+                    } else {
+                        $fn(&self, *max, stream)
+                    }
                 } else {
                     ArrayTypeId::Void
                 }
@@ -140,7 +149,11 @@ macro_rules! impl_lowerable {
                     DynArrayBranch::Void => {
                         Ok(Vec::new().into_iter())
                     }
-                    _ => Err(ReadError::SchemaMismatch),
+                    other => {
+                        let bools = <IntoIter<bool> as InfallibleReaderArray>::new_infallible(other, options)?;
+                        let mapped = bools.map(|i| if i {1} else {0}).collect::<Vec<_>>();
+                        Ok(mapped.into_iter())
+                    },
                 }
             }
             fn read_next_infallible(&mut self) -> Self::Read {
@@ -202,7 +215,6 @@ impl_lowerable!(u64, write_u64, u32, write_u32, (u16), (PrefixVarIntCompressor))
 impl_lowerable!(u32, write_u32, u16, write_u16, (), (Simple16Compressor, PrefixVarIntCompressor)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
 impl_lowerable!(u16, write_u16, u8, write_u8, (), (Simple16Compressor, PrefixVarIntCompressor));
 impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor, BytesCompressor));
-// TODO: (Compression) Another lowering down to bool
 
 #[cfg(feature = "write")]
 fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
