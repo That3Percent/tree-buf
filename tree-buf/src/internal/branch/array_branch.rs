@@ -207,6 +207,11 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         RLEBoolTrue | RLEBoolFalse => {
             let first = matches!(id, ArrayTypeId::RLEBoolTrue);
             let runs = read_next_array(bytes, offset, lens)?;
+            
+            // TODO: Yikes. This is just because of the write_with_len pattern around compress.
+            // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
+            let _hack = decode_suffix_varint(bytes, lens)?;
+
             DynArrayBranch::Boolean(ArrayBool::RLE(first, runs.into()))
         }
         IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
