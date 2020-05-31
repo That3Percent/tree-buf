@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "write")]
-pub(crate) fn compress<T: PartialEq + Default>(data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
+pub(crate) fn compress<T: PartialEq + Default, O: EncodeOptions>(data: &[T], stream: &mut WriterStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "compress");
 
     // Remove trailing default values.
@@ -14,16 +14,15 @@ pub(crate) fn compress<T: PartialEq + Default>(data: &[T], bytes: &mut Vec<u8>, 
     let data = &data[0..data.len() - trailing_defaults.count()];
     */
 
-    // TODO: If there aren't multiple compressors, no need to be dynamic
-    // debug_assert!(compressors.len() > 1);
+    // If there aren't multiple compressors, no need to be dynamic
     if compressors.len() == 1 {
-        return compressors.compress(0, data, bytes, lens).unwrap();
+        return compressors.compress(0, data, stream).unwrap();
     }
 
-    let restore_bytes = bytes.len();
+    let restore_bytes = stream.bytes.len();
     // TODO: Yuck!. This is ugly and error prone to restore these
     // and update the byte count with the assumed compressor for lens
-    let restore_lens = lens.len();
+    let restore_lens = stream.lens.len();
     let sample_size = data.len().min(256);
     let sample = &data[..sample_size];
 
@@ -37,15 +36,15 @@ pub(crate) fn compress<T: PartialEq + Default>(data: &[T], bytes: &mut Vec<u8>, 
         if let Some(size) = compressors.fast_size_for(i, sample) {
             by_size.push((i, size));
         } else {
-            if compressors.compress(i, sample, bytes, lens).is_ok() {
-                let mut size = bytes.len() - restore_bytes;
-                for len in &lens[restore_lens..lens.len()] {
+            if compressors.compress(i, sample, stream).is_ok() {
+                let mut size = stream.bytes.len() - restore_bytes;
+                for len in &stream.lens[restore_lens..stream.lens.len()] {
                     size += crate::internal::encodings::varint::size_for_varint(*len as u64);
                 }
                 by_size.push((i, size));
             }
-            bytes.truncate(restore_bytes);
-            lens.truncate(restore_lens);
+            stream.bytes.truncate(restore_bytes);
+            stream.lens.truncate(restore_lens);
         }
     }
 
@@ -54,12 +53,12 @@ pub(crate) fn compress<T: PartialEq + Default>(data: &[T], bytes: &mut Vec<u8>, 
 
     // Return the first compressor that succeeds
     for ranked in by_size.iter() {
-        if let Ok(ok) = compressors.compress(ranked.0, data, bytes, lens) {
+        if let Ok(ok) = compressors.compress(ranked.0, data, stream) {
             return ok;
         }
         // If the compressor failed, clear out whatever it wrote to try again.
-        bytes.truncate(restore_bytes);
-        lens.truncate(restore_lens);
+        stream.bytes.truncate(restore_bytes);
+        stream.lens.truncate(restore_lens);
     }
 
     // This must be called with at least one infallable compressor.
@@ -73,14 +72,14 @@ pub(crate) trait Compressor<T> {
     fn fast_size_for(&self, _data: &[T]) -> Option<usize> {
         None
     }
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()>;
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
 
 
 pub (crate) trait CompressorSet<T> {
     fn len(&self) -> usize;
     fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize>;
-    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()>;
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
 
 

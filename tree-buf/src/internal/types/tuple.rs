@@ -193,9 +193,9 @@ impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
-            0 => self.0.compress(data, bytes, lens),
+            0 => self.0.compress(data, stream),
             _ => unreachable!("No compressor at that index"),
         }
     }
@@ -212,10 +212,10 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
-            0 => self.0.compress(data, bytes, lens),
-            1 => self.1.compress(data, bytes, lens),
+            0 => self.0.compress(data, stream),
+            1 => self.1.compress(data, stream),
             _ => unreachable!("No compressor at that index"),
         }
     }
@@ -234,11 +234,11 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
-            0 => self.0.compress(data, bytes, lens),
-            1 => self.1.compress(data, bytes, lens),
-            2 => self.2.compress(data, bytes, lens),
+            0 => self.0.compress(data, stream),
+            1 => self.1.compress(data, stream),
+            2 => self.2.compress(data, stream),
             _ => unreachable!("No compressor at that index"),
         }
     }

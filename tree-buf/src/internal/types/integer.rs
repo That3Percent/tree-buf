@@ -183,7 +183,7 @@ macro_rules! impl_lowerable {
                     RLE::new(($(<$compressions>::new(),)+))
                 );
                 stream.write_with_len(|stream|
-                    compress(data, stream.bytes, stream.lens, &compressors)
+                    compress(data, stream, &compressors)
                 )
             }
 
@@ -274,10 +274,10 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         }
         Some(size)
     }
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         for item in data {
-            encode_prefix_varint((*item).into(), bytes);
+            encode_prefix_varint((*item).into(), &mut stream.bytes);
         }
         Ok(ArrayTypeId::IntPrefixVar)
     }
@@ -292,7 +292,7 @@ impl Simple16Compressor {
 }
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
@@ -309,7 +309,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
             v
         };
 
-        compress_simple_16(&v, bytes).map_err(|_| ())?;
+        compress_simple_16(&v, stream.bytes).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
     }
@@ -323,9 +323,9 @@ impl BytesCompressor {
 }
 
 impl Compressor<u8> for BytesCompressor {
-    fn compress(&self, data: &[u8], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        bytes.extend_from_slice(data);
+        stream.bytes.extend_from_slice(data);
         Ok(ArrayTypeId::U8)
     }
     fn fast_size_for(&self, data: &[u8]) -> Option<usize> {

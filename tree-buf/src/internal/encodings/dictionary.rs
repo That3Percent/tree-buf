@@ -64,7 +64,7 @@ impl<S> Dictionary<S> {
 }
 
 impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Compressor<T> for Dictionary<S> {
-    fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
         profile!("compress");
         // It will always be more efficient to just defer to another encoding.
@@ -100,25 +100,7 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorS
             return Err(());
         }
 
-        // Can't use write_with_id and write_with_len directly, because that would cause problems
-        // with object safety.
-        // See also f4aba341-af61-490f-b113-380cb4c38a77
-
-        let type_index = bytes.len();
-        bytes.push(0);
-        let len = bytes.len();
-        let id = compress(&values[..], bytes, lens, &self.sub_compressors);
-        lens.push(bytes.len() - len);
-        bytes[type_index] = id.into();
-
-        // HACK: FIXME: We happen to know that writing ints doesn't use options (at least right now)
-        // so, that means we can whip up the default options to be able to call a trait method. :/
-        // The thing that needs to happen here is not use dyn for compressors so methods can be generic
-        // See also a6a01d5f-c49f-45ae-a57e-a018c5822c21
-        let mut stream = WriterStream {
-            bytes, lens,
-            options: &crate::options::EncodeOptionsDefault
-        };
+        stream.write_with_id(|stream| stream.write_with_len(|stream| compress(&values[..], stream, &self.sub_compressors)));
         stream.write_with_id(|stream| indices.flush(stream));
 
         Ok(ArrayTypeId::Dictionary)

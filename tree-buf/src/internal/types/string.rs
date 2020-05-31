@@ -78,7 +78,7 @@ impl WriterArray<String> for Vec<&'static str> {
 
         // TODO: This write_with_len puts an unnecessary len
         // See also 40ea8819-da26-4af3-8dc0-1a4602560f30
-        stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
+        stream.write_with_len(|stream| compress(&self, stream, &compressors))
     }
 }
 
@@ -139,12 +139,12 @@ impl<'a> Compressor<&'a str> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress(&self, data: &[&'a str], bytes: &mut Vec<u8>, _lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[&'a str], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("Compressor::compress");
 
         for value in data.iter() {
-            encode_prefix_varint(value.len() as u64, bytes);
-            bytes.extend_from_slice(value.as_bytes());
+            encode_prefix_varint(value.len() as u64, stream.bytes);
+            stream.bytes.extend_from_slice(value.as_bytes());
         }
 
         Ok(ArrayTypeId::Utf8)

@@ -1,12 +1,15 @@
 use crate::internal::encodings::varint::{size_for_varint, write_varint_into};
 use crate::prelude::*;
 
+// REMEMBER: The reason this is not a trait is because of partial borrows.
+// If this is a trait, you can't borrow both bytes and lens at the same time.
 #[cfg(feature = "write")]
 pub struct WriterStream<'a, O> {
     pub bytes: &'a mut Vec<u8>,
     pub lens: &'a mut Vec<usize>,
     pub options: &'a O,
 }
+
 
 #[cfg(feature = "write")]
 impl<'a, O: EncodeOptions> WriterStream<'a, O> {

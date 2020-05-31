@@ -1,4 +1,3 @@
-use crate::encodings::varint::encode_prefix_varint;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
@@ -18,7 +17,7 @@ pub fn decode_rle_bool(runs: IntoIter<u64>, first: bool) -> IntoIter<bool> {
 }
 
 #[cfg(feature = "write")]
-pub fn encode_rle_bool(items: &[bool], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
     profile!(&[bool], "encode_rle_bool");
 
     // This encoding is not useful for this case, since we can store 8 values
@@ -43,20 +42,7 @@ pub fn encode_rle_bool(items: &[bool], bytes: &mut Vec<u8>, lens: &mut Vec<usize
     }
     runs.push(current_run);
 
-    // TODO: We would probably prefer Simple16 here, but because of a subtle
-    // issue we have to use PrefixVar instead. The problem is that compress removes
-    // default values from the end of the array, but with Simple16 we don't know
-    // for sure if a 0 at the end is a default value or just "padding" from the
-    // encoder. This comes at a significant loss to compression in many cases,
-    // since it is very likely that most values are small. This would be a problem
-    // if we tried to use the compress fn here too.
-    // See also 490cf083-7fba-49ea-a14a-41c4ba91a656
-    bytes.push(ArrayTypeId::IntPrefixVar.into());
-    let len = bytes.len();
-    for run in runs {
-        encode_prefix_varint(run, bytes);
-    }
-    lens.push(bytes.len() - len);
+    stream.write_with_id(|stream| runs.flush(stream));
 
     Ok(type_id)
 }
