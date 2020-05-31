@@ -184,14 +184,14 @@ macro_rules! impl_float {
             fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!("flush");
                 let tolerance = stream.options.lossy_float_tolerance();
-                let compressors: Vec<Box<dyn Compressor<$T>>> = vec![
-                    Box::new($fixed),
-                    // Box::new($Zfp { tolerance }),
-                    // TODO: Re-enable Gorilla. Sometimes it panics at the moment, but sometimes it's better than Zfp
-                    // especially for very small inputs it seems?
-                    Box::new($Gorilla { tolerance }),
-                    $(Box::new($rest)),*
-                ];
+
+                let compressors = (
+                    $fixed,
+                    //$Zfp { tolerance },
+                    $Gorilla { tolerance },
+                    $($rest,)*
+                );
+
                 stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
             }
         }

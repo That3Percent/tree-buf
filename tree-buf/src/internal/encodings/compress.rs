@@ -77,21 +77,10 @@ pub(crate) trait Compressor<T> {
 }
 
 
-// TODO: Remove the ?Sized and the impl for [Box<dyn Compressor<T>>]
 pub (crate) trait CompressorSet<T> {
     fn len(&self) -> usize;
     fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize>;
     fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()>;
 }
 
-impl<T> CompressorSet<T> for Vec<Box<dyn Compressor<T>>> {
-    fn len(&self) -> usize {
-        <[Box<dyn Compressor<T>>]>::len(self)
-    }
-    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
-        self[compressor].fast_size_for(data)
-    }
-    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
-        self[compressor].compress(data, bytes, lens)
-    }
-}
+

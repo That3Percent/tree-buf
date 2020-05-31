@@ -180,3 +180,66 @@ impl_tuple!(5, RootTypeId::Tuple5, ArrayTypeId::Tuple5, T0, 0, T1, 1, T2, 2, T3,
 impl_tuple!(6, RootTypeId::Tuple6, ArrayTypeId::Tuple6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
 
 // TODO: Support tuple structs in the macro
+
+// TODO: Move these into macro
+
+impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
+    fn len(&self) -> usize {
+        1
+    }
+    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+        match compressor {
+            0 => self.0.fast_size_for(data),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        match compressor {
+            0 => self.0.compress(data, bytes, lens),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+}
+
+impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
+    fn len(&self) -> usize {
+        2
+    }
+    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+        match compressor {
+            0 => self.0.fast_size_for(data),
+            1 => self.1.fast_size_for(data),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        match compressor {
+            0 => self.0.compress(data, bytes, lens),
+            1 => self.1.compress(data, bytes, lens),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+}
+
+
+impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T> for (T0, T1, T2) {
+    fn len(&self) -> usize {
+        3
+    }
+    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+        match compressor {
+            0 => self.0.fast_size_for(data),
+            1 => self.1.fast_size_for(data),
+            2 => self.2.fast_size_for(data),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+    fn compress(&self, compressor: usize, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
+        match compressor {
+            0 => self.0.compress(data, bytes, lens),
+            1 => self.1.compress(data, bytes, lens),
+            2 => self.2.compress(data, bytes, lens),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+}

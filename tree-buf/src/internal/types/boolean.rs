@@ -36,11 +36,13 @@ impl WriterArray<bool> for Vec<bool> {
     fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
 
-        let compressors: Vec<Box<dyn Compressor<bool>>> = vec![Box::new(PackedBoolCompressor), Box::new(RLEBoolCompressor)];
+        let compressors = (PackedBoolCompressor, RLEBoolCompressor);
 
         stream.write_with_len(|stream| compress(&self, stream.bytes, stream.lens, &compressors))
     }
 }
+
+
 
 struct PackedBoolCompressor;
 impl Compressor<bool> for PackedBoolCompressor {

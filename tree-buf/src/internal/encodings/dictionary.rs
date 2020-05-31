@@ -52,18 +52,18 @@ impl<T: Send + Clone> DictionaryIterator<T> {
     }
 }
 
-pub(crate) struct Dictionary<T> {
+pub(crate) struct Dictionary<S> {
     // TODO: (Performance) Do not require the allocation of this Vec
-    sub_compressors: Vec<Box<dyn Compressor<T>>>,
+    sub_compressors: S,
 }
 
-impl<T> Dictionary<T> {
-    pub fn new(sub_compressors: Vec<Box<dyn Compressor<T>>>) -> Self {
+impl<S> Dictionary<S> {
+    pub fn new(sub_compressors: S) -> Self {
         Self { sub_compressors }
     }
 }
 
-impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq> Compressor<T> for Dictionary<T> {
+impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Compressor<T> for Dictionary<S> {
     fn compress(&self, data: &[T], bytes: &mut Vec<u8>, lens: &mut Vec<usize>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
         profile!("compress");

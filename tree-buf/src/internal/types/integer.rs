@@ -177,12 +177,11 @@ macro_rules! impl_lowerable {
 
             fn write_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
                 profile!(&[$Ty], "write_inner");
-                // TODO: (Performance) Remove allocations
-                let rle_inner: Vec<Box<dyn Compressor<$Ty>>> = vec![$(Box::new(<$compressions>::new())),+];
-                let compressors: Vec<Box<dyn Compressor<$Ty>>> = vec![
-                    $(Box::new(<$compressions>::new()),)+
-                    Box::new(RLE::new(rle_inner)),
-                ];
+
+                let compressors = (
+                    $(<$compressions>::new(),)+
+                    RLE::new(($(<$compressions>::new(),)+))
+                );
                 stream.write_with_len(|stream|
                     compress(data, stream.bytes, stream.lens, &compressors)
                 )
