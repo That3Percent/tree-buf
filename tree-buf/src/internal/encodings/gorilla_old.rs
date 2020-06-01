@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use gibbon::{
-    vec_stream::{VecReader, VecWriter},
-    DoubleStreamIterator, DoubleStreamWriter,
+    vec_stream::VecReader,
+    DoubleStreamIterator,
 };
 use num_traits::AsPrimitive;
 use std::convert::TryInto as _;
@@ -48,35 +48,4 @@ where
     #[cfg(feature = "profile")]
     flame::end("Collect");
     Ok(values)
-}
-
-pub fn compress(data: impl Iterator<Item = f64> + ExactSizeIterator, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
-    if data.len() == 0 {
-        return Ok(ArrayTypeId::DoubleGorilla);
-    }
-
-    let mut writer = VecWriter::new();
-    let mut stream = gibbon::DoubleStreamWriter::new();
-    for value in data {
-        stream.push(value, &mut writer);
-    }
-    let VecWriter {
-        mut bit_vector,
-        used_bits_last_elm,
-    } = writer;
-    let last = bit_vector.pop().unwrap(); // Does not panic because of early out
-                                          // TODO: It should be safe to do 1 extend and a transmute on le platforms
-
-    for value in bit_vector {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
-    let mut byte_count = used_bits_last_elm / 8;
-    if byte_count * 8 != used_bits_last_elm {
-        byte_count += 1;
-    }
-    let last = &(&last.to_le_bytes())[(8 - byte_count) as usize..];
-    bytes.extend_from_slice(&last);
-    bytes.push(used_bits_last_elm);
-
-    Ok(ArrayTypeId::DoubleGorilla)
 }

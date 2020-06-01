@@ -1,5 +1,21 @@
 use crate::prelude::*;
 use std::vec::IntoIter;
+use std::thread_local;
+use std::cell::RefCell;
+
+// FIXME: This won't fly when writes are mult-threaded.
+// Should use options here, but the wanted closure API isn't
+// easy for some reason. Also, this API is fragile.
+thread_local! {
+    static IN_RLE_ENCODE: RefCell<bool> = RefCell::new(false);
+}
+
+pub fn get_in_rle() -> bool {
+    IN_RLE_ENCODE.with(|v| *v.borrow())
+}
+pub fn set_in_rle(value: bool) {
+    IN_RLE_ENCODE.with(|v| *v.borrow_mut() = value);
+}
 
 // TODO: Use ReaderArray or InfallableReaderArray
 pub struct RleIterator<T> {
@@ -64,14 +80,23 @@ impl<S> RLE<S> {
     }
 }
 
+
+
 impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        // Prevent panic on indexing first item.
-        profile!(&[T], "RLE::compress");
+        // Nesting creates performance problems
+        if get_in_rle() {
+            return Err(());
+        }
+
         // It will always be more efficient to just defer to another encoding. Also, this prevents a panic.
         if data.len() < 2 {
             return Err(());
         }
+        
+        // Prevent panic on indexing first item.
+        profile!(&[T], "RLE::compress");
+        
         let mut runs = Vec::new();
         let mut current_run = 0u64;
         let mut current_value = data[0];
@@ -99,7 +124,10 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compr
         }
 
         stream.write_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
+
+        set_in_rle(true);
         stream.write_with_id(|stream| runs.flush(stream));
+        set_in_rle(false);
 
         Ok(ArrayTypeId::RLE)
     }

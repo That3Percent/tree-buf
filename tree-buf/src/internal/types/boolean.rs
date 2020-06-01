@@ -58,7 +58,13 @@ impl Compressor<bool> for PackedBoolCompressor {
 struct RLEBoolCompressor;
 impl Compressor<bool> for RLEBoolCompressor {
     fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        encode_rle_bool(data, stream)
+        if get_in_rle() {
+            return Err(());
+        }
+        set_in_rle(true);
+        let result = encode_rle_bool(data, stream);
+        set_in_rle(false);
+        result
     }
 }
 

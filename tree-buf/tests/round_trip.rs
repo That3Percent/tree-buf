@@ -156,7 +156,7 @@ fn item() {
 fn item_vec() {
     let item = make_item();
     let item = vec![item; 5];
-    round_trip(&item, 379, 645);
+    round_trip(&item, 379, 646);
 }
 
 #[test]

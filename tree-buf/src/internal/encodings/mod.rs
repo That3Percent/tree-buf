@@ -11,16 +11,12 @@ pub(crate) use compress::*;
 pub(crate) use dictionary::*;
 pub(crate) use rle::*;
 
-pub mod gorilla;
-
-/*
 mod gorilla_new;
 mod gorilla_old;
 pub mod gorilla {
     pub use super::gorilla_new::compress;
     pub use super::gorilla_old::decompress;
 }
-*/
 
 //pub mod zfp;
 

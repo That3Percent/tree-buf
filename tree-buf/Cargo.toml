@@ -13,12 +13,13 @@ license = "MIT"
 maintenance = { status = "experimental"}
 
 [dependencies]
-tree-buf-macros = {version = "0.7.0", path="../tree-buf-macros", optional = true }
+tree-buf-macros = {version = "0.8.0", path="../tree-buf-macros", optional = true }
 simple-16 = "0.1.0"
 num-traits = "0.2.11"
 gibbon = "0.1.3"
 rayon = "1.3.0"
 transmute = "0.1.1"
+
 flame = { version = "0.2.2", optional = true }
 coercible_errors = "0.1.4"
 #zfp-sys-cc = "0.1.0"

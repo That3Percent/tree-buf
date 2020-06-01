@@ -11,8 +11,16 @@ It's key features are:
 ## Benchmarks
 
 ### Tree-Buf vs MessagePack for GraphQL
-This test compares the serialization of a complex GraphQL response containing 1000 entities having several fields of different types. Entities look roughly like:
+This test compares the serialization of a complex GraphQL response containing 1000 entities having several fields of different types.
 
+|                | Size in Bytes  | Round Trip CPU Time |
+| --------------:| --------------:| -------------------:|
+| Message Pack   |         200728 |              1035µs |
+| Tree-Buf       |          51423 |               960µs |
+
+Tree-Buf compresses to about **1/4 the size** as compared to Message Pack, and finishes reading and writing faster.
+
+Entities look like this:
 ```json
 {
     "createdAt": "1582911422",
@@ -38,23 +46,16 @@ This test compares the serialization of a complex GraphQL response containing 10
 }
 ```
 
-|                | Size in Bytes  | Round Trip CPU Time |
-| --------------:| --------------:| -------------------:|
-| Message Pack   |         200728 |               992µs |
-| Tree-Buf       |          95839 |               584µs |
-
-Tree-Buf is **1.7 times as fast** and creates a file that is less than **1/2 the size** as compared to Message Pack.
-
 ### Tree-Buf vs GeoJson
 This test compares the serialization of a GeoJson file containing a Feature Collection of MultiPolygon and Polygon Geometries for every country in the world.
 
 |               | Size in Bytes  | Round Trip CPU Time |
 | -------------:| --------------:| -------------------:|
-| GeoJson       |       24090863 |             424.6ms |
-| Tree-Buf      |        6865300 |              54.9ms |
-| Tree-Buf 1m   |        2268041 |              52.3ms |
+| GeoJson       |       24090863 |               407ms |
+| Tree-Buf      |        6865300 |                39ms |
+| Tree-Buf 1m   |        2268041 |                41ms |
 
-In this test, Tree-Buf is **7.7x as fast** as GeoJson, while producing a file that is **2/7th the size**.
+In this test, Tree-Buf is over **10 times as fast** as GeoJson, while producing a file that is **2/7th the size**.
 
 There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::write_with_options(data, &encode_options! { options::LossyFloatTolerance(-12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, while being even faster to encode + decode.
 
@@ -72,7 +73,7 @@ __Step 1__: Add the latest version tree-buf to your `cargo.toml`
 
 ```toml
 [dependencies]
-tree-buf = "0.7.0"
+tree-buf = "0.8.0"
 ```
 
 __Step 2__: Derive `Read` and / or `Write` on your structs.
@@ -111,6 +112,102 @@ pub fn round_trip() {
 ```
 
 Done! You have mastered the use of Tree-buf.
+
+# Other tricks
+
+## Profile your data size
+Tree-Buf makes it easy to see how your data is being compresses, and where you might optimize. For example, in the GraphQL benchmark we can run:
+
+```rust
+let sizes = tree_buf::experimental::stats::size_breakdown(&tb_bytes);
+println!("{}", sizes.unwrap());
+```
+
+and it will print:
+```
+Largest by path:
+        32000
+           data.orders.[1000].id.[32]
+           Object.Object.Array.Object.Array Fixed.U8 Fixed
+        5000
+           data.orders.[1000].createdAt
+           Object.Object.Array.Object.Prefix Varint
+        5000
+           data.orders.[1000].price
+           Object.Object.Array.Object.Prefix Varint
+        2836
+           data.orders.[1000].nft.wearable.representationId.values
+           Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+        2452
+           data.orders.[1000].nft.wearable.name.values
+           Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+        952
+           data.orders.[1000].nft.wearable.representationId.indices
+           Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+        948
+           data.orders.[1000].nft.wearable.name.indices
+           Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+        420
+           data.orders.[1000].nft.wearable.category.discriminants
+           Object.Object.Array.Object.Object.Object.Enum.Simple16
+        356
+           data.orders.[1000].nft.wearable.collection.indices
+           Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+        288
+           data.orders.[1000].nft.wearable.rarity.discriminants
+           Object.Object.Array.Object.Object.Object.Enum.Simple16
+        268
+           data.orders.[1000].status.discriminants
+           Object.Object.Array.Object.Enum.Simple16
+        236
+           data.orders.[1000].nft.wearable.bodyShapes.values.discriminants
+           Object.Object.Array.Object.Object.Object.Array.Enum.Packed Boolean
+        120
+           data.orders.[1000].nft.wearable.bodyShapes.len.runs
+           Object.Object.Array.Object.Object.Object.Array.RLE.Simple16
+        85
+           data.orders.[1000].nft.wearable.collection.values
+           Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+        60
+           data.orders.[1000].nft.wearable.bodyShapes.len.values
+           Object.Object.Array.Object.Object.Object.Array.RLE.Simple16
+        2
+           data.orders.[1000].nft.wearable.owner.mana.runs
+           Object.Object.Array.Object.Object.Object.Object.Bool RLE.Prefix Varint
+
+Largest by type:
+         1x 32000 @ U8 Fixed
+         3x 10002 @ Prefix Varint
+         3x 5373 @ UTF-8
+         8x 3412 @ Simple16
+         1x 236 @ Packed Boolean
+
+Other: 400
+Total: 51423
+```
+
+
+## Easy Language Interop
+Tree-buf has canonical field names. That means you can say goodbye to `#[serde(rename = "")]` in Rust, `[JsonProperty("")]` in C#, and linter warnings in JavaScript. These are equivalent schemas in Tree-buf:
+
+```C#
+// C#
+class Klass {
+    public double FieldName;
+}
+```
+```typescript
+// TypeScript
+class Klass {
+    fieldName: number
+}
+```
+```rust
+// Rust
+struct Klass {
+    field_name: f64
+}
+```
 
 # Tree-buf under the hood
 
@@ -219,30 +316,3 @@ Depending on the game, Tree-buf may require on average only 17 bits per move. ~4
 
 As compared to JSON? With 17 bits per move we can get... `"t` - Not quite `"time_seconds":`. The complete, minified move requires a whopping 336 bits, 19 times as much as Tree-buf.
 
-# Other tricks
-
-## Selective Loading
-Because the data model separates data by path down the schema, it becomes easy to selectively load parts of the file without requiring loading, parsing, and de-compressing data we aren't interested in.
-
-Continuing with the Go tournament example, if we wanted to just collect the results of the game and not the moves vector we could just modify the struct that we pass to `read` by removing the fields we don't need. Tree-buf will then only parse as much of the file as is necessary to match the schema.
-
-## Easy Language Interop
-Tree-buf has canonical field names. That means you can say goodbye to `#[serde(rename = "")]` in Rust, `[JsonProperty("")]` in C#, and linter warnings in JavaScript. These are equivalent schemas in Tree-buf:
-
-```C#
-// C#
-class Klass {
-    public double FieldName;
-}
-```
-```typescript
-// TypeScript
-class Klass {
-    fieldName: number
-}
-```
-```rust
-// Rust
-struct Klass {
-    field_name: f64
-}
