@@ -116,7 +116,7 @@ Done! You have mastered the use of Tree-buf.
 # Other tricks
 
 ## Profile your data size
-Tree-Buf makes it easy to see how your data is being compresses, and where you might optimize. For example, in the GraphQL benchmark we can run:
+Tree-Buf makes it easy to see how your data is being compressed, and where you might optimize. For example, in the GraphQL benchmark we can run:
 
 ```rust
 let sizes = tree_buf::experimental::stats::size_breakdown(&tb_bytes);
@@ -217,9 +217,9 @@ How does Tree-buf enable fast compression and serialization of real-world data?
  2. Use best-in-breed compression that is only available to typed vectors of primitive data.
  3. Amortize the cost of the self-describing schema.
 
-To break these down concretely, it is be useful to track an example using real-world data. We'll take a look at the data, see how maps to the Tree-buf data model, and then see how Tree-buf applies compression to each part of the resulting model.
+To break these down concretely, it would be useful to track an example using real-world data. We'll take a look at the data, see how maps to the Tree-buf data model, and then see how Tree-buf applies compression to each part of the resulting model.
 
-Let's say that we want to store all of the game records for a round-robin tournament of Go. To follow along, you won't need any knowledge of the game. Suffice to say that it's played on a 19x19 , and players alternate placing white and black stones on the intersections of the board. It looks like this:
+Let's say that we want to store all of the game records for a round-robin tournament of Go. To follow along, you won't need any knowledge of the game. Suffice to say that it's played on a 19x19, and players alternate placing white and black stones on the intersections of the board. It looks like this:
 
 ![Goban](https://upload.wikimedia.org/wikipedia/commons/2/2a/FloorGoban.JPG)
 
@@ -278,7 +278,7 @@ And some sample data in that schema, given in JSON...
 
 ## The Tree-buf data model
 
-Tree-buf considers each path from the root through the schema as it's own branch of a tree.
+Tree-buf considers each path from the root through the schema as its own branch of a tree.
 
 Here is an illustration of what that breakdown would look like for our schema:
 
@@ -294,7 +294,7 @@ Not all data ends up in a `Vec`. For example, there is only one possible `String
 
 ## Compressing the Tree-buf model
 
->Real-world data exhibits patterns. If your data does not exhibit some pattern, it's probably not very interesting.
+> Real-world data exhibits patterns. If your data does not exhibit some pattern, it's probably not very interesting.
 
 The Tree-buf data model clusters related data together so that it can take advantage of the patterns in your data using highly optimized compression libraries.
 
@@ -306,13 +306,12 @@ Even the names of the players aren't random. Because a round-robin tournament be
 
 Add these to first-class support for enums, tuples, nullables, and a few other tricks, and it adds up to significant wins.
 
->All of this compression in Tree-buf happens behind the scenes, without any work on the part of the developer, or modification to the schema.
+> All of this compression in Tree-buf happens behind the scenes, without any work on the part of the developer, or modification to the schema.
 
-Comparison of compression results to other formats
+## Comparison of compression results to other formats
 
 Let's compare these results to another popular binary format, Protobuf 3, to see the difference caused by this accumulation of many small wins. For now, let's only consider the moves vector since that's the largest portion of the data. Each move in Protobuf is a message. Each message in Protobuf is length delimited, requiring 1 byte. After the first 2 minutes and 7 seconds of the game clock, each `time_seconds` requires 2 bytes for the LEB128 encoded value and 1 byte for the field id - 3 bytes. For the coordinate field, we can cheat and implement this using a packed array. That doesn't exactly match the data model, but would require fewer bytes than an embedded message. A packed array requires 1 byte for the field id, 1 byte for the length prefix, and 1 byte each for the two values. Add these together, and you get 7 bytes per move, or 56 bits.
 
 Depending on the game, Tree-buf may require on average only 17 bits per move. ~4.5 bits each for the coordinate deltas, plus ~8 bits or less for time deltas of up to 2 minutes, 7 seconds. That is to say, the moves list requires about 3.3 times as much space in Protobuf 3 as compared to Tree-buf (17 bits * 3.3 = 56 bits).
 
 As compared to JSON? With 17 bits per move we can get... `"t` - Not quite `"time_seconds":`. The complete, minified move requires a whopping 336 bits, 19 times as much as Tree-buf.
-
