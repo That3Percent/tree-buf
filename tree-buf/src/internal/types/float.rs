@@ -1,13 +1,3 @@
-//use crate::encodings::zfp;
-use crate::prelude::*;
-use num_traits::AsPrimitive as _;
-use std::convert::TryInto;
-use std::mem::size_of;
-use std::vec::IntoIter;
-
-#[cfg(feature = "profile")]
-use flame;
-
 // Promising Compressors:
 // Gorilla - https://crates.io/crates/tsz   http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
 // FPC
@@ -29,21 +19,30 @@ use flame;
 // TODO: More compressors
 
 macro_rules! impl_float {
-    ($T:ident, $encode_item:ident, $decode_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $Zfp:ident, $($rest:ident),*) => {
+    ($T:ident, $id:ident) => {
+        //use crate::encodings::zfp;
+        use crate::prelude::*;
+        use num_traits::AsPrimitive as _;
+        use std::convert::TryInto;
+        use std::mem::size_of;
+        use std::vec::IntoIter;
+
+        #[cfg(feature = "profile")]
+        use flame;
+
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "encode")]
-        fn $encode_item(item: $T, bytes: &mut Vec<u8>) {
+        fn encode_item(item: $T, bytes: &mut Vec<u8>) {
             let b = item.to_le_bytes();
             bytes.extend_from_slice(&b);
         }
 
         #[cfg(feature = "decode")]
-        fn $decode_item(bytes: &[u8], offset: &mut usize) -> DecodeResult<$T> {
+        pub(super) fn decode_item(bytes: &[u8], offset: &mut usize) -> DecodeResult<$T> {
             let bytes = decode_bytes(size_of::<$T>(), bytes, offset)?;
             // This unwrap is ok, because we just read exactly size_of::<T> bytes on the line above.
             Ok(<$T>::from_le_bytes(bytes.try_into().unwrap()))
         }
-
 
         #[cfg(feature = "encode")]
         impl Encodable for $T {
@@ -64,12 +63,11 @@ macro_rules! impl_float {
                     // so that other NaN round trip bit-for-bit
                     RootTypeId::NaN
                 } else {
-                    $encode_item(value, stream.bytes);
+                    encode_item(value, stream.bytes);
                     RootTypeId::$id
                 }
             }
         }
-
 
         #[cfg(feature = "decode")]
         impl Decodable for $T {
@@ -115,7 +113,6 @@ macro_rules! impl_float {
             }
         }
 
-
         #[cfg(feature = "decode")]
         impl InfallibleDecoderArray for IntoIter<$T> {
             type Decode = $T;
@@ -126,23 +123,21 @@ macro_rules! impl_float {
                     DynArrayBranch::Float(float) => {
                         match float {
                             ArrayFloat::F64(bytes) => {
-                                #[cfg(feature="profile")]
+                                #[cfg(feature = "profile")]
                                 let _g = flame::start_guard("f64");
 
                                 // FIXME: Should do schema mismatch for f32 -> f64
-                                let values = decode_all(&bytes, |bytes, offset| Ok(decode_64(bytes, offset)?.as_()))?;
+                                let values = decode_all(&bytes, |bytes, offset| Ok(super::_f64::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
-                                #[cfg(feature="profile")]
+                                #[cfg(feature = "profile")]
                                 let _g = flame::start_guard("f32");
 
-                                let values = decode_all(&bytes, |bytes, offset| Ok(decode_32(bytes, offset)?.as_()))?;
+                                let values = decode_all(&bytes, |bytes, offset| Ok(super::_f32::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
-                            },
-                            ArrayFloat::DoubleGorilla(bytes) => {
-                                gorilla::decompress::<$T>(&bytes).map(|f| f.into_iter())
-                            },
+                            }
+                            ArrayFloat::DoubleGorilla(bytes) => gorilla::decompress::<$T>(&bytes).map(|f| f.into_iter()),
                             /*
                             ArrayFloat::Zfp32(bytes) => {
                                 // FIXME: This is likely a bug switching between 32 and 64 might just get garbage data out
@@ -158,12 +153,8 @@ macro_rules! impl_float {
                                 Ok(values.into_iter())
                             }
                             */
-                            ArrayFloat::Zfp32(_bytes) => {
-                                unimplemented!("zfp32")
-                            }
-                            ArrayFloat::Zfp64(_bytes) => {
-                                unimplemented!("zfp64")
-                            }
+                            ArrayFloat::Zfp32(_bytes) => unimplemented!("zfp32"),
+                            ArrayFloat::Zfp64(_bytes) => unimplemented!("zfp64"),
                         }
                     }
                     // TODO: There are some conversions that are infallable.
@@ -183,21 +174,18 @@ macro_rules! impl_float {
             }
             fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                 profile!("flush");
-                let tolerance = stream.options.lossy_float_tolerance();
 
                 let compressors = (
-                    $fixed,
-                    //$Zfp { tolerance },
-                    $Gorilla { tolerance },
-                    $($rest,)*
+                    Fixed, //Zfp,
+                    Gorilla,
                 );
 
                 compress(&self, stream, &compressors)
             }
         }
 
-        struct $fixed;
-        impl Compressor<$T> for $fixed {
+        struct Fixed;
+        impl Compressor<$T> for Fixed {
             fn fast_size_for(&self, data: &[$T]) -> Option<usize> {
                 Some(size_of::<$T>() * data.len())
             }
@@ -205,7 +193,7 @@ macro_rules! impl_float {
                 profile!("compress");
                 stream.encode_with_len(|stream| {
                     for item in data {
-                        $encode_item(*item, &mut stream.bytes);
+                        encode_item(*item, &mut stream.bytes);
                     }
                 });
                 Ok(ArrayTypeId::$id)
@@ -216,15 +204,13 @@ macro_rules! impl_float {
         // Alternatively, there is the tsz crate, but that doesn't offer a separate
         // double-stream (just joined time+double stream). Both of the implementations
         // aren't perfect for our API.
-        struct $Gorilla {
-            tolerance: Option<i32>,
-        }
-        impl Compressor<$T> for $Gorilla {
+        struct Gorilla;
+        impl Compressor<$T> for Gorilla {
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-                profile!("compress");
+                profile!($T, "Gorilla.compress");
 
                 stream.encode_with_len(|stream| {
-                    if let Some(tolerance) = self.tolerance {
+                    if let Some(tolerance) = stream.options.lossy_float_tolerance() {
                         // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                         // before a real lossy compressor (Eg: fzip) is used.
                         let multiplier = (2.0 as $T).powi(tolerance * -1);
@@ -235,7 +221,6 @@ macro_rules! impl_float {
                         gorilla::compress(data, stream.bytes)
                     }
                 })
-
             }
         }
     };
@@ -263,5 +248,9 @@ impl Compressor<f32> for Zfp32 {
 }
 */
 
-impl_float!(f64, encode_64, decode_64, F64, Fixed64Compressor, GorillaCompressor64, Zfp64,);
-impl_float!(f32, encode_32, decode_32, F32, Fixed32Compressor, GorillaCompressor32, Zfp32,);
+mod _f64 {
+    impl_float!(f64, F64);
+}
+mod _f32 {
+    impl_float!(f32, F32);
+}
