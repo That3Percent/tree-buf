@@ -221,7 +221,6 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
     }
 }
 
-
 impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T> for (T0, T1, T2) {
     fn len(&self) -> usize {
         3

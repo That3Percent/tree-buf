@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use std::collections::HashMap;
-use std::fmt;
 use std::default::Default;
+use std::fmt;
 
 #[derive(Default)]
 struct Path {
@@ -89,16 +89,9 @@ impl SizeBreakdown {
             },
         );
 
-        
         let types = Path::c(&path.types, &type_id);
 
-        let prev = self.by_path.insert(
-            path.names.clone(),
-            PathAggregation {
-                types,
-                size: len,
-            },
-        );
+        let prev = self.by_path.insert(path.names.clone(), PathAggregation { types, size: len });
         assert!(prev.is_none());
     }
 }

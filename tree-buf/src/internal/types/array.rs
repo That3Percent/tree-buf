@@ -147,7 +147,11 @@ impl<T: DecoderArray> DecoderArray for Option<VecArrayDecoder<T>> {
         match sticks {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {
-                let (values, len) = parallel(|| T::new(*values, options), || <<u64 as Decodable>::DecoderArray as DecoderArray>::new(*len, options), options);
+                let (values, len) = parallel(
+                    || T::new(*values, options),
+                    || <<u64 as Decodable>::DecoderArray as DecoderArray>::new(*len, options),
+                    options,
+                );
                 let values = values?;
                 let len = FixedOrVariableLength::Variable(len?);
                 Ok(Some(VecArrayDecoder { len, values }))

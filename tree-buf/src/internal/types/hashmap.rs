@@ -136,7 +136,13 @@ where
             DynArrayBranch::Map { len, keys, values } => {
                 let (keys, (values, len)) = parallel(
                     || K::new(*keys, options),
-                    || parallel(|| V::new(*values, options), || <<u64 as Decodable>::DecoderArray as DecoderArray>::new(*len, options), options),
+                    || {
+                        parallel(
+                            || V::new(*values, options),
+                            || <<u64 as Decodable>::DecoderArray as DecoderArray>::new(*len, options),
+                            options,
+                        )
+                    },
                     options,
                 );
                 let keys = keys?;

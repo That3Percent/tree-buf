@@ -3,7 +3,6 @@ pub(crate) struct Unowned<T: ?Sized> {
     _marker: std::marker::PhantomData<*const T>,
 }
 
-
 impl<T> Copy for Unowned<T> {}
 impl<T> Clone for Unowned<T> {
     fn clone(&self) -> Self {

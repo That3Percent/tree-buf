@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use std::vec::IntoIter;
-use std::thread_local;
 use std::cell::RefCell;
+use std::thread_local;
+use std::vec::IntoIter;
 
 // FIXME: This won't fly when encodes are mult-threaded.
 // Should use options here, but the wanted closure API isn't
@@ -80,8 +80,6 @@ impl<S> RLE<S> {
     }
 }
 
-
-
 impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Nesting creates performance problems
@@ -93,10 +91,10 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compr
         if data.len() < 2 {
             return Err(());
         }
-        
+
         // Prevent panic on indexing first item.
         profile!(&[T], "RLE::compress");
-        
+
         let mut runs = Vec::new();
         let mut current_run = 0u64;
         let mut current_value = data[0];

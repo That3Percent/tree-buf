@@ -1,4 +1,4 @@
-use crate::internal::encodings::varint::{size_for_varint, encode_varint_into};
+use crate::internal::encodings::varint::{encode_varint_into, size_for_varint};
 use crate::prelude::*;
 
 // REMEMBER: The reason this is not a trait is because of partial borrows.
@@ -9,7 +9,6 @@ pub struct EncoderStream<'a, O> {
     pub lens: &'a mut Vec<usize>,
     pub options: &'a O,
 }
-
 
 #[cfg(feature = "encode")]
 impl<'a, O: EncodeOptions> EncoderStream<'a, O> {

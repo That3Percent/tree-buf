@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use gibbon::{
-    vec_stream::VecReader,
-    DoubleStreamIterator,
-};
+use gibbon::{vec_stream::VecReader, DoubleStreamIterator};
 use num_traits::AsPrimitive;
 use std::convert::TryInto as _;
 use std::mem::size_of;

@@ -8,7 +8,7 @@ use tree_buf::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
-    use tree_buf::{Encode, Decode};
+    use tree_buf::{Decode, Encode};
     #[derive(Encode, Decode, PartialEq, Debug, Clone)]
     pub struct Bits {
         pub f: f64,
@@ -452,17 +452,10 @@ fn long_bool_runs() {
 
 #[test]
 fn int_to_bool_nested() {
-    let data = (
-        vec![0u32,0,1,1,0],
-        vec![0u32,0,0,1,1,1,1],
-    );
+    let data = (vec![0u32, 0, 1, 1, 0], vec![0u32, 0, 0, 1, 1, 1, 1]);
     round_trip(&data, 11, 15);
 
-    let data = vec![
-        vec![0u32, 0, 1, 1,0],
-        vec![1u32, 1, 1, 1, 1, 1, 0],
-        vec![1u32, 0, 0, 0, 0, 0, 1],
-    ];
+    let data = vec![vec![0u32, 0, 1, 1, 0], vec![1u32, 1, 1, 1, 1, 1, 0], vec![1u32, 0, 0, 0, 0, 0, 1]];
     round_trip(&data, 13, 18);
 }
 

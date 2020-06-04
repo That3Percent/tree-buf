@@ -32,7 +32,7 @@ pub mod prelude {
     // Likely the minimum API that should go here. It's easier to add later than to remove.
 
     #[cfg(feature = "macros")]
-    pub use tree_buf_macros::{Encode, Decode};
+    pub use tree_buf_macros::{Decode, Encode};
 
     #[cfg(feature = "decode")]
     pub use crate::decode;

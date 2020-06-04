@@ -42,8 +42,6 @@ impl EncoderArray<bool> for Vec<bool> {
     }
 }
 
-
-
 struct PackedBoolCompressor;
 impl Compressor<bool> for PackedBoolCompressor {
     fn fast_size_for(&self, data: &[bool]) -> Option<usize> {
