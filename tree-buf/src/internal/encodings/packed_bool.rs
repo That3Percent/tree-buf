@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     profile!(&[bool], "encode_packed_bool");
 
@@ -27,7 +27,7 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     }
 }
 
-#[cfg(feature = "read")]
+#[cfg(feature = "decode")]
 pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
     profile!(Vec<bool>, "decode_packed_bool");
 
@@ -53,7 +53,7 @@ pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
 mod tests {
     use super::*;
 
-    #[cfg(all(feature = "read", feature = "write"))]
+    #[cfg(all(feature = "decode", feature = "encode"))]
     #[test]
     fn round_trip_packed_bool() {
         let cases = vec![

@@ -68,7 +68,7 @@ fn set_accuracy(zfp: *mut zfp_stream, tolerance: Option<i32>) {
     }
 }
 
-pub(crate) fn decompress<T: ZfpKind>(bytes: &[u8]) -> ReadResult<Vec<T>> {
+pub(crate) fn decompress<T: ZfpKind>(bytes: &[u8]) -> DecodeResult<Vec<T>> {
     unsafe {
         let mut offset = 0;
         let len = decode_prefix_varint(bytes, &mut offset)?;
@@ -83,7 +83,7 @@ pub(crate) fn decompress<T: ZfpKind>(bytes: &[u8]) -> ReadResult<Vec<T>> {
         // TODO: (Performance)
         // Use an uninitialized vec
         let mut data = vec![T::default(); len as usize];
-        let (field, _field_guard) = field_1d(&mut data[..]).map_err(|_| ReadError::InvalidFormat)?;
+        let (field, _field_guard) = field_1d(&mut data[..]).map_err(|_| DecodeError::InvalidFormat)?;
 
         // Allocate metadata for the compressed stream
         let (zfp, _zfp_guard) = open_zfp_stream();
@@ -94,7 +94,7 @@ pub(crate) fn decompress<T: ZfpKind>(bytes: &[u8]) -> ReadResult<Vec<T>> {
 
         let ret = zfp_decompress(zfp, field);
         if ret == 0 {
-            return Err(ReadError::InvalidFormat);
+            return Err(DecodeError::InvalidFormat);
         }
 
         Ok(data)

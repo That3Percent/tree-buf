@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display, Formatter};
 
-#[cfg(feature = "read")]
+#[cfg(feature = "decode")]
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ReadError {
+pub enum DecodeError {
     SchemaMismatch,
     // Had these broken up at one point into different kinds of errors,
     // like reading past the end of the file or having an invalid type id.
@@ -13,25 +13,25 @@ pub enum ReadError {
 }
 
 use coercible_errors::coercible_errors;
-coercible_errors!(ReadError);
+coercible_errors!(DecodeError);
 
-#[cfg(feature = "read")]
-impl Display for ReadError {
+#[cfg(feature = "decode")]
+impl Display for DecodeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            ReadError::SchemaMismatch => f.write_str("The expected schema did not match that in the document."),
-            ReadError::InvalidFormat => f.write_str("The format was not a valid Tree-Buf"),
+            DecodeError::SchemaMismatch => f.write_str("The expected schema did not match that in the document."),
+            DecodeError::InvalidFormat => f.write_str("The format was not a valid Tree-Buf"),
         }
     }
 }
 
-#[cfg(feature = "read")]
-impl std::error::Error for ReadError {}
+#[cfg(feature = "decode")]
+impl std::error::Error for DecodeError {}
 
-#[cfg(feature = "read")]
-impl From<std::str::Utf8Error> for ReadError {
+#[cfg(feature = "decode")]
+impl From<std::str::Utf8Error> for DecodeError {
     fn from(_value: std::str::Utf8Error) -> Self {
-        ReadError::InvalidFormat
+        DecodeError::InvalidFormat
     }
 }
 

@@ -3,7 +3,7 @@ use num_traits::AsPrimitive;
 
 // TODO: Remove warning
 #[allow(dead_code)]
-pub fn decompress<T: 'static + Copy>(_bytes: &[u8]) -> ReadResult<Vec<T>>
+pub fn decompress<T: 'static + Copy>(_bytes: &[u8]) -> DecodeResult<Vec<T>>
 where
     f64: AsPrimitive<T>,
 {
@@ -14,7 +14,7 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
     // FIXME: Verify current platform is little endian
     let mut data = data.map(f64::to_bits);
 
-    let write = move |bits, count, capacity: &mut u8, buffer: &mut u64, bytes: &mut Vec<u8>| {
+    let encode = move |bits, count, capacity: &mut u8, buffer: &mut u64, bytes: &mut Vec<u8>| {
         if count <= *capacity {
             *buffer ^= bits << (*capacity - count);
             *capacity -= count;
@@ -44,7 +44,7 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
         let xored = previous ^ value;
 
         match xored {
-            0 => write(0, 1, capacity, buffer, bytes),
+            0 => encode(0, 1, capacity, buffer, bytes),
             _ => {
                 let lz = xored.leading_zeros().min(31) as u64;
                 let tz = xored.trailing_zeros() as u64;
@@ -54,16 +54,16 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
                     let meaningful_bits = xored >> prev_tz;
                     let meaningful_bit_count = 64 - prev_tz - prev_lz;
 
-                    write(0b10, 2, capacity, buffer, bytes);
-                    write(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
+                    encode(0b10, 2, capacity, buffer, bytes);
+                    encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
                 } else {
                     let meaningful_bits = xored >> tz;
                     let meaningful_bit_count = 64 - tz - lz;
 
-                    write(0b11, 2, capacity, buffer, bytes);
-                    write(lz, 5, capacity, buffer, bytes);
-                    write(meaningful_bit_count - 1, 6, capacity, buffer, bytes);
-                    write(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
+                    encode(0b11, 2, capacity, buffer, bytes);
+                    encode(lz, 5, capacity, buffer, bytes);
+                    encode(meaningful_bit_count - 1, 6, capacity, buffer, bytes);
+                    encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
                 }
             }
         };

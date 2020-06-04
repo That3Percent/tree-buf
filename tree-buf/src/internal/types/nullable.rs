@@ -1,49 +1,49 @@
 use crate::prelude::*;
 
-#[cfg(feature = "write")]
-impl<T: Writable> Writable for Option<T> {
-    type WriterArray = NullableWriter<T::WriterArray>;
-    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
+#[cfg(feature = "encode")]
+impl<T: Encodable> Encodable for Option<T> {
+    type EncoderArray = NullableEncoder<T::EncoderArray>;
+    fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
         if let Some(value) = self {
-            T::write_root(value, stream)
+            T::encode_root(value, stream)
         } else {
             RootTypeId::Void
         }
     }
 }
 
-#[cfg(feature = "read")]
-impl<T: Readable> Readable for Option<T> {
-    type ReaderArray = Option<NullableReader<T::ReaderArray>>;
-    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("Readable::read");
+#[cfg(feature = "decode")]
+impl<T: Decodable> Decodable for Option<T> {
+    type DecoderArray = Option<NullableDecoder<T::DecoderArray>>;
+    fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("Decodable::decode");
         match sticks {
             DynRootBranch::Void => Ok(None),
-            _ => Ok(Some(T::read(sticks, options)?)),
+            _ => Ok(Some(T::decode(sticks, options)?)),
         }
     }
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 #[derive(Default)]
-pub struct NullableWriter<V> {
-    opt: <bool as Writable>::WriterArray,
+pub struct NullableEncoder<V> {
+    opt: <bool as Encodable>::EncoderArray,
     value: Option<V>,
 }
 
-#[cfg(feature = "write")]
-impl<T: Writable> WriterArray<Option<T>> for NullableWriter<T::WriterArray> {
+#[cfg(feature = "encode")]
+impl<T: Encodable> EncoderArray<Option<T>> for NullableEncoder<T::EncoderArray> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Option<T>) {
         self.opt.buffer(&value.is_some());
         if let Some(value) = value {
-            self.value.get_or_insert_with(T::WriterArray::default).buffer(value);
+            self.value.get_or_insert_with(T::EncoderArray::default).buffer(value);
         }
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         let Self { opt, value } = self;
         if let Some(value) = value {
-            stream.write_with_id(|stream| opt.flush(stream));
-            stream.write_with_id(|stream| value.flush(stream));
+            stream.encode_with_id(|stream| opt.flush(stream));
+            stream.encode_with_id(|stream| value.flush(stream));
             ArrayTypeId::Nullable
         } else {
             ArrayTypeId::Void
@@ -51,34 +51,34 @@ impl<T: Writable> WriterArray<Option<T>> for NullableWriter<T::WriterArray> {
     }
 }
 
-#[cfg(feature = "read")]
-pub struct NullableReader<T> {
-    opts: <bool as Readable>::ReaderArray,
+#[cfg(feature = "decode")]
+pub struct NullableDecoder<T> {
+    opts: <bool as Decodable>::DecoderArray,
     values: T,
 }
 
-#[cfg(feature = "read")]
-impl<T: ReaderArray> ReaderArray for Option<NullableReader<T>> {
-    type Read = Option<T::Read>;
+#[cfg(feature = "decode")]
+impl<T: DecoderArray> DecoderArray for Option<NullableDecoder<T>> {
+    type Decode = Option<T::Decode>;
     type Error = T::Error;
-    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("ReaderArray::new");
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("DecoderArray::new");
 
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
-                let (opts, values) = parallel(|| <bool as Readable>::ReaderArray::new(*opt, options), || T::new(*values, options), options);
+                let (opts, values) = parallel(|| <bool as Decodable>::DecoderArray::new(*opt, options), || T::new(*values, options), options);
                 let opts = opts?;
                 let values = values?;
-                Ok(Some(NullableReader { opts, values }))
+                Ok(Some(NullableDecoder { opts, values }))
             }
             DynArrayBranch::Void => Ok(None),
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+    fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {
         Ok(if let Some(inner) = self {
-            if inner.opts.read_next_infallible() {
-                Some(inner.values.read_next()?)
+            if inner.opts.decode_next_infallible() {
+                Some(inner.values.decode_next()?)
             } else {
                 None
             }

@@ -26,15 +26,15 @@ macro_rules! parallel_new_rhs {
     }
 }
 
-macro_rules! parallel_read_rhs {
+macro_rules! parallel_decode_rhs {
     ($opts: ident) => {
       ()
     };
     ($opts: ident, $ts:ident) => {
-        $ts::read($ts, $opts)
+        $ts::decode($ts, $opts)
     };
     ($opts: ident, $ts:ident, $($remainder:ident),+) => {
-        parallel(move || $ts::read($ts, $opts), move || parallel_read_rhs!($opts, $($remainder),*), $opts)
+        parallel(move || $ts::decode($ts, $opts), move || parallel_decode_rhs!($opts, $($remainder),*), $opts)
     }
 }
 
@@ -56,38 +56,38 @@ macro_rules! parallel_new {
     };
 }
 
-macro_rules! parallel_read {
+macro_rules! parallel_decode {
     ($opts:ident, $($ts:ident),*) => {
-        let parallel_lhs!($($ts),*) = parallel_read_rhs!($opts, $($ts),*);
+        let parallel_lhs!($($ts),*) = parallel_decode_rhs!($opts, $($ts),*);
     };
 }
 
 macro_rules! impl_tuple {
     ($count:expr, $trid:expr, $taid:expr, $($ts:ident, $ti:tt,)+) => {
-        #[cfg(feature = "write")]
-        impl <$($ts: Writable),+> Writable for ($($ts),+) {
-            type WriterArray=($($ts::WriterArray),+);
-            fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
-                profile!("Writable::write_root");
+        #[cfg(feature = "encode")]
+        impl <$($ts: Encodable),+> Encodable for ($($ts),+) {
+            type EncoderArray=($($ts::EncoderArray),+);
+            fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+                profile!("Encodable::encode_root");
                 $(
-                    stream.write_with_id(|stream| tuple_index!(self, $ti).write_root(stream));
+                    stream.encode_with_id(|stream| tuple_index!(self, $ti).encode_root(stream));
                 )+
                 $trid
             }
         }
 
-        #[cfg(feature = "write")]
-        impl<$($ts: Writable),+> WriterArray<($($ts),+)> for ($($ts::WriterArray),+) {
+        #[cfg(feature = "encode")]
+        impl<$($ts: Encodable),+> EncoderArray<($($ts),+)> for ($($ts::EncoderArray),+) {
             fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b ($($ts),+)) {
                 $(
                     tuple_index!(self, $ti).buffer(&tuple_index!(value, $ti));
                 )+
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
-                profile!("WriterArray::flush");
+            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                profile!("EncoderArray::flush");
                 let ($($ts,)+) = self;
                 $(
-                    stream.write_with_id(|stream|
+                    stream.encode_with_id(|stream|
                         $ts.flush(stream)
                     );
                 )+
@@ -95,18 +95,18 @@ macro_rules! impl_tuple {
             }
         }
 
-        #[cfg(feature = "read")]
-        impl <$($ts: Readable + Send),+> Readable for ($($ts),+)
+        #[cfg(feature = "decode")]
+        impl <$($ts: Decodable + Send),+> Decodable for ($($ts),+)
         // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-        where $(ReadError : From<<$ts::ReaderArray as ReaderArray>::Error>),+ {
-            type ReaderArray=($($ts::ReaderArray),+);
-            fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!("Readable::read");
+        where $(DecodeError : From<<$ts::DecoderArray as DecoderArray>::Error>),+ {
+            type DecoderArray=($($ts::DecoderArray),+);
+            fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!("Decodable::decode");
                 match sticks {
                     DynRootBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
                         if fields.len() != $count {
-                            return Err(ReadError::SchemaMismatch)
+                            return Err(DecodeError::SchemaMismatch)
                         }
                         let mut fields = fields.drain(..);
 
@@ -116,32 +116,32 @@ macro_rules! impl_tuple {
                             let $ts = fields.next().unwrap();
                         )+
 
-                        parallel_read!(options, $($ts),*);
+                        parallel_decode!(options, $($ts),*);
 
                         Ok(($($ts?),*))
                     },
-                    _ => Err(ReadError::SchemaMismatch),
+                    _ => Err(DecodeError::SchemaMismatch),
                 }
             }
         }
 
-        #[cfg(feature = "read")]
-        impl <$($ts: ReaderArray),+> ReaderArray for ($($ts),+)
+        #[cfg(feature = "decode")]
+        impl <$($ts: DecoderArray),+> DecoderArray for ($($ts),+)
         // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-        where $(ReadError : From<$ts::Error>),+ {
-            type Read=($($ts::Read),+);
+        where $(DecodeError : From<$ts::Error>),+ {
+            type Decode=($($ts::Decode),+);
             // TODO: It would be nice to know somehow whether or not
             // all the fields are infallible types. Perhaps specialization
             // can achieve this.
-            type Error=ReadError;
-            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!("ReaderArray::new");
+            type Error=DecodeError;
+            fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!("DecoderArray::new");
 
                 match sticks {
                     DynArrayBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
                         if fields.len() != $count {
-                            return Err(ReadError::SchemaMismatch)
+                            return Err(DecodeError::SchemaMismatch)
                         }
                         let mut fields = fields.drain(..);
 
@@ -155,12 +155,12 @@ macro_rules! impl_tuple {
 
                         Ok(($($ts?),*))
                     },
-                    _ => Err(ReadError::SchemaMismatch)
+                    _ => Err(DecodeError::SchemaMismatch)
                 }
             }
-            fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+            fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {
                 Ok(($(
-                    tuple_index!(self, $ti).read_next()?,
+                    tuple_index!(self, $ti).decode_next()?,
                 )+))
             }
         }
@@ -193,7 +193,7 @@ impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
             0 => self.0.compress(data, stream),
             _ => unreachable!("No compressor at that index"),
@@ -212,7 +212,7 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
             0 => self.0.compress(data, stream),
             1 => self.1.compress(data, stream),
@@ -234,7 +234,7 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T
             _ => unreachable!("No compressor at that index"),
         }
     }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         match compressor {
             0 => self.0.compress(data, stream),
             1 => self.1.compress(data, stream),

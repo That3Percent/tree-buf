@@ -55,37 +55,37 @@ pub enum DynRootBranch<'a> {
     },
 }
 
-pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
-    let id = RootTypeId::read_next(bytes, offset)?;
+pub fn decode_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynRootBranch<'a>> {
+    let id = RootTypeId::decode_next(bytes, offset)?;
 
     // See also e25db64d-8424-46b9-bdc1-cdb618807513
-    fn read_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
+    fn decode_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynRootBranch<'a>> {
         let mut fields = Vec::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let child = read_next_root(bytes, offset, lens)?;
+            let child = decode_next_root(bytes, offset, lens)?;
             fields.push(child);
         }
         Ok(DynRootBranch::Tuple { fields })
     }
 
-    fn read_array<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
-        let values = read_next_array(bytes, offset, lens)?;
+    fn decode_array<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynRootBranch<'a>> {
+        let values = decode_next_array(bytes, offset, lens)?;
         Ok(DynRootBranch::Array { len, values })
     }
 
     // See also 47a1482f-5ce3-4b78-b356-30c66dc60cda
-    fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
+    fn decode_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynRootBranch<'a>> {
         let mut fields = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let name = crate::internal::read_ident(bytes, offset)?;
-            let child = read_next_root(bytes, offset, lens)?;
+            let name = crate::internal::decode_ident(bytes, offset)?;
+            let child = decode_next_root(bytes, offset, lens)?;
             fields.insert(name, child);
         }
         Ok(DynRootBranch::Object { fields })
     }
 
-    fn read_str<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<DynRootBranch<'a>> {
-        let bytes = read_bytes(len, bytes, offset)?;
+    fn decode_str<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> DecodeResult<DynRootBranch<'a>> {
+        let bytes = decode_bytes(len, bytes, offset)?;
         let s = std::str::from_utf8(bytes)?;
         Ok(DynRootBranch::String(s))
     }
@@ -94,50 +94,50 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
     let branch = match id {
         Void => DynRootBranch::Void,
 
-        Tuple2 => read_tuple(2, bytes, offset, lens)?,
-        Tuple3 => read_tuple(3, bytes, offset, lens)?,
-        Tuple4 => read_tuple(4, bytes, offset, lens)?,
-        Tuple5 => read_tuple(5, bytes, offset, lens)?,
-        Tuple6 => read_tuple(6, bytes, offset, lens)?,
-        Tuple7 => read_tuple(7, bytes, offset, lens)?,
-        Tuple8 => read_tuple(8, bytes, offset, lens)?,
-        TupleN => read_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
+        Tuple2 => decode_tuple(2, bytes, offset, lens)?,
+        Tuple3 => decode_tuple(3, bytes, offset, lens)?,
+        Tuple4 => decode_tuple(4, bytes, offset, lens)?,
+        Tuple5 => decode_tuple(5, bytes, offset, lens)?,
+        Tuple6 => decode_tuple(6, bytes, offset, lens)?,
+        Tuple7 => decode_tuple(7, bytes, offset, lens)?,
+        Tuple8 => decode_tuple(8, bytes, offset, lens)?,
+        TupleN => decode_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
 
         Array0 => DynRootBranch::Array0,
-        Array1 => DynRootBranch::Array1(Box::new(read_next_root(bytes, offset, lens)?)),
-        //Array2 => read_array(2, bytes, offset, lens)?,
-        //Array3 => read_array(3, bytes, offset, lens)?,
-        //Array4 => read_array(4, bytes, offset, lens)?,
+        Array1 => DynRootBranch::Array1(Box::new(decode_next_root(bytes, offset, lens)?)),
+        //Array2 => decode_array(2, bytes, offset, lens)?,
+        //Array3 => decode_array(3, bytes, offset, lens)?,
+        //Array4 => decode_array(4, bytes, offset, lens)?,
         // TODO: usize - 2
-        ArrayN => read_array(read_usize(bytes, offset)?, bytes, offset, lens)?,
+        ArrayN => decode_array(decode_usize(bytes, offset)?, bytes, offset, lens)?,
         Map => {
-            let len = read_usize(bytes, offset)?;
+            let len = decode_usize(bytes, offset)?;
             match len {
                 0 => DynRootBranch::Map0,
                 1 => {
-                    let key = read_next_root(bytes, offset, lens)?.into();
-                    let value = read_next_root(bytes, offset, lens)?.into();
+                    let key = decode_next_root(bytes, offset, lens)?.into();
+                    let value = decode_next_root(bytes, offset, lens)?.into();
                     DynRootBranch::Map1 { key, value }
                 }
                 _ => {
-                    let keys = read_next_array(bytes, offset, lens)?;
-                    let values = read_next_array(bytes, offset, lens)?;
+                    let keys = decode_next_array(bytes, offset, lens)?;
+                    let values = decode_next_array(bytes, offset, lens)?;
                     DynRootBranch::Map { len, keys, values }
                 }
             }
         }
 
         // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
-        Obj0 => read_obj(0, bytes, offset, lens)?,
-        Obj1 => read_obj(1, bytes, offset, lens)?,
-        Obj2 => read_obj(2, bytes, offset, lens)?,
-        Obj3 => read_obj(3, bytes, offset, lens)?,
-        Obj4 => read_obj(4, bytes, offset, lens)?,
-        Obj5 => read_obj(5, bytes, offset, lens)?,
-        Obj6 => read_obj(6, bytes, offset, lens)?,
-        Obj7 => read_obj(7, bytes, offset, lens)?,
-        Obj8 => read_obj(8, bytes, offset, lens)?,
-        ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
+        Obj0 => decode_obj(0, bytes, offset, lens)?,
+        Obj1 => decode_obj(1, bytes, offset, lens)?,
+        Obj2 => decode_obj(2, bytes, offset, lens)?,
+        Obj3 => decode_obj(3, bytes, offset, lens)?,
+        Obj4 => decode_obj(4, bytes, offset, lens)?,
+        Obj5 => decode_obj(5, bytes, offset, lens)?,
+        Obj6 => decode_obj(6, bytes, offset, lens)?,
+        Obj7 => decode_obj(7, bytes, offset, lens)?,
+        Obj8 => decode_obj(8, bytes, offset, lens)?,
+        ObjN => decode_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
 
         Enum => {
             // TODO: Consider having the enum be:
@@ -152,8 +152,8 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
             // languages. Eg: GeoJson could have { "type" : "..." } as static_data in an object here and merge that with another
             // object in instance_data. So many questions though, like does static_data need to be the same type for each discriminant?
             // If so, it would be an ArrayBranch with a fixed size.
-            let discriminant = read_ident(bytes, offset)?;
-            let value = read_next_root(bytes, offset, lens)?.into();
+            let discriminant = decode_ident(bytes, offset)?;
+            let value = decode_next_root(bytes, offset, lens)?.into();
             DynRootBranch::Enum { discriminant, value }
         }
 
@@ -184,15 +184,15 @@ pub fn read_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut 
         NegOne => DynRootBranch::Integer(RootInteger::S(-1)),
 
         // Float,
-        F32 => DynRootBranch::Float(RootFloat::F32(f32::from_le_bytes(read_bytes(4, bytes, offset)?.try_into().unwrap()))),
-        F64 => DynRootBranch::Float(RootFloat::F64(f64::from_le_bytes(read_bytes(8, bytes, offset)?.try_into().unwrap()))),
+        F32 => DynRootBranch::Float(RootFloat::F32(f32::from_le_bytes(decode_bytes(4, bytes, offset)?.try_into().unwrap()))),
+        F64 => DynRootBranch::Float(RootFloat::F64(f64::from_le_bytes(decode_bytes(8, bytes, offset)?.try_into().unwrap()))),
         NaN => DynRootBranch::Float(RootFloat::NaN), // Works for either f64 or f32.
 
-        Str0 => read_str(0, bytes, offset)?,
-        Str1 => read_str(1, bytes, offset)?,
-        Str2 => read_str(2, bytes, offset)?,
-        Str3 => read_str(3, bytes, offset)?,
-        Str => read_str(decode_prefix_varint(bytes, offset)? as usize, bytes, offset)?,
+        Str0 => decode_str(0, bytes, offset)?,
+        Str1 => decode_str(1, bytes, offset)?,
+        Str2 => decode_str(2, bytes, offset)?,
+        Str3 => decode_str(3, bytes, offset)?,
+        Str => decode_str(decode_prefix_varint(bytes, offset)? as usize, bytes, offset)?,
     };
     Ok(branch)
 }
@@ -249,8 +249,8 @@ impl_type_id!(RootTypeId, [
 
 impl RootInteger {
     #[inline(always)]
-    pub fn new(bytes: &[u8], offset: &mut usize, len: usize, signed: bool) -> ReadResult<Self> {
-        let bytes = read_bytes(len, bytes, offset)?;
+    pub fn new(bytes: &[u8], offset: &mut usize, len: usize, signed: bool) -> DecodeResult<Self> {
+        let bytes = decode_bytes(len, bytes, offset)?;
         let ok = match (len, signed) {
             (1, true) => Self::S((bytes[0] as i8).into()),
             (1, false) => Self::U(bytes[0].into()),

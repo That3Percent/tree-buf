@@ -10,10 +10,10 @@ fn increasing_floats(c: &mut Criterion) {
         data.push(f);
     }
 
-    c.bench_function("write", |b| b.iter_with_large_drop(|| black_box(write(&data))));
+    c.bench_function("encode", |b| b.iter_with_large_drop(|| black_box(encode(&data))));
 
     let data_ser = write(&data);
-    c.bench_function("read", |b| b.iter_with_large_drop(|| black_box(read::<Vec<f64>>(&data_ser))));
+    c.bench_function("decode", |b| b.iter_with_large_drop(|| black_box(decode::<Vec<f64>>(&data_ser))));
 }
 
 criterion_group!(benches, increasing_floats);

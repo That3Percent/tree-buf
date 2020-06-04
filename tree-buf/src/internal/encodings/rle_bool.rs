@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use std::vec::IntoIter;
 
-#[cfg(feature = "read")]
+#[cfg(feature = "decode")]
 pub fn decode_rle_bool(runs: IntoIter<u64>, first: bool) -> IntoIter<bool> {
     let mut results = Vec::new();
     let mut current = first;
@@ -16,8 +16,8 @@ pub fn decode_rle_bool(runs: IntoIter<u64>, first: bool) -> IntoIter<bool> {
     results.into_iter()
 }
 
-#[cfg(feature = "write")]
-pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+#[cfg(feature = "encode")]
+pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
     profile!(&[bool], "encode_rle_bool");
 
     // This encoding is not useful for this case, since we can store 8 values
@@ -42,7 +42,7 @@ pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut WriterStre
     }
     runs.push(current_run);
 
-    stream.write_with_id(|stream| runs.flush(stream));
+    stream.encode_with_id(|stream| runs.flush(stream));
 
     Ok(type_id)
 }

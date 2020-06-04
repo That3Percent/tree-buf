@@ -1,14 +1,14 @@
 use std::fmt::Debug;
 use tree_buf::prelude::*;
-use tree_buf::ReadError;
-use tree_buf::{Readable, Writable};
+use tree_buf::DecodeError;
+use tree_buf::{Decodable, Encodable};
 
-fn expect_schema_mismatch<TIn: Writable + Default, TOut: Debug + Readable>() {
+fn expect_schema_mismatch<TIn: Encodable + Default, TOut: Debug + Decodable>() {
     let data = TIn::default();
-    let bytes = write(&data);
-    let result = read::<TOut>(&bytes);
+    let bytes = encode(&data);
+    let result = decode::<TOut>(&bytes);
     match result.unwrap_err() {
-        ReadError::SchemaMismatch => (),
+        DecodeError::SchemaMismatch => (),
         _ => assert!(false),
     }
 }
@@ -20,11 +20,11 @@ fn mismatched_root() {
 
 #[test]
 fn missnamed_obj_field() {
-    #[derive(Default, Write)]
+    #[derive(Default, Encode)]
     pub struct X {
         x: u64,
     }
-    #[derive(Read, Debug)]
+    #[derive(Decode, Debug)]
     pub struct Y {
         y: u64,
     }

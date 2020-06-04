@@ -8,28 +8,28 @@ use std::vec::IntoIter;
 // be compared and usually not displayed we can do bit-for-bit comparisons
 // (Make sure that's true for SCSU, which may allow multiple encodings!)
 
-#[cfg(feature = "write")]
-pub fn write_str<O: EncodeOptions>(value: &str, stream: &mut WriterStream<'_, O>) {
-    write_usize(value.len(), stream);
+#[cfg(feature = "encode")]
+pub fn encode_str<O: EncodeOptions>(value: &str, stream: &mut EncoderStream<'_, O>) {
+    encode_usize(value.len(), stream);
     stream.bytes.extend_from_slice(value.as_bytes());
 }
 
-#[cfg(feature = "read")]
-fn read_str_len<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
-    let utf8 = read_bytes(len, bytes, offset)?;
+#[cfg(feature = "decode")]
+fn decode_str_len<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> DecodeResult<&'a str> {
+    let utf8 = decode_bytes(len, bytes, offset)?;
     Ok(std::str::from_utf8(utf8)?)
 }
 
-#[cfg(feature = "read")]
-pub fn read_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a str> {
+#[cfg(feature = "decode")]
+pub fn decode_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> DecodeResult<&'a str> {
     let len = decode_prefix_varint(bytes, offset)? as usize;
-    read_str_len(len, bytes, offset)
+    decode_str_len(len, bytes, offset)
 }
 
-#[cfg(feature = "write")]
-impl Writable for String {
-    type WriterArray = Vec<&'static str>;
-    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
+#[cfg(feature = "encode")]
+impl Encodable for String {
+    type EncoderArray = Vec<&'static str>;
+    fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
         let value = self.as_str();
         match value.len() {
             0 => RootTypeId::Str0,
@@ -55,8 +55,8 @@ impl Writable for String {
     }
 }
 
-#[cfg(feature = "write")]
-impl WriterArray<String> for Vec<&'static str> {
+#[cfg(feature = "encode")]
+impl EncoderArray<String> for Vec<&'static str> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b String) {
         // TODO: Working around lifetime issues for lack of GAT
         // A quick check makes this appear to be sound, since the signature
@@ -67,8 +67,8 @@ impl WriterArray<String> for Vec<&'static str> {
         // but when things like threading come into play it's hard to know.
         self.push(unsafe { std::mem::transmute(value.as_str()) });
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
-        profile!("WriterArray::flush");
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        profile!("EncoderArray::flush");
 
         let compressors = (
             Utf8Compressor,
@@ -80,32 +80,32 @@ impl WriterArray<String> for Vec<&'static str> {
     }
 }
 
-#[cfg(feature = "read")]
-impl Readable for String {
-    // TODO: Use lifetimes to make this read lazy rather than IntoIter
-    type ReaderArray = IntoIter<String>;
-    fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("Readable::read");
+#[cfg(feature = "decode")]
+impl Decodable for String {
+    // TODO: Use lifetimes to make this decode lazy rather than IntoIter
+    type DecoderArray = IntoIter<String>;
+    fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("Decodable::decode");
         match sticks {
             DynRootBranch::String(s) => Ok(s.to_owned()),
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
 }
 
-#[cfg(feature = "read")]
-impl InfallibleReaderArray for IntoIter<String> {
-    type Read = String;
+#[cfg(feature = "decode")]
+impl InfallibleDecoderArray for IntoIter<String> {
+    type Decode = String;
 
-    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("ReaderArray::new");
+    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("DecoderArray::new");
 
         match sticks {
             DynArrayBranch::String(bytes) => {
                 #[cfg(feature = "profile")]
                 let _g = flame::start_guard("String");
 
-                let strs = read_all(&bytes, |b, o| read_str(b, o).and_then(|v| Ok(v.to_owned())))?;
+                let strs = decode_all(&bytes, |b, o| decode_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
             }
             DynArrayBranch::RLE { runs, values } => {
@@ -118,15 +118,15 @@ impl InfallibleReaderArray for IntoIter<String> {
                 let all = dict.collect::<Vec<_>>();
                 Ok(all.into_iter())
             }
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
-    fn read_next_infallible(&mut self) -> Self::Read {
+    fn decode_next_infallible(&mut self) -> Self::Decode {
         self.next().unwrap_or_default()
     }
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 impl<'a> Compressor<&'a str> for Utf8Compressor {
     fn fast_size_for(&self, data: &[&'a str]) -> Option<usize> {
         profile!("Compressor::fast_size_for");
@@ -137,10 +137,10 @@ impl<'a> Compressor<&'a str> for Utf8Compressor {
         }
         Some(total)
     }
-    fn compress<O: EncodeOptions>(&self, data: &[&'a str], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[&'a str], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("Compressor::compress");
 
-        stream.write_with_len(|stream| {
+        stream.encode_with_len(|stream| {
             for value in data.iter() {
                 encode_prefix_varint(value.len() as u64, stream.bytes);
                 stream.bytes.extend_from_slice(value.as_bytes());

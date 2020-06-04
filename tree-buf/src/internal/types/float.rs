@@ -29,26 +29,26 @@ use flame;
 // TODO: More compressors
 
 macro_rules! impl_float {
-    ($T:ident, $write_item:ident, $read_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $Zfp:ident, $($rest:ident),*) => {
+    ($T:ident, $encode_item:ident, $decode_item:ident, $id:ident, $fixed:ident, $Gorilla:ident, $Zfp:ident, $($rest:ident),*) => {
         // TODO: Check for lowering - f64 -> f63
-        #[cfg(feature = "write")]
-        fn $write_item(item: $T, bytes: &mut Vec<u8>) {
+        #[cfg(feature = "encode")]
+        fn $encode_item(item: $T, bytes: &mut Vec<u8>) {
             let b = item.to_le_bytes();
             bytes.extend_from_slice(&b);
         }
 
-        #[cfg(feature = "read")]
-        fn $read_item(bytes: &[u8], offset: &mut usize) -> ReadResult<$T> {
-            let bytes = read_bytes(size_of::<$T>(), bytes, offset)?;
+        #[cfg(feature = "decode")]
+        fn $decode_item(bytes: &[u8], offset: &mut usize) -> DecodeResult<$T> {
+            let bytes = decode_bytes(size_of::<$T>(), bytes, offset)?;
             // This unwrap is ok, because we just read exactly size_of::<T> bytes on the line above.
             Ok(<$T>::from_le_bytes(bytes.try_into().unwrap()))
         }
 
 
-        #[cfg(feature = "write")]
-        impl Writable for $T {
-            type WriterArray = Vec<$T>;
-            fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
+        #[cfg(feature = "encode")]
+        impl Encodable for $T {
+            type EncoderArray = Vec<$T>;
+            fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
                 let value = *self;
 
                 // Check for positive sign so that -0.0 goes through
@@ -64,18 +64,18 @@ macro_rules! impl_float {
                     // so that other NaN round trip bit-for-bit
                     RootTypeId::NaN
                 } else {
-                    $write_item(value, stream.bytes);
+                    $encode_item(value, stream.bytes);
                     RootTypeId::$id
                 }
             }
         }
 
 
-        #[cfg(feature = "read")]
-        impl Readable for $T {
-            type ReaderArray = IntoIter<$T>;
-            fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!("Readable::read");
+        #[cfg(feature = "decode")]
+        impl Decodable for $T {
+            type DecoderArray = IntoIter<$T>;
+            fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!("Decodable::decode");
                 match sticks {
                     DynRootBranch::Integer(root_integer) => {
                         // FIXME: Fast and lose to get refactoring done. Double check here.
@@ -85,7 +85,7 @@ macro_rules! impl_float {
                                 if u < (2 << std::$T::MANTISSA_DIGITS) {
                                     Ok(u as $T)
                                 } else {
-                                    Err(ReadError::SchemaMismatch)
+                                    Err(DecodeError::SchemaMismatch)
                                 }
                             }
                             RootInteger::S(s) => {
@@ -93,7 +93,7 @@ macro_rules! impl_float {
                                     // FIXME: Made up number
                                     Ok(s as $T)
                                 } else {
-                                    Err(ReadError::SchemaMismatch)
+                                    Err(DecodeError::SchemaMismatch)
                                 }
                             }
                         }
@@ -110,17 +110,17 @@ macro_rules! impl_float {
                             RootFloat::F32(v) => Ok(v as $T),
                         }
                     }
-                    _ => Err(ReadError::SchemaMismatch),
+                    _ => Err(DecodeError::SchemaMismatch),
                 }
             }
         }
 
 
-        #[cfg(feature = "read")]
-        impl InfallibleReaderArray for IntoIter<$T> {
-            type Read = $T;
-            fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!("ReaderArray::new");
+        #[cfg(feature = "decode")]
+        impl InfallibleDecoderArray for IntoIter<$T> {
+            type Decode = $T;
+            fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!("DecoderArray::new");
 
                 match sticks {
                     DynArrayBranch::Float(float) => {
@@ -130,14 +130,14 @@ macro_rules! impl_float {
                                 let _g = flame::start_guard("f64");
 
                                 // FIXME: Should do schema mismatch for f32 -> f64
-                                let values = read_all(&bytes, |bytes, offset| Ok(read_64(bytes, offset)?.as_()))?;
+                                let values = decode_all(&bytes, |bytes, offset| Ok(decode_64(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
                                 #[cfg(feature="profile")]
                                 let _g = flame::start_guard("f32");
 
-                                let values = read_all(&bytes, |bytes, offset| Ok(read_32(bytes, offset)?.as_()))?;
+                                let values = decode_all(&bytes, |bytes, offset| Ok(decode_32(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             },
                             ArrayFloat::DoubleGorilla(bytes) => {
@@ -168,20 +168,20 @@ macro_rules! impl_float {
                     }
                     // TODO: There are some conversions that are infallable.
                     // Eg: Simple16.
-                    _ => Err(ReadError::SchemaMismatch),
+                    _ => Err(DecodeError::SchemaMismatch),
                 }
             }
-            fn read_next_infallible(&mut self) -> Self::Read {
+            fn decode_next_infallible(&mut self) -> Self::Decode {
                 self.next().unwrap_or_default()
             }
         }
 
-        #[cfg(feature = "write")]
-        impl WriterArray<$T> for Vec<$T> {
+        #[cfg(feature = "encode")]
+        impl EncoderArray<$T> for Vec<$T> {
             fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $T) {
                 self.push(*value);
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                 profile!("flush");
                 let tolerance = stream.options.lossy_float_tolerance();
 
@@ -201,11 +201,11 @@ macro_rules! impl_float {
             fn fast_size_for(&self, data: &[$T]) -> Option<usize> {
                 Some(size_of::<$T>() * data.len())
             }
-            fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+            fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
-                stream.write_with_len(|stream| {
+                stream.encode_with_len(|stream| {
                     for item in data {
-                        $write_item(*item, &mut stream.bytes);
+                        $encode_item(*item, &mut stream.bytes);
                     }
                 });
                 Ok(ArrayTypeId::$id)
@@ -220,10 +220,10 @@ macro_rules! impl_float {
             tolerance: Option<i32>,
         }
         impl Compressor<$T> for $Gorilla {
-            fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+            fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!("compress");
 
-                stream.write_with_len(|stream| {
+                stream.encode_with_len(|stream| {
                     if let Some(tolerance) = self.tolerance {
                         // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                         // before a real lossy compressor (Eg: fzip) is used.
@@ -246,9 +246,9 @@ struct Zfp64 {
     tolerance: Option<i32>,
 }
 impl Compressor<f64> for Zfp64 {
-    fn compress<O: EncodeOptions>(&self, data: &[f64], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[f64], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        stream.write_with_len(|stream| zfp::compress(data, &mut stream.bytes, self.tolerance));
+        stream.encode_with_len(|stream| zfp::compress(data, &mut stream.bytes, self.tolerance));
     }
 }
 
@@ -256,12 +256,12 @@ struct Zfp32 {
     tolerance: Option<i32>,
 }
 impl Compressor<f32> for Zfp32 {
-    fn compress<O: EncodeOptions>(&self, data: &[f32], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[f32], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        stream.write_with_len(|stream| zfp::compress(data, bytes, self.tolerance));
+        stream.encode_with_len(|stream| zfp::compress(data, bytes, self.tolerance));
     }
 }
 */
 
-impl_float!(f64, write_64, read_64, F64, Fixed64Compressor, GorillaCompressor64, Zfp64,);
-impl_float!(f32, write_32, read_32, F32, Fixed32Compressor, GorillaCompressor32, Zfp32,);
+impl_float!(f64, encode_64, decode_64, F64, Fixed64Compressor, GorillaCompressor64, Zfp64,);
+impl_float!(f32, encode_32, decode_32, F32, Fixed32Compressor, GorillaCompressor32, Zfp32,);

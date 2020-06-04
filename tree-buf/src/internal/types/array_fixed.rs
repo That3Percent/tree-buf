@@ -9,15 +9,15 @@ macro_rules! impl_fixed {
             // std::mem::transmute to be used: https://github.com/rust-lang/rust/issues/47966
             use transmute::transmute;
 
-            #[cfg(feature = "write")]
-            impl<T: Writable> Writable for [T; $size] {
-                type WriterArray = ArrayWriter<T::WriterArray>;
-                fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
-                    profile!("write_root");
+            #[cfg(feature = "encode")]
+            impl<T: Encodable> Encodable for [T; $size] {
+                type EncoderArray = ArrayEncoder<T::EncoderArray>;
+                fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+                    profile!("encode_root");
                     match self.len() {
                         0 => RootTypeId::Array0,
                         1 => {
-                            stream.write_with_id(|stream| (&self[0]).write_root(stream));
+                            stream.encode_with_id(|stream| (&self[0]).encode_root(stream));
                             RootTypeId::Array1
                         }
                         _ => {
@@ -25,7 +25,7 @@ macro_rules! impl_fixed {
                             // and the bytes len. Though, it's not for obvious reasons.
                             // Maybe sometimes we can infer from context. Eg: bool always
                             // requires the same number of bits per item
-                            write_usize(self.len(), stream);
+                            encode_usize(self.len(), stream);
 
                             // TODO: When there are types that are already
                             // primitive (eg: Vec<f64>) it doesn't make sense
@@ -34,12 +34,12 @@ macro_rules! impl_fixed {
                             //
                             // TODO: See below, and just call buffer on the vec
                             // and flush it!
-                            let mut writer = T::WriterArray::default();
+                            let mut encoder = T::EncoderArray::default();
                             for item in self.iter() {
-                                writer.buffer(item);
+                                encoder.buffer(item);
                             }
 
-                            stream.write_with_id(|stream| writer.flush(stream));
+                            stream.encode_with_id(|stream| encoder.flush(stream));
 
                             RootTypeId::ArrayN
                         }
@@ -48,15 +48,15 @@ macro_rules! impl_fixed {
             }
 
             // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-            #[cfg(feature = "read")]
-            impl<T: Readable + Sized> Readable for [T; $size] where ReadError : From<<T::ReaderArray as ReaderArray>::Error> {
-                type ReaderArray = ArrayReader<T::ReaderArray>;
-                fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-                    profile!("Readable::read");
+            #[cfg(feature = "decode")]
+            impl<T: Decodable + Sized> Decodable for [T; $size] where DecodeError : From<<T::DecoderArray as DecoderArray>::Error> {
+                type DecoderArray = ArrayDecoder<T::DecoderArray>;
+                fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                    profile!("Decodable::decode");
                     match sticks {
                         DynRootBranch::Array0 => {
                             if $size != 0 {
-                                return Err(ReadError::SchemaMismatch);
+                                return Err(DecodeError::SchemaMismatch);
                             } else {
                                 let data: [MaybeUninit<T>; $size] = unsafe {
                                     MaybeUninit::uninit().assume_init()
@@ -69,9 +69,9 @@ macro_rules! impl_fixed {
                         },
                         DynRootBranch::Array1(inner) => {
                             if $size != 1 {
-                                return Err(ReadError::SchemaMismatch);
+                                return Err(DecodeError::SchemaMismatch);
                             }
-                            let inner = T::read(*inner, options)?;
+                            let inner = T::decode(*inner, options)?;
 
                             let mut data: [MaybeUninit<T>; $size] = unsafe {
                                 MaybeUninit::uninit().assume_init()
@@ -83,38 +83,38 @@ macro_rules! impl_fixed {
                         }
                         DynRootBranch::Array { len, values } => {
                             if len != $size {
-                                return Err(ReadError::SchemaMismatch);
+                                return Err(DecodeError::SchemaMismatch);
                             }
-                            let mut reader = T::ReaderArray::new(values, options)?;
+                            let mut decoder = T::DecoderArray::new(values, options)?;
                             let mut data: [MaybeUninit<T>; $size] = unsafe {
                                 MaybeUninit::uninit().assume_init()
                             };
 
                             for elem in &mut data[..] {
-                                *elem = MaybeUninit::new(reader.read_next()?);
+                                *elem = MaybeUninit::new(decoder.decode_next()?);
                             }
 
                             Ok(unsafe { transmute(data) })
                         }
-                        _ => Err(ReadError::SchemaMismatch),
+                        _ => Err(DecodeError::SchemaMismatch),
                     }
                 }
             }
 
 
-            #[cfg(feature = "write")]
+            #[cfg(feature = "encode")]
             #[derive(Debug, Default)]
-            pub struct ArrayWriter<T> {
+            pub struct ArrayEncoder<T> {
                 values: T,
             }
 
-            #[cfg(feature = "read")]
-            pub struct ArrayReader<T> {
+            #[cfg(feature = "decode")]
+            pub struct ArrayDecoder<T> {
                 values: T,
             }
 
-            #[cfg(feature = "write")]
-            impl<T: Writable> WriterArray<[T; $size]> for ArrayWriter<T::WriterArray> {
+            #[cfg(feature = "encode")]
+            impl<T: Encodable> EncoderArray<[T; $size]> for ArrayEncoder<T::EncoderArray> {
                 fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b [T; $size]) {
                     // TODO: Consider whether buffer should actually just
                     // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
@@ -127,43 +127,43 @@ macro_rules! impl_fixed {
                         self.values.buffer(item);
                     }
                 }
-                fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+                fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                     profile!("flush");
                     let Self { values } = self;
-                    write_usize($size, stream);
+                    encode_usize($size, stream);
                     if $size != 0 {
-                        stream.write_with_id(|stream| values.flush(stream));
+                        stream.encode_with_id(|stream| values.flush(stream));
                     }
 
                     ArrayTypeId::ArrayFixed
                 }
             }
 
-            #[cfg(feature = "read")]
-            impl<T: ReaderArray> ReaderArray for ArrayReader<T> {
-                type Read = [T::Read; $size];
+            #[cfg(feature = "decode")]
+            impl<T: DecoderArray> DecoderArray for ArrayDecoder<T> {
+                type Decode = [T::Decode; $size];
                 type Error = T::Error;
-                fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-                    profile!("ReaderArray::new");
+                fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                    profile!("DecoderArray::new");
 
                     match sticks {
                         DynArrayBranch::ArrayFixed { len, values } => {
                             if len != $size {
-                                return Err(ReadError::SchemaMismatch);
+                                return Err(DecodeError::SchemaMismatch);
                             }
                             let values = T::new(*values, options)?;
-                            Ok(ArrayReader { values })
+                            Ok(ArrayDecoder { values })
                         }
-                        _ => Err(ReadError::SchemaMismatch),
+                        _ => Err(DecodeError::SchemaMismatch),
                     }
                 }
-                fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
-                    let mut data: [MaybeUninit<T::Read>; $size] = unsafe {
+                fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {
+                    let mut data: [MaybeUninit<T::Decode>; $size] = unsafe {
                         MaybeUninit::uninit().assume_init()
                     };
 
                     for elem in &mut data[..] {
-                        *elem = MaybeUninit::new(self.values.read_next()?);
+                        *elem = MaybeUninit::new(self.values.decode_next()?);
                     }
 
                     // Safety - all elements initialized in loop
@@ -176,7 +176,7 @@ macro_rules! impl_fixed {
 }
 
 impl_fixed!(
-    // TODO: Re-add these, consider the changes that have to occur in ReaderArray.
+    // TODO: Re-add these, consider the changes that have to occur in DecoderArray.
     // It should be relatively simple, Add Eg: ArrayFixed0 variant
     //(0, _0),
     //(1, _1),

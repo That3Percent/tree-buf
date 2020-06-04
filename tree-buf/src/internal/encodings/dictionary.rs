@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::vec::IntoIter;
 
 // TODO: usize
-// TODO: Use ReaderArray or InfallableReaderArray
+// TODO: Use DecoderArray or InfallableDecoderArray
 pub struct DictionaryIterator<T> {
     // FIXME: There may be a subtle issue here with compounded removing of default values.
     // It is not the same to remove a default elem from the original collection as
@@ -38,9 +38,9 @@ impl<T: Send + Clone> DictionaryIterator<T> {
         indexes: Box<DynArrayBranch<'_>>,
         values: Box<DynArrayBranch<'_>>,
         options: &impl DecodeOptions,
-        f: impl Send + FnOnce(DynArrayBranch<'_>) -> ReadResult<IntoIter<T>>,
-    ) -> ReadResult<Self> {
-        let (indexes, values) = parallel(|| <u64 as Readable>::ReaderArray::new(*indexes, options), || f(*values), options);
+        f: impl Send + FnOnce(DynArrayBranch<'_>) -> DecodeResult<IntoIter<T>>,
+    ) -> DecodeResult<Self> {
+        let (indexes, values) = parallel(|| <u64 as Decodable>::DecoderArray::new(*indexes, options), || f(*values), options);
         let indexes = indexes?;
         let values = values?;
 
@@ -64,7 +64,7 @@ impl<S> Dictionary<S> {
 }
 
 impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Compressor<T> for Dictionary<S> {
-    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
         profile!("compress");
         // It will always be more efficient to just defer to another encoding.
@@ -100,8 +100,8 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug + Hash + Eq, S: CompressorS
             return Err(());
         }
 
-        stream.write_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
-        stream.write_with_id(|stream| indices.flush(stream));
+        stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
+        stream.encode_with_id(|stream| indices.flush(stream));
 
         Ok(ArrayTypeId::Dictionary)
     }

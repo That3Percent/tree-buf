@@ -57,7 +57,7 @@ This test compares the serialization of a GeoJson file containing a Feature Coll
 
 In this test, Tree-Buf is over **10 times as fast** as GeoJson, while producing a file that is **2/7th the size**.
 
-There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::write_with_options(data, &encode_options! { options::LossyFloatTolerance(-12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, while being even faster to encode + decode.
+There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::encode_with_options(data, &encode_options! { options::LossyFloatTolerance(-12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, while being even faster to encode + decode.
 
 Another thing we can try is to selectively load some portion of the data using a modified schema. If we instruct Tree-Buf to only load the names and other attributes of the countries from the file without loading their geometries this takes 240µs - more than **1,500 times as fast** as loading the data as GeoJson because Tree-Buf does not need to parse fields that do not need to be loaded, whereas Json needs to parse this data in order to skip over it.
 
@@ -88,12 +88,12 @@ __Step 1__: Add the latest version Tree-Buf to your `cargo.toml`
 tree-buf = "0.8.0"
 ```
 
-__Step 2__: Derive `Read` and / or `Write` on your structs.
+__Step 2__: Derive `Encode` and / or `Decode` on your structs.
 
 ```rust
     use tree_buf::prelude::*;
 
-    #[derive(Read, Write, PartialEq)]
+    #[derive(Encode, Decode, PartialEq)]
     pub struct Data {
         pub id: u32,
         pub vertices: Vec<(f64, f64, f64)>,
@@ -101,7 +101,7 @@ __Step 2__: Derive `Read` and / or `Write` on your structs.
     }
 ```
 
-__Step 3__: Call `read` and / or `write` on your data.
+__Step 3__: Call `encode` and / or `decode` on your data.
 
 ```rust
 pub fn round_trip() {
@@ -114,10 +114,10 @@ pub fn round_trip() {
         ],
         extra: String::from("Fast"),
     };
-    // Write to Vec<u8>
-    let bytes = write(&data);
-    // Read from &[u8]
-    let copy = read(&bytes).unwrap();
+    // Encode to Vec<u8>
+    let bytes = encode(&data);
+    // Decode from &[u8]
+    let copy = decode(&bytes).unwrap();
     // Success!
     assert_eq!(&copy, &data);
 }

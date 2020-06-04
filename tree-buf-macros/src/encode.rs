@@ -5,27 +5,27 @@ use {
     syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsUnnamed},
 };
 
-pub fn impl_write_macro(ast: &DeriveInput) -> TokenStream {
+pub fn impl_encode_macro(ast: &DeriveInput) -> TokenStream {
     match &ast.data {
-        Data::Struct(data_struct) => impl_struct_write(ast, data_struct),
-        Data::Enum(data_enum) => impl_enum_write(ast, data_enum),
+        Data::Struct(data_struct) => impl_struct_encode(ast, data_struct),
+        Data::Enum(data_enum) => impl_enum_encode(ast, data_enum),
         Data::Union(_) => panic!("Unions are not supported by tree-buf"),
     }
 }
 
-fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
+fn impl_struct_encode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
     let fields = get_named_fields(data_struct);
 
-    let writers = fields.iter().map(|NamedField { ident, canon_str, .. }| {
+    let encoders = fields.iter().map(|NamedField { ident, canon_str, .. }| {
         quote! {
-            ::tree_buf::internal::write_ident(#canon_str, stream);
-            stream.write_with_id(|stream| self.#ident.write_root(stream));
+            ::tree_buf::internal::encode_ident(#canon_str, stream);
+            stream.encode_with_id(|stream| self.#ident.encode_root(stream));
         }
     });
 
     let array_fields = fields.iter().map(|NamedField { ident, ty, .. }| {
         quote! {
-            #ident: <#ty as ::tree_buf::internal::Writable>::WriterArray
+            #ident: <#ty as ::tree_buf::internal::Encodable>::EncoderArray
         }
     });
 
@@ -37,9 +37,9 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     let flushers = fields.iter().map(|NamedField { ident, canon_str, ty }| {
         quote! {
-            ::tree_buf::internal::write_ident(#canon_str, stream);
+            ::tree_buf::internal::encode_ident(#canon_str, stream);
             let o = self.#ident;
-            stream.write_with_id(|stream| ::tree_buf::internal::WriterArray::<#ty>::flush(o, stream));
+            stream.encode_with_id(|stream| ::tree_buf::internal::EncoderArray::<#ty>::flush(o, stream));
         }
     });
 
@@ -47,8 +47,8 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
 
     /*
     quote! {
-        ::tree_buf::internal::write_fields(#num_fields, stream, |stream| move {
-            #(#writers)*
+        ::tree_buf::internal::encode_fields(#num_fields, stream, |stream| move {
+            #(#encoders)*
         })
     };
     */
@@ -73,67 +73,67 @@ fn impl_struct_write(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream
         #(#buffers)*
     };
 
-    let write_root = quote! {
+    let encode_root = quote! {
         #prefix
-        #(#writers)*
+        #(#encoders)*
         ::tree_buf::internal::RootTypeId::#suffix
     };
 
-    fill_write_skeleton(ast, array_fields, buffer, flush, write_root)
+    fill_encode_skeleton(ast, array_fields, buffer, flush, encode_root)
 }
 
-fn fill_write_skeleton<A: ToTokens>(
+fn fill_encode_skeleton<A: ToTokens>(
     ast: &DeriveInput,
     array_fields: impl Iterator<Item = A>,
     buffer: impl ToTokens,
     flush: impl ToTokens,
-    write_root: impl ToTokens,
+    encode_root: impl ToTokens,
 ) -> TokenStream {
     let name = &ast.ident;
     let vis = &ast.vis;
-    let array_writer_name = format_ident!("{}TreeBufWriterArray", name);
+    let array_encoder_name = format_ident!("{}TreeBufEncoderArray", name);
 
     quote! {
         #[derive(Default)]
         #[allow(non_snake_case)]
-        #vis struct #array_writer_name {
+        #vis struct #array_encoder_name {
             #(#array_fields,)*
         }
 
-        impl ::tree_buf::internal::WriterArray<#name> for #array_writer_name {
+        impl ::tree_buf::internal::EncoderArray<#name> for #array_encoder_name {
             fn buffer<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
                 #buffer
             }
-            fn flush<O: ::tree_buf::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::WriterStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush<O: ::tree_buf::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
-                //::tree_buf::internal::profile!("WriterArray::flush");
+                //::tree_buf::internal::profile!("EncoderArray::flush");
                 #flush
             }
         }
 
-        impl ::tree_buf::internal::Writable for #name {
-            type WriterArray=#array_writer_name;
-            fn write_root<O: ::tree_buf::options::EncodeOptions>(&self, stream: &mut ::tree_buf::internal::WriterStream<'_, O>) -> tree_buf::internal::RootTypeId {
+        impl ::tree_buf::internal::Encodable for #name {
+            type EncoderArray=#array_encoder_name;
+            fn encode_root<O: ::tree_buf::options::EncodeOptions>(&self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> tree_buf::internal::RootTypeId {
                 // TODO: Re-enable profile here
                 // See also dcebaa54-d21e-4e79-abfe-4a89cc829180
-                //::tree_buf::internal::profile!("WriterArray::write_root");
-                #write_root
+                //::tree_buf::internal::profile!("EncoderArray::encode_root");
+                #encode_root
             }
         }
     }
 }
 
-fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
+fn impl_enum_encode(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     // What is needed:
-    // An outer struct containing writers for each variant
-    // For each variant, possibly it's own writer struct if it's a tuple or struct sort of DataEnum
+    // An outer struct containing encoders for each variant
+    // For each variant, possibly it's own encoder struct if it's a tuple or struct sort of DataEnum
     // A discriminant
 
     let mut array_fields = Vec::new();
     array_fields.push(quote! {
         // TODO: (Performance) have the size scale to the number of variants
-        tree_buf_discriminant: <u64 as ::tree_buf::Writable>::WriterArray,
+        tree_buf_discriminant: <u64 as ::tree_buf::Encodable>::EncoderArray,
         tree_buf_next_discriminant: u64
     });
 
@@ -150,8 +150,8 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
             Fields::Unit => {
                 root_matches.push(quote! {
                     #ident::#variant_ident => {
-                        ::tree_buf::internal::write_ident(#discriminant, stream);
-                        stream.write_with_id(|stream| ::tree_buf::internal::RootTypeId::Void);
+                        ::tree_buf::internal::encode_ident(#discriminant, stream);
+                        stream.encode_with_id(|stream| ::tree_buf::internal::RootTypeId::Void);
                     }
                 });
                 array_fields.push(quote! {
@@ -178,8 +178,8 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         }
                     }
                     if matches {
-                        ::tree_buf::internal::write_ident(#discriminant, stream);
-                        stream.write_with_id(|stream| ::tree_buf::internal::ArrayTypeId::Void);
+                        ::tree_buf::internal::encode_ident(#discriminant, stream);
+                        stream.encode_with_id(|stream| ::tree_buf::internal::ArrayTypeId::Void);
                         continue;
                     }
                 });
@@ -195,12 +195,12 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                         let ty = &unnamed[0].ty;
                         root_matches.push(quote! {
                             #ident::#variant_ident(_0) => {
-                                ::tree_buf::internal::write_ident(#discriminant, stream);
-                                stream.write_with_id(|stream| _0.write_root(stream));
+                                ::tree_buf::internal::encode_ident(#discriminant, stream);
+                                stream.encode_with_id(|stream| _0.encode_root(stream));
                             }
                         });
                         array_fields.push(quote! {
-                            #variant_ident: Option<(u64, <#ty as ::tree_buf::Writable>::WriterArray)>
+                            #variant_ident: Option<(u64, <#ty as ::tree_buf::Encodable>::EncoderArray)>
                         });
                         array_matches.push(quote! {
                             #ident::#variant_ident(_0) => {
@@ -222,19 +222,19 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             }
                             if matches {
                                 let mut buffer = self.#variant_ident.take().unwrap().1;
-                                ::tree_buf::internal::write_ident(#discriminant, stream);
-                                stream.write_with_id(|stream| ::tree_buf::internal::WriterArray::<#ty>:: flush(buffer, stream));
+                                ::tree_buf::internal::encode_ident(#discriminant, stream);
+                                stream.encode_with_id(|stream| ::tree_buf::internal::EncoderArray::<#ty>:: flush(buffer, stream));
                                 continue;
                             }
                         });
                     }
-                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Write"),
+                    _ => todo!("Enums with multiple unnamed fields not yet supported by tree-buf Encode"),
                 }
             }
         }
     }
 
-    let write_root = quote! {
+    let encode_root = quote! {
        match self {
            #(#root_matches,)*
        }
@@ -249,7 +249,7 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         let variant_count = self.tree_buf_next_discriminant;
         ::tree_buf::internal::encodings::varint::encode_prefix_varint(variant_count, stream.bytes);
         let _0 = self.tree_buf_discriminant;
-        stream.write_with_id(|stream| _0.flush(stream));
+        stream.encode_with_id(|stream| _0.flush(stream));
 
         for current_discriminant in 0..variant_count {
             #(#flushes)*
@@ -258,5 +258,5 @@ fn impl_enum_write(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
         ::tree_buf::internal::ArrayTypeId::Enum
     };
 
-    fill_write_skeleton(ast, array_fields.iter(), buffer, flush, write_root)
+    fill_encode_skeleton(ast, array_fields.iter(), buffer, flush, encode_root)
 }

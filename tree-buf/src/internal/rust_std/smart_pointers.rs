@@ -1,55 +1,55 @@
 use crate::prelude::*;
 use std::ops::Deref;
 
-// TODO: impl Writable for () {
-#[cfg(feature = "write")]
+// TODO: impl Encodable for () {
+#[cfg(feature = "encode")]
 #[derive(Default)]
-pub struct BoxWriterArray<T> {
+pub struct BoxEncoderArray<T> {
     inner: T,
 }
 
-#[cfg(feature = "write")]
-impl<T: Writable> Writable for Box<T> {
-    type WriterArray = BoxWriterArray<T::WriterArray>;
-    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
-        profile!("write_root");
-        self.deref().write_root(stream)
+#[cfg(feature = "encode")]
+impl<T: Encodable> Encodable for Box<T> {
+    type EncoderArray = BoxEncoderArray<T::EncoderArray>;
+    fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+        profile!("encode_root");
+        self.deref().encode_root(stream)
     }
 }
 
-#[cfg(feature = "read")]
-pub struct BoxReaderArray<T> {
+#[cfg(feature = "decode")]
+pub struct BoxDecoderArray<T> {
     inner: T,
 }
 
-#[cfg(feature = "read")]
-impl<T: Readable> Readable for Box<T> {
-    type ReaderArray = BoxReaderArray<T::ReaderArray>;
-    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("Readable::read");
-        Ok(Box::new(T::read(sticks, options)?))
+#[cfg(feature = "decode")]
+impl<T: Decodable> Decodable for Box<T> {
+    type DecoderArray = BoxDecoderArray<T::DecoderArray>;
+    fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("Decodable::decode");
+        Ok(Box::new(T::decode(sticks, options)?))
     }
 }
 
-#[cfg(feature = "write")]
-impl<T: Writable> WriterArray<Box<T>> for BoxWriterArray<T::WriterArray> {
+#[cfg(feature = "encode")]
+impl<T: Encodable> EncoderArray<Box<T>> for BoxEncoderArray<T::EncoderArray> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Box<T>) {
         self.inner.buffer(&value)
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         self.inner.flush(stream)
     }
 }
 
-#[cfg(feature = "read")]
-impl<T: ReaderArray> ReaderArray for BoxReaderArray<T> {
-    type Read = Box<T::Read>;
+#[cfg(feature = "decode")]
+impl<T: DecoderArray> DecoderArray for BoxDecoderArray<T> {
+    type Decode = Box<T::Decode>;
     type Error = T::Error;
-    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("ReaderArray::new");
-        Ok(BoxReaderArray { inner: T::new(sticks, options)? })
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("DecoderArray::new");
+        Ok(BoxDecoderArray { inner: T::new(sticks, options)? })
     }
-    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
-        Ok(Box::new(self.inner.read_next()?))
+    fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {
+        Ok(Box::new(self.inner.decode_next()?))
     }
 }

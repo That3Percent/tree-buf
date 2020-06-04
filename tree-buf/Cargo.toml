@@ -35,9 +35,9 @@ name = "float_list"
 harness = false
 
 [features]
-default = ["read", "write", "macros"]
+default = ["encode", "decode", "macros"]
 
-read = []
-write = []
+encode = []
+decode = []
 macros = ["tree-buf-macros"]
 profile = ["flame"]

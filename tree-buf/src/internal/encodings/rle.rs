@@ -3,7 +3,7 @@ use std::vec::IntoIter;
 use std::thread_local;
 use std::cell::RefCell;
 
-// FIXME: This won't fly when writes are mult-threaded.
+// FIXME: This won't fly when encodes are mult-threaded.
 // Should use options here, but the wanted closure API isn't
 // easy for some reason. Also, this API is fragile.
 thread_local! {
@@ -17,7 +17,7 @@ pub fn set_in_rle(value: bool) {
     IN_RLE_ENCODE.with(|v| *v.borrow_mut() = value);
 }
 
-// TODO: Use ReaderArray or InfallableReaderArray
+// TODO: Use DecoderArray or InfallableDecoderArray
 pub struct RleIterator<T> {
     // See also 522d2f4f-c5f7-478c-8d94-e7457ae45b29
     runs: IntoIter<u64>,
@@ -54,9 +54,9 @@ impl<T: Send + Clone> RleIterator<T> {
         runs: Box<DynArrayBranch<'_>>,
         values: Box<DynArrayBranch<'_>>,
         options: &impl DecodeOptions,
-        f: impl Send + FnOnce(DynArrayBranch<'_>) -> ReadResult<IntoIter<T>>,
-    ) -> ReadResult<Self> {
-        let (runs, values) = parallel(|| <u64 as Readable>::ReaderArray::new(*runs, options), || f(*values), options);
+        f: impl Send + FnOnce(DynArrayBranch<'_>) -> DecodeResult<IntoIter<T>>,
+    ) -> DecodeResult<Self> {
+        let (runs, values) = parallel(|| <u64 as Decodable>::DecoderArray::new(*runs, options), || f(*values), options);
         let runs = runs?;
         let values = values?;
 
@@ -83,7 +83,7 @@ impl<S> RLE<S> {
 
 
 impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
-    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Nesting creates performance problems
         if get_in_rle() {
             return Err(());
@@ -123,10 +123,10 @@ impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compr
             return Err(());
         }
 
-        stream.write_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
+        stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
 
         set_in_rle(true);
-        stream.write_with_id(|stream| runs.flush(stream));
+        stream.encode_with_id(|stream| runs.flush(stream));
         set_in_rle(false);
 
         Ok(ArrayTypeId::RLE)

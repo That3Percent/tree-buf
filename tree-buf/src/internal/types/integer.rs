@@ -20,7 +20,7 @@ impl Bounded for U0 {
     }
 }
 
-fn write_u0<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+fn encode_u0<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
     unreachable!();
 }
 
@@ -44,21 +44,21 @@ macro_rules! impl_lowerable {
             }
         }
 
-        #[cfg(feature = "write")]
-        impl Writable for $Ty {
-            type WriterArray = Vec<$Ty>;
-            fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
-                write_root_uint(*self as u64, stream.bytes)
+        #[cfg(feature = "encode")]
+        impl Encodable for $Ty {
+            type EncoderArray = Vec<$Ty>;
+            fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+                encode_root_uint(*self as u64, stream.bytes)
             }
         }
 
-        #[cfg(feature = "write")]
-        impl WriterArray<$Ty> for Vec<$Ty> {
+        #[cfg(feature = "encode")]
+        impl EncoderArray<$Ty> for Vec<$Ty> {
             fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
                 self.push(*value);
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
-                profile!("WriterArray::flush");
+            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                profile!("EncoderArray::flush");
                 let max = self.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
@@ -77,28 +77,28 @@ macro_rules! impl_lowerable {
             }
         }
 
-        #[cfg(feature = "read")]
-        impl Readable for $Ty {
-            type ReaderArray = IntoIter<$Ty>;
-            fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!("Readable::read");
+        #[cfg(feature = "decode")]
+        impl Decodable for $Ty {
+            type DecoderArray = IntoIter<$Ty>;
+            fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!("Decodable::decode");
                 match sticks {
                     DynRootBranch::Integer(root_int) => {
                         match root_int {
-                            RootInteger::U(v) => v.try_into().map_err(|_| ReadError::SchemaMismatch),
-                            _ => Err(ReadError::SchemaMismatch),
+                            RootInteger::U(v) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
+                            _ => Err(DecodeError::SchemaMismatch),
                         }
                     }
-                    _ => Err(ReadError::SchemaMismatch),
+                    _ => Err(DecodeError::SchemaMismatch),
                 }
             }
         }
 
-        #[cfg(feature = "read")]
-        impl InfallibleReaderArray for IntoIter<$Ty> {
-            type Read = $Ty;
-            fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-                profile!(Self::Read, "ReaderArray::new");
+        #[cfg(feature = "decode")]
+        impl InfallibleDecoderArray for IntoIter<$Ty> {
+            type Decode = $Ty;
+            fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                profile!(Self::Decode, "DecoderArray::new");
 
                 match sticks {
                     // TODO: Support eg: delta/zigzag
@@ -109,10 +109,10 @@ macro_rules! impl_lowerable {
                                 #[cfg(feature="profile")]
                                 let _g = flame::start_guard("PrefixVarInt");
 
-                                let v: Vec<$Ty> = read_all(
+                                let v: Vec<$Ty> = decode_all(
                                         &bytes,
                                         |bytes, offset| {
-                                            let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| ReadError::SchemaMismatch)?;
+                                            let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| DecodeError::SchemaMismatch)?;
                                             Ok(r)
                                         }
                                 )?;
@@ -123,9 +123,9 @@ macro_rules! impl_lowerable {
                                 let _g = flame::start_guard("Simple16");
 
                                 let mut v = Vec::new();
-                                simple_16::decompress(&bytes, &mut v).map_err(|_| ReadError::InvalidFormat)?;
+                                simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
                                 let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
-                                let v = result.map_err(|_| ReadError::SchemaMismatch)?;
+                                let v = result.map_err(|_| DecodeError::SchemaMismatch)?;
                                 Ok(v.into_iter())
                             },
                             ArrayIntegerEncoding::U8 => {
@@ -150,20 +150,20 @@ macro_rules! impl_lowerable {
                         Ok(Vec::new().into_iter())
                     }
                     other => {
-                        let bools = <IntoIter<bool> as InfallibleReaderArray>::new_infallible(other, options)?;
+                        let bools = <IntoIter<bool> as InfallibleDecoderArray>::new_infallible(other, options)?;
                         let mapped = bools.map(|i| if i {1} else {0}).collect::<Vec<_>>();
                         Ok(mapped.into_iter())
                     },
                 }
             }
-            fn read_next_infallible(&mut self) -> Self::Read {
+            fn decode_next_infallible(&mut self) -> Self::Decode {
                 self.next().unwrap_or_default()
             }
         }
 
-        #[cfg(feature = "write")]
+        #[cfg(feature = "encode")]
         fn $fn<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
-            (data: &[T], max: T, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+            (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
             profile!($Ty, "lowering_fn");
 
             // TODO: (Performance) When getting ranges, use SIMD
@@ -175,8 +175,8 @@ macro_rules! impl_lowerable {
                 }
             }
 
-            fn write_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
-                profile!(&[$Ty], "write_inner");
+            fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                profile!(&[$Ty], "encode_inner");
 
                 let compressors = (
                     $(<$compressions>::new(),)+
@@ -189,14 +189,14 @@ macro_rules! impl_lowerable {
             if TypeId::of::<$Ty>() == TypeId::of::<T>() {
                 // Safety - this is a unit conversion.
                 let data = unsafe { transmute(data) };
-                write_inner(data, stream)
+                encode_inner(data, stream)
             } else {
                 // TODO: (Performance) Use second-stack
                 let mut v = Vec::new();
                 for item in data.iter() {
                     v.push(item.as_());
                 }
-                write_inner(&v, stream)
+                encode_inner(&v, stream)
             }
         }
     };
@@ -208,14 +208,14 @@ macro_rules! impl_lowerable {
 //
 // Broadly we only want to downcast if it allows for some other kind of compressor to be used.
 
-// Type, array writer, next lower, next lower writer, non-inferred lowers
-impl_lowerable!(u64, write_u64, u32, write_u32, (u16), (PrefixVarIntCompressor));
-impl_lowerable!(u32, write_u32, u16, write_u16, (), (Simple16Compressor, PrefixVarIntCompressor)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
-impl_lowerable!(u16, write_u16, u8, write_u8, (), (Simple16Compressor, PrefixVarIntCompressor));
-impl_lowerable!(u8, write_u8, U0, write_u0, (), (Simple16Compressor, BytesCompressor));
+// Type, array encoder, next lower, next lower encoder, non-inferred lowers
+impl_lowerable!(u64, encode_u64, u32, encode_u32, (u16), (PrefixVarIntCompressor));
+impl_lowerable!(u32, encode_u32, u16, encode_u16, (), (Simple16Compressor, PrefixVarIntCompressor)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
+impl_lowerable!(u16, encode_u16, u8, encode_u8, (), (Simple16Compressor, PrefixVarIntCompressor));
+impl_lowerable!(u8, encode_u8, U0, encode_u0, (), (Simple16Compressor, BytesCompressor));
 
-#[cfg(feature = "write")]
-fn write_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
+#[cfg(feature = "encode")]
+fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     let le = value.to_le_bytes();
     match value {
         0 => RootTypeId::Zero,
@@ -272,9 +272,9 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         }
         Some(size)
     }
-    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        stream.write_with_len(|stream| {
+        stream.encode_with_len(|stream| {
             for item in data {
                 encode_prefix_varint((*item).into(), &mut stream.bytes);
             }
@@ -292,7 +292,7 @@ impl Simple16Compressor {
 }
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
-    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
@@ -309,7 +309,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
             v
         };
 
-        stream.write_with_len(|stream| compress_simple_16(&v, stream.bytes)).map_err(|_| ())?;
+        stream.encode_with_len(|stream| compress_simple_16(&v, stream.bytes)).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
     }
@@ -323,9 +323,9 @@ impl BytesCompressor {
 }
 
 impl Compressor<u8> for BytesCompressor {
-    fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress");
-        stream.write_with_len(|stream| stream.bytes.extend_from_slice(data));
+        stream.encode_with_len(|stream| stream.bytes.extend_from_slice(data));
         Ok(ArrayTypeId::U8)
     }
     fn fast_size_for(&self, data: &[u8]) -> Option<usize> {

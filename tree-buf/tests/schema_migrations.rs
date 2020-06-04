@@ -8,11 +8,11 @@ use common::*;
 // part of a more general default on missing or func on missing kind of thing
 #[test]
 fn add_option_defaults_to_none() {
-    #[derive(Write)]
+    #[derive(Encode)]
     pub struct Before {
         x: u64,
     }
-    #[derive(Debug, Read, PartialEq)]
+    #[derive(Debug, Decode, PartialEq)]
     pub struct After {
         x: u64,
         y: Option<u64>,
@@ -25,12 +25,12 @@ fn add_option_defaults_to_none() {
 fn canonical_idents_compatible() {
     #![allow(non_snake_case)]
 
-    #[derive(Read, Write, PartialEq, Debug)]
+    #[derive(Encode, Decode, PartialEq, Debug)]
     pub struct JavaScript {
         myName: u64,
     }
 
-    #[derive(Read, Write, PartialEq, Debug)]
+    #[derive(Encode, Decode, PartialEq, Debug)]
     pub struct Rust {
         my_name: u64,
     }

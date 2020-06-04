@@ -1,11 +1,11 @@
 use crate::prelude::*;
 
-#[cfg(feature = "read")]
-pub fn read_bytes<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> ReadResult<&'a [u8]> {
+#[cfg(feature = "decode")]
+pub fn decode_bytes<'a>(len: usize, bytes: &'a [u8], offset: &'_ mut usize) -> DecodeResult<&'a [u8]> {
     let start = *offset;
-    let end = start.checked_add(len).ok_or(ReadError::InvalidFormat)?;
+    let end = start.checked_add(len).ok_or(DecodeError::InvalidFormat)?;
     if end > bytes.len() {
-        return Err(ReadError::InvalidFormat);
+        return Err(DecodeError::InvalidFormat);
     }
     *offset = end;
     Ok(&bytes[start..end])

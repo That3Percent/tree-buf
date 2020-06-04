@@ -5,7 +5,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::Deref;
 
-/// This wrapper is just to make the Debug impl not write every byte
+/// This wrapper is just to make the Debug impl not display every byte
 pub struct Bytes<'a>(&'a [u8]);
 
 impl fmt::Debug for Bytes<'_> {
@@ -101,37 +101,37 @@ pub enum DynArrayBranch<'a> {
     // Dynamic(Bytes<'a>)
 }
 
-pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
-    let id = ArrayTypeId::read_next(bytes, offset)?;
+pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
+    let id = ArrayTypeId::decode_next(bytes, offset)?;
 
     use ArrayTypeId::*;
 
-    fn read_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> ReadResult<DynArrayBranch<'a>> {
-        let bytes = read_bytes_from_len(bytes, offset, lens)?.into();
+    fn decode_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> DecodeResult<DynArrayBranch<'a>> {
+        let bytes = decode_bytes_from_len(bytes, offset, lens)?.into();
         Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 
-    fn read_bytes_from_len<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<Bytes<'a>> {
+    fn decode_bytes_from_len<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<Bytes<'a>> {
         let len = decode_suffix_varint(bytes, lens)?;
-        Ok(read_bytes(len as usize, bytes, offset)?.into())
+        Ok(decode_bytes(len as usize, bytes, offset)?.into())
     }
 
     // See also e25db64d-8424-46b9-bdc1-cdb618807513
-    fn read_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
+    fn decode_tuple<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
         let mut fields = Vec::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let child = read_next_array(bytes, offset, lens)?;
+            let child = decode_next_array(bytes, offset, lens)?;
             fields.push(child);
         }
         Ok(DynArrayBranch::Tuple { fields })
     }
 
     // See also 47a1482f-5ce3-4b78-b356-30c66dc60cda
-    fn read_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> ReadResult<DynArrayBranch<'a>> {
+    fn decode_obj<'a>(num_fields: usize, bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
         let mut fields = HashMap::with_capacity(num_fields);
         for _ in 0..num_fields {
-            let name = crate::internal::read_ident(bytes, offset)?;
-            let child = read_next_array(bytes, offset, lens)?;
+            let name = crate::internal::decode_ident(bytes, offset)?;
+            let child = decode_next_array(bytes, offset, lens)?;
             fields.insert(name, child);
         }
         Ok(DynArrayBranch::Object { fields })
@@ -139,50 +139,50 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
 
     let branch = match id {
         Nullable => {
-            let opt = read_next_array(bytes, offset, lens)?.into();
-            let values = read_next_array(bytes, offset, lens)?.into();
+            let opt = decode_next_array(bytes, offset, lens)?.into();
+            let values = decode_next_array(bytes, offset, lens)?.into();
             DynArrayBranch::Nullable { opt, values }
         }
         Void => DynArrayBranch::Void,
-        Tuple2 => read_tuple(2, bytes, offset, lens)?,
-        Tuple3 => read_tuple(3, bytes, offset, lens)?,
-        Tuple4 => read_tuple(4, bytes, offset, lens)?,
-        Tuple5 => read_tuple(5, bytes, offset, lens)?,
-        Tuple6 => read_tuple(6, bytes, offset, lens)?,
-        Tuple7 => read_tuple(7, bytes, offset, lens)?,
-        Tuple8 => read_tuple(8, bytes, offset, lens)?,
-        TupleN => read_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
+        Tuple2 => decode_tuple(2, bytes, offset, lens)?,
+        Tuple3 => decode_tuple(3, bytes, offset, lens)?,
+        Tuple4 => decode_tuple(4, bytes, offset, lens)?,
+        Tuple5 => decode_tuple(5, bytes, offset, lens)?,
+        Tuple6 => decode_tuple(6, bytes, offset, lens)?,
+        Tuple7 => decode_tuple(7, bytes, offset, lens)?,
+        Tuple8 => decode_tuple(8, bytes, offset, lens)?,
+        TupleN => decode_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         ArrayVar => {
-            let len = read_next_array(bytes, offset, lens)?;
+            let len = decode_next_array(bytes, offset, lens)?;
             match len {
                 DynArrayBranch::Void => DynArrayBranch::Array0,
                 _ => {
                     // FIXME: Verify that len is Integer here. If not, the file is invalid.
                     // This may not be verified later if the schema is selectively matched.
                     let len = Box::new(len);
-                    let values = read_next_array(bytes, offset, lens)?;
+                    let values = decode_next_array(bytes, offset, lens)?;
                     let values = Box::new(values);
                     DynArrayBranch::Array { len, values }
                 }
             }
         }
         ArrayFixed => {
-            let len = read_usize(bytes, offset)?;
-            let values = read_next_array(bytes, offset, lens)?;
+            let len = decode_usize(bytes, offset)?;
+            let values = decode_next_array(bytes, offset, lens)?;
             let values = Box::new(values);
             DynArrayBranch::ArrayFixed { len, values }
         }
         Map => {
-            let len = read_next_array(bytes, offset, lens)?;
+            let len = decode_next_array(bytes, offset, lens)?;
             match len {
                 DynArrayBranch::Void => DynArrayBranch::Map0,
                 _ => {
                     // FIXME: Verify that len is Integer here. If not, the file is invalid.
                     // This may not be verified later if the schema is selectively matched.
                     let len = Box::new(len);
-                    let keys = read_next_array(bytes, offset, lens)?;
+                    let keys = decode_next_array(bytes, offset, lens)?;
                     let keys = Box::new(keys);
-                    let values = read_next_array(bytes, offset, lens)?;
+                    let values = decode_next_array(bytes, offset, lens)?;
                     let values = Box::new(values);
                     DynArrayBranch::Map { len, keys, values }
                 }
@@ -190,50 +190,50 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
         }
 
         // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
-        Obj0 => read_obj(0, bytes, offset, lens)?,
-        Obj1 => read_obj(1, bytes, offset, lens)?,
-        Obj2 => read_obj(2, bytes, offset, lens)?,
-        Obj3 => read_obj(3, bytes, offset, lens)?,
-        Obj4 => read_obj(4, bytes, offset, lens)?,
-        Obj5 => read_obj(5, bytes, offset, lens)?,
-        Obj6 => read_obj(6, bytes, offset, lens)?,
-        Obj7 => read_obj(7, bytes, offset, lens)?,
-        Obj8 => read_obj(8, bytes, offset, lens)?,
-        ObjN => read_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
+        Obj0 => decode_obj(0, bytes, offset, lens)?,
+        Obj1 => decode_obj(1, bytes, offset, lens)?,
+        Obj2 => decode_obj(2, bytes, offset, lens)?,
+        Obj3 => decode_obj(3, bytes, offset, lens)?,
+        Obj4 => decode_obj(4, bytes, offset, lens)?,
+        Obj5 => decode_obj(5, bytes, offset, lens)?,
+        Obj6 => decode_obj(6, bytes, offset, lens)?,
+        Obj7 => decode_obj(7, bytes, offset, lens)?,
+        Obj8 => decode_obj(8, bytes, offset, lens)?,
+        ObjN => decode_obj(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         PackedBool => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Boolean(ArrayBool::Packed(bytes))
         }
         RLEBoolTrue | RLEBoolFalse => {
             let first = matches!(id, ArrayTypeId::RLEBoolTrue);
-            let runs = read_next_array(bytes, offset, lens)?;
+            let runs = decode_next_array(bytes, offset, lens)?;
             DynArrayBranch::Boolean(ArrayBool::RLE(first, runs.into()))
         }
-        IntSimple16 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
-        IntPrefixVar => read_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
-        U8 => read_ints(bytes, offset, lens, ArrayIntegerEncoding::U8)?,
+        IntSimple16 => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
+        IntPrefixVar => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
+        U8 => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::U8)?,
         F32 => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F32(bytes))
         }
         F64 => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F64(bytes))
         }
         Zfp32 => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::Zfp32(bytes))
         }
         Zfp64 => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::Zfp64(bytes))
         }
         Utf8 => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::String(bytes)
         }
         DoubleGorilla => {
-            let bytes = read_bytes_from_len(bytes, offset, lens)?;
+            let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::DoubleGorilla(bytes))
         }
         Enum => {
@@ -241,13 +241,13 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             let mut variants = Vec::with_capacity(count);
 
             // TODO: Elide discriminants when there are 0 or 1 variants
-            let discriminants = read_next_array(bytes, offset, lens)?.into();
+            let discriminants = decode_next_array(bytes, offset, lens)?.into();
 
             if count != 0 {
                 for _ in 0..count {
                     variants.push(ArrayEnumVariant {
-                        ident: read_ident(bytes, offset)?,
-                        data: read_next_array(bytes, offset, lens)?,
+                        ident: decode_ident(bytes, offset)?,
+                        data: decode_next_array(bytes, offset, lens)?,
                     });
                 }
             }
@@ -255,13 +255,13 @@ pub fn read_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut
             DynArrayBranch::Enum { discriminants, variants }
         }
         RLE => {
-            let values = read_next_array(bytes, offset, lens)?.into();
-            let runs = read_next_array(bytes, offset, lens)?.into();
+            let values = decode_next_array(bytes, offset, lens)?.into();
+            let runs = decode_next_array(bytes, offset, lens)?.into();
             DynArrayBranch::RLE { runs, values }
         }
         Dictionary => {
-            let values = read_next_array(bytes, offset, lens)?.into();
-            let indices = read_next_array(bytes, offset, lens)?.into();
+            let values = decode_next_array(bytes, offset, lens)?.into();
+            let indices = decode_next_array(bytes, offset, lens)?.into();
             DynArrayBranch::Dictionary { values, indices }
         }
     };

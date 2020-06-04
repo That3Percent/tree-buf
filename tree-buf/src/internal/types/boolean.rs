@@ -3,11 +3,11 @@ use crate::internal::encodings::rle_bool::*;
 use crate::prelude::*;
 use std::vec::IntoIter;
 
-#[cfg(feature = "write")]
-impl Writable for bool {
-    type WriterArray = Vec<bool>;
+#[cfg(feature = "encode")]
+impl Encodable for bool {
+    type EncoderArray = Vec<bool>;
     #[inline]
-    fn write_root<O: EncodeOptions>(&self, _stream: &mut WriterStream<'_, O>) -> RootTypeId {
+    fn encode_root<O: EncodeOptions>(&self, _stream: &mut EncoderStream<'_, O>) -> RootTypeId {
         if *self {
             RootTypeId::True
         } else {
@@ -16,24 +16,24 @@ impl Writable for bool {
     }
 }
 
-#[cfg(feature = "read")]
-impl Readable for bool {
-    type ReaderArray = IntoIter<bool>;
-    fn read(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("Readable::read");
+#[cfg(feature = "decode")]
+impl Decodable for bool {
+    type DecoderArray = IntoIter<bool>;
+    fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("Decodable::decode");
         match sticks {
             DynRootBranch::Boolean(v) => Ok(v),
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
 }
 
-#[cfg(feature = "write")]
-impl WriterArray<bool> for Vec<bool> {
+#[cfg(feature = "encode")]
+impl EncoderArray<bool> for Vec<bool> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
         self.push(*value);
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
 
         let compressors = (PackedBoolCompressor, RLEBoolCompressor);
@@ -49,15 +49,15 @@ impl Compressor<bool> for PackedBoolCompressor {
     fn fast_size_for(&self, data: &[bool]) -> Option<usize> {
         Some((data.len() + 7) / 8)
     }
-    fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        stream.write_with_len(|stream| encode_packed_bool(data, stream.bytes));
+    fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+        stream.encode_with_len(|stream| encode_packed_bool(data, stream.bytes));
         Ok(ArrayTypeId::PackedBool)
     }
 }
 
 struct RLEBoolCompressor;
 impl Compressor<bool> for RLEBoolCompressor {
-    fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         if get_in_rle() {
             return Err(());
         }
@@ -68,28 +68,28 @@ impl Compressor<bool> for RLEBoolCompressor {
     }
 }
 
-#[cfg(feature = "read")]
-impl InfallibleReaderArray for IntoIter<bool> {
-    type Read = bool;
+#[cfg(feature = "decode")]
+impl InfallibleDecoderArray for IntoIter<bool> {
+    type Decode = bool;
 
-    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("ReaderArray::new");
+    fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("DecoderArray::new");
 
         match sticks {
             DynArrayBranch::Boolean(encoding) => {
                 let v = match encoding {
                     ArrayBool::Packed(bytes) => decode_packed_bool(&bytes).into_iter(),
                     ArrayBool::RLE(first, runs) => {
-                        let runs = <u64 as Readable>::ReaderArray::new(*runs, options)?;
+                        let runs = <u64 as Decodable>::DecoderArray::new(*runs, options)?;
                         decode_rle_bool(runs, first)
                     }
                 };
                 Ok(v)
             }
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
-    fn read_next_infallible(&mut self) -> Self::Read {
+    fn decode_next_infallible(&mut self) -> Self::Decode {
         self.next().unwrap_or_default()
     }
 }

@@ -8,8 +8,8 @@ use tree_buf::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
-    use tree_buf::{Read, Write};
-    #[derive(Read, Write, PartialEq, Debug, Clone)]
+    use tree_buf::{Encode, Decode};
+    #[derive(Encode, Decode, PartialEq, Debug, Clone)]
     pub struct Bits {
         pub f: f64,
         pub obj_array: Vec<Bobs>,
@@ -17,7 +17,7 @@ mod hide_namespace {
         pub s: Box<String>,
     }
 
-    #[derive(Read, Write, PartialEq, Debug, Clone)]
+    #[derive(Encode, Decode, PartialEq, Debug, Clone)]
     pub struct Bobs {
         pub one: Vec<u64>,
         pub tup: (f64, f64),
@@ -119,9 +119,9 @@ fn lossy_f64_vec() {
     }
     let tolerance = -10;
     let options = encode_options! { options::LossyFloatTolerance(tolerance) };
-    let binary = tree_buf::write_with_options(&data, &options);
+    let binary = tree_buf::encode_with_options(&data, &options);
     assert_eq!(binary.len(), 104);
-    let decoded = read::<Vec<f64>>(&binary).unwrap();
+    let decoded = decode::<Vec<f64>>(&binary).unwrap();
     assert_eq!(data.len(), decoded.len());
     for (e, d) in data.iter().zip(decoded.iter()) {
         assert!((e - d).abs() <= 0.001);
@@ -129,7 +129,7 @@ fn lossy_f64_vec() {
 
     // Show how much smaller this is than lossless
     let options = encode_options! { options::LosslessFloat };
-    let binary = tree_buf::write_with_options(&data, &options);
+    let binary = tree_buf::encode_with_options(&data, &options);
     assert_eq!(binary.len(), 376);
 
     // Show that this is much better than fixed, since this would be a minimum for exactly 0 schema overhead.
@@ -166,17 +166,17 @@ fn nullable_array() {
 
 #[test]
 fn visibility_modifiers() {
-    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Default, Encode, Decode, Debug, PartialEq, Clone)]
     struct Inherited {
         a: u64,
     }
 
-    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Default, Encode, Decode, Debug, PartialEq, Clone)]
     pub(crate) struct Crate {
         a: u64,
     }
 
-    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Default, Encode, Decode, Debug, PartialEq, Clone)]
     pub struct Public {
         a: u64,
     }
@@ -191,7 +191,7 @@ fn ignores() {
     use tree_buf::Ignore;
     round_trip(&Ignore, 1, 3);
 
-    #[derive(Default, Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Default, Encode, Decode, Debug, PartialEq, Clone)]
     struct X {
         i: Ignore,
     }
@@ -199,7 +199,7 @@ fn ignores() {
     let x = X { i: Ignore };
     round_trip(&x, 4, 6);
 
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum E {
         A(Ignore),
         B(Ignore),
@@ -208,7 +208,7 @@ fn ignores() {
     let e = E::A(Ignore);
     round_trip(&e, 4, 10);
 
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     struct N {
         e: E,
     }
@@ -247,7 +247,7 @@ fn conversions() {
 
 #[test]
 fn small_structs() {
-    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Default, Debug, PartialEq, Clone)]
     struct _1 {
         a: u64,
     }
@@ -257,7 +257,7 @@ fn small_structs() {
 
 #[test]
 fn large_structs() {
-    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Default, Debug, PartialEq, Clone)]
     struct _14 {
         a: f64,
         b: f64,
@@ -275,7 +275,7 @@ fn large_structs() {
         n: f64,
     }
 
-    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Default, Debug, PartialEq, Clone)]
     struct _15 {
         a: f64,
         b: f64,
@@ -294,7 +294,7 @@ fn large_structs() {
         o: f64,
     }
 
-    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Default, Debug, PartialEq, Clone)]
     struct _16 {
         a: f64,
         b: f64,
@@ -313,7 +313,7 @@ fn large_structs() {
         o: f64,
         p: f64,
     }
-    #[derive(Read, Write, Default, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Default, Debug, PartialEq, Clone)]
     struct _17 {
         a: f64,
         b: f64,
@@ -393,10 +393,10 @@ fn fixed_arrays() {
     round_trip(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 6, 8);
 }
 
-// This failed to compile at one point when moving generics for WriterArray out of associated type.
+// This failed to compile at one point when moving generics for EncoderArray out of associated type.
 #[test]
 fn enum_with_vec() {
-    #[derive(Write, Read, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum X {
         X(Vec<u64>),
     }
@@ -489,7 +489,7 @@ fn broken_gorilla() {
 
     // 457009 - 457012
 
-    let data = std::fs::read("C:\\git\\floats.dat").unwrap();
+    let data = std::fs::decode("C:\\git\\floats.dat").unwrap();
     let mut offset = 0;
     let mut values = Vec::new();
     while offset < data.len() {

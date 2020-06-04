@@ -1,15 +1,15 @@
 use crate::prelude::*;
 use std::vec::IntoIter;
 
-#[cfg(feature = "write")]
-impl<T: Writable> Writable for Vec<T> {
-    type WriterArray = VecArrayWriter<T::WriterArray>;
-    fn write_root<O: EncodeOptions>(&self, stream: &mut WriterStream<'_, O>) -> RootTypeId {
-        profile!("write_root");
+#[cfg(feature = "encode")]
+impl<T: Encodable> Encodable for Vec<T> {
+    type EncoderArray = VecArrayEncoder<T::EncoderArray>;
+    fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+        profile!("encode_root");
         match self.len() {
             0 => RootTypeId::Array0,
             1 => {
-                stream.write_with_id(|stream| (&self[0]).write_root(stream));
+                stream.encode_with_id(|stream| (&self[0]).encode_root(stream));
                 RootTypeId::Array1
             }
             _ => {
@@ -17,7 +17,7 @@ impl<T: Writable> Writable for Vec<T> {
                 // and the bytes len. Though, it's not for obvious reasons.
                 // Maybe sometimes we can infer from context. Eg: bool always
                 // requires the same number of bits per item
-                write_usize(self.len(), stream);
+                encode_usize(self.len(), stream);
 
                 // TODO: When there are types that are already
                 // primitive (eg: Vec<f64>) it doesn't make sense
@@ -26,12 +26,12 @@ impl<T: Writable> Writable for Vec<T> {
                 //
                 // TODO: See below, and just call buffer on the vec
                 // and flush it!
-                let mut writer = T::WriterArray::default();
+                let mut encoder = T::EncoderArray::default();
                 for item in self {
-                    writer.buffer(item);
+                    encoder.buffer(item);
                 }
 
-                stream.write_with_id(|stream| writer.flush(stream));
+                stream.encode_with_id(|stream| encoder.flush(stream));
 
                 RootTypeId::ArrayN
             }
@@ -39,42 +39,42 @@ impl<T: Writable> Writable for Vec<T> {
     }
 }
 
-#[cfg(feature = "read")]
-impl<T: Readable> Readable for Vec<T>
+#[cfg(feature = "decode")]
+impl<T: Decodable> Decodable for Vec<T>
 // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
 where
-    ReadError: From<<<T as Readable>::ReaderArray as ReaderArray>::Error>,
+    DecodeError: From<<<T as Decodable>::DecoderArray as DecoderArray>::Error>,
 {
-    type ReaderArray = Option<VecArrayReader<T::ReaderArray>>;
-    fn read(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("Readable::read");
+    type DecoderArray = Option<VecArrayDecoder<T::DecoderArray>>;
+    fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("Decodable::decode");
         match sticks {
             DynRootBranch::Array0 => Ok(Vec::new()),
             DynRootBranch::Array1(inner) => {
-                let inner = T::read(*inner, options)?;
+                let inner = T::decode(*inner, options)?;
                 Ok(vec![inner])
             }
             DynRootBranch::Array { len, values } => {
                 let mut v = Vec::with_capacity(len);
                 // TODO: Some of what the code is actually doing here is silly.
-                // Actual ReaderArray's may be IntoIter, which moved out of a Vec
+                // Actual DecoderArray's may be IntoIter, which moved out of a Vec
                 // that we wanted in the first place. Specialization here would be nice.
-                let mut reader = T::ReaderArray::new(values, options)?;
+                let mut decoder = T::DecoderArray::new(values, options)?;
                 for _ in 0..len {
-                    v.push(reader.read_next()?);
+                    v.push(decoder.decode_next()?);
                 }
                 Ok(v)
             }
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 #[derive(Debug, Default)]
-pub struct VecArrayWriter<T> {
+pub struct VecArrayEncoder<T> {
     // TODO: usize
-    len: <u64 as Writable>::WriterArray,
+    len: <u64 as Encodable>::EncoderArray,
     // Using Option here enables recursion when necessary.
     values: Option<T>,
 }
@@ -89,19 +89,19 @@ impl FixedOrVariableLength {
     fn next(&mut self) -> usize {
         match self {
             Self::Fixed(v) => *v,
-            Self::Variable(i) => i.read_next_infallible() as usize,
+            Self::Variable(i) => i.decode_next_infallible() as usize,
         }
     }
 }
 
-#[cfg(feature = "read")]
-pub struct VecArrayReader<T> {
+#[cfg(feature = "decode")]
+pub struct VecArrayDecoder<T> {
     len: FixedOrVariableLength,
     values: T,
 }
 
-#[cfg(feature = "write")]
-impl<T: Writable> WriterArray<Vec<T>> for VecArrayWriter<T::WriterArray> {
+#[cfg(feature = "encode")]
+impl<T: Encodable> EncoderArray<Vec<T>> for VecArrayEncoder<T::EncoderArray> {
     fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Vec<T>) {
         // TODO: Consider whether buffer should actually just
         // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
@@ -116,58 +116,58 @@ impl<T: Writable> WriterArray<Vec<T>> for VecArrayWriter<T::WriterArray> {
             values.buffer(item);
         }
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut WriterStream<'_, O>) -> ArrayTypeId {
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile!("flush");
         let Self { len, values } = self;
         if let Some(values) = values {
             if len.iter().all(|l| *l == len[0]) {
-                write_usize(len[0] as usize, stream);
-                stream.write_with_id(|stream| values.flush(stream));
+                encode_usize(len[0] as usize, stream);
+                stream.encode_with_id(|stream| values.flush(stream));
                 return ArrayTypeId::ArrayFixed;
             }
             // TODO: Consider an all-0 type // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
-            stream.write_with_id(|stream| len.flush(stream));
-            stream.write_with_id(|stream| values.flush(stream));
+            stream.encode_with_id(|stream| len.flush(stream));
+            stream.encode_with_id(|stream| values.flush(stream));
         } else {
-            stream.write_with_id(|_| ArrayTypeId::Void);
+            stream.encode_with_id(|_| ArrayTypeId::Void);
         }
 
         ArrayTypeId::ArrayVar
     }
 }
 
-#[cfg(feature = "read")]
-impl<T: ReaderArray> ReaderArray for Option<VecArrayReader<T>> {
-    type Read = Vec<T::Read>;
+#[cfg(feature = "decode")]
+impl<T: DecoderArray> DecoderArray for Option<VecArrayDecoder<T>> {
+    type Decode = Vec<T::Decode>;
     type Error = T::Error;
 
-    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> ReadResult<Self> {
-        profile!("ReaderArray::new");
+    fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+        profile!("DecoderArray::new");
 
         match sticks {
             DynArrayBranch::Array0 => Ok(None),
             DynArrayBranch::Array { len, values } => {
-                let (values, len) = parallel(|| T::new(*values, options), || <<u64 as Readable>::ReaderArray as ReaderArray>::new(*len, options), options);
+                let (values, len) = parallel(|| T::new(*values, options), || <<u64 as Decodable>::DecoderArray as DecoderArray>::new(*len, options), options);
                 let values = values?;
                 let len = FixedOrVariableLength::Variable(len?);
-                Ok(Some(VecArrayReader { len, values }))
+                Ok(Some(VecArrayDecoder { len, values }))
             }
             DynArrayBranch::ArrayFixed { len, values } => Ok(if len == 0 {
                 None
             } else {
                 let len = FixedOrVariableLength::Fixed(len);
                 let values = T::new(*values, options)?;
-                Some(VecArrayReader { len, values })
+                Some(VecArrayDecoder { len, values })
             }),
-            _ => Err(ReadError::SchemaMismatch),
+            _ => Err(DecodeError::SchemaMismatch),
         }
     }
-    fn read_next(&mut self) -> Result<Self::Read, Self::Error> {
+    fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {
         if let Some(inner) = self {
             let len = inner.len.next();
             let mut result = Vec::with_capacity(len);
             for _ in 0..len {
-                result.push(inner.values.read_next()?);
+                result.push(inner.values.decode_next()?);
             }
             Ok(result)
         } else {

@@ -197,8 +197,8 @@ fn visit(path: Path, branch: &DynRootBranch<'_>, breakdown: &mut SizeBreakdown) 
     }
 }
 
-pub fn size_breakdown(data: &[u8]) -> ReadResult<String> {
-    let root = read_root(data)?;
+pub fn size_breakdown(data: &[u8]) -> DecodeResult<String> {
+    let root = decode_root(data)?;
 
     let mut breakdown = SizeBreakdown {
         by_path: HashMap::new(),

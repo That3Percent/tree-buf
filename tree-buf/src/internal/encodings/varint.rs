@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 pub fn size_for_varint(value: u64) -> usize {
     if value < (1 << 7) {
         1
@@ -24,8 +24,8 @@ pub fn size_for_varint(value: u64) -> usize {
 }
 
 // TODO: This isn't yet used
-#[cfg(feature = "write")]
-pub fn write_varint_into(value: u64, into: &mut [u8]) {
+#[cfg(feature = "encode")]
+pub fn encode_varint_into(value: u64, into: &mut [u8]) {
     debug_assert!(size_for_varint(value) <= into.len());
     match into.len() {
         1 => {
@@ -35,11 +35,11 @@ pub fn write_varint_into(value: u64, into: &mut [u8]) {
             into[0] = (value << 2) as u8 | (1 << 1);
             into[1] = (value >> 6) as u8;
         }
-        _ => todo!("write_varint_into"),
+        _ => todo!("encode_varint_into"),
     }
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 pub fn encode_prefix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
         into.push((value << 1) as u8 | 1);
@@ -104,7 +104,7 @@ pub fn encode_prefix_varint(value: u64, into: &mut Vec<u8>) {
 
 /// This is much like prefix varint, but with the tag bits in the last byte.
 /// Useful for reading backwards.
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
     if value < (1 << 7) {
         into.push((value << 1) as u8 | 1);
@@ -167,14 +167,14 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
     }
 }
 
-#[cfg(feature = "read")]
-pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
+#[cfg(feature = "decode")]
+pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
+    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Check that the compiler does unchecked indexing after this
     if (*offset + (shift as usize)) >= bytes.len() {
-        return Err(ReadError::InvalidFormat);
+        return Err(DecodeError::InvalidFormat);
     }
 
     let result = match shift {
@@ -232,14 +232,14 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64>
 }
 
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
-#[cfg(feature = "read")]
-pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
+#[cfg(feature = "decode")]
+pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
+    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Ensure unchecked indexing follows.
     if *offset < (shift as usize) {
-        return Err(ReadError::InvalidFormat);
+        return Err(DecodeError::InvalidFormat);
     }
 
     let result = match shift {
@@ -298,11 +298,11 @@ pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> ReadResult<u64>
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "read", feature = "write"))]
+    #[cfg(all(feature = "encode", feature = "decode"))]
     use super::super::tests::round_trip;
     use super::*;
 
-    #[cfg(all(feature = "read", feature = "write"))]
+    #[cfg(all(feature = "encode", feature = "decode"))]
     #[test]
     fn round_trip_reserved() {
         let mut v = Vec::new();
@@ -312,7 +312,7 @@ mod tests {
                 v.push(0);
             }
             let w = i / ((i % 3) + 1);
-            write_varint_into(w, &mut v[..]);
+            encode_varint_into(w, &mut v[..]);
             let mut offset = 0;
             let result = decode_prefix_varint(&v[..], &mut offset);
             assert_eq!(Ok(w), result);
@@ -321,13 +321,13 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "read", feature = "write"))]
-    fn round_trip_prefix(values: &[u64]) -> ReadResult<()> {
+    #[cfg(all(feature = "encode", feature = "decode"))]
+    fn round_trip_prefix(values: &[u64]) -> DecodeResult<()> {
         round_trip(values, encode_prefix_varint, decode_prefix_varint)
     }
 
-    #[cfg(all(feature = "read", feature = "write"))]
-    fn round_trip_suffix(values: &[u64]) -> ReadResult<()> {
+    #[cfg(all(feature = "encode", feature = "decode"))]
+    fn round_trip_suffix(values: &[u64]) -> DecodeResult<()> {
         let mut bytes = Vec::new();
         for value in values.iter() {
             encode_suffix_varint(*value, &mut bytes);
@@ -345,9 +345,9 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(all(feature = "read", feature = "write"))]
+    #[cfg(all(feature = "encode", feature = "decode"))]
     #[test]
-    fn test_prefix() -> ReadResult<()> {
+    fn test_prefix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
         for vec in vecs.iter() {
             round_trip_prefix(vec)?;
@@ -369,9 +369,9 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(all(feature = "read", feature = "write"))]
+    #[cfg(all(feature = "encode", feature = "decode"))]
     #[test]
-    fn test_suffix() -> ReadResult<()> {
+    fn test_suffix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
         for vec in vecs.iter() {
             round_trip_suffix(vec)?;

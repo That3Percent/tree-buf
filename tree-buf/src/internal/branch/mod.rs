@@ -42,11 +42,11 @@ macro_rules! impl_type_id_inner {
         }
 
         impl TryFrom<u8> for $T {
-            type Error = ReadError;
-            fn try_from(value: u8) -> ReadResult<Self> {
+            type Error = DecodeError;
+            fn try_from(value: u8) -> DecodeResult<Self> {
                 Ok(match value {
                     $($i => $T::$name,)+
-                    _ => return Err(ReadError::InvalidFormat),
+                    _ => return Err(DecodeError::InvalidFormat),
                 })
             }
         }
@@ -60,8 +60,8 @@ macro_rules! impl_type_id_inner {
         }
 
         impl $T {
-            fn read_next(bytes: &[u8], offset: &mut usize) -> ReadResult<Self> {
-                let next = bytes.get(*offset).ok_or_else(|| ReadError::InvalidFormat)?;
+            fn decode_next(bytes: &[u8], offset: &mut usize) -> DecodeResult<Self> {
+                let next = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
                 *offset += 1;
                 (*next).try_into()
             }
@@ -77,16 +77,16 @@ pub use array_branch::*;
 
 pub type Ident<'a> = &'a str;
 
-#[cfg(feature = "read")]
+#[cfg(feature = "decode")]
 #[inline]
-pub fn read_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> ReadResult<Ident<'a>> {
-    read_str(bytes, offset)
+pub fn decode_ident<'a>(bytes: &'a [u8], offset: &mut usize) -> DecodeResult<Ident<'a>> {
+    decode_str(bytes, offset)
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 #[inline]
-pub fn write_ident<O: EncodeOptions>(value: &str, stream: &mut WriterStream<'_, O>) {
-    write_str(value, stream)
+pub fn encode_ident<O: EncodeOptions>(value: &str, stream: &mut EncoderStream<'_, O>) {
+    encode_str(value, stream)
 }
 
 pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
@@ -110,20 +110,20 @@ pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
 //
 // A purist architecture would do each step separately...
 // 1: Convert Rust types into Object Model
-// 2: Write Object model
+// 2: Encode Object model
 // - and in reverse for deserialize
 //
 // Note that the object model may be just defined in terms of eg: Number, where Number is the sum type of F64, u64, and i64 with downcasts.
 
-#[cfg(feature = "read")]
-pub fn read_root(bytes: &[u8]) -> ReadResult<DynRootBranch<'_>> {
-    profile!(&[u8], "read_root");
+#[cfg(feature = "decode")]
+pub fn decode_root(bytes: &[u8]) -> DecodeResult<DynRootBranch<'_>> {
+    profile!(&[u8], "decode_root");
     if bytes.len() == 0 {
         return Ok(DynRootBranch::Void);
     }
     let mut lens = bytes.len() - 1;
     let mut offset = 0;
-    read_next_root(bytes, &mut offset, &mut lens)
+    decode_next_root(bytes, &mut offset, &mut lens)
 }
 
 #[cfg(test)]
@@ -139,13 +139,13 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "read")]
+    #[cfg(feature = "decode")]
     #[test]
     fn all_root_type_ids() {
         convert_all::<RootTypeId>();
     }
 
-    #[cfg(feature = "read")]
+    #[cfg(feature = "decode")]
     #[test]
     fn all_array_type_ids() {
         convert_all::<ArrayTypeId>();

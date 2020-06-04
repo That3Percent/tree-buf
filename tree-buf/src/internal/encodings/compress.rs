@@ -1,11 +1,11 @@
 use crate::prelude::*;
 
-#[cfg(feature = "write")]
-pub(crate) fn compress<T: PartialEq + Default, O: EncodeOptions>(data: &[T], stream: &mut WriterStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
+#[cfg(feature = "encode")]
+pub(crate) fn compress<T: PartialEq + Default, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "compress");
 
     // Remove trailing default values.
-    // All the readers always generate defaults when values "run out".
+    // All the decoders always generate defaults when values "run out".
     // These cause problems with nested encodings like Dictionary and RLE
     // TODO: Bring back in "root" compression schemes?
     /*
@@ -65,21 +65,21 @@ pub(crate) fn compress<T: PartialEq + Default, O: EncodeOptions>(data: &[T], str
     panic!("Missing infallable compressor for type");
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "encode")]
 pub(crate) trait Compressor<T> {
     /// If it's possible to figure out how big the data will be without
     /// compressing it, implement that here.
     fn fast_size_for(&self, _data: &[T]) -> Option<usize> {
         None
     }
-    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()>;
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
 
 
 pub (crate) trait CompressorSet<T> {
     fn len(&self) -> usize;
     fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize>;
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut WriterStream<'_, O>) -> Result<ArrayTypeId, ()>;
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
 
 

@@ -4,7 +4,7 @@ use tree_buf::prelude::*;
 
 #[test]
 fn unnamed_field_one_variant() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum K {
         St(String),
     }
@@ -14,7 +14,7 @@ fn unnamed_field_one_variant() {
 
 #[test]
 fn selects_correct_discriminant() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum Opts {
         One(u32),
         Two(u8),
@@ -26,7 +26,7 @@ fn selects_correct_discriminant() {
 
 #[test]
 fn pub_vis() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     pub enum Pub {
         Val(u32),
     }
@@ -36,11 +36,11 @@ fn pub_vis() {
 
 #[test]
 fn unused_variations_do_not_affect_size() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum A {
         One(u32),
     }
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum B {
         One(u32),
         Two(u32),
@@ -52,7 +52,7 @@ fn unused_variations_do_not_affect_size() {
 
 #[test]
 fn void_value() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum HasVoid {
         One,
         Two,
@@ -63,7 +63,7 @@ fn void_value() {
 
 #[test]
 fn mixed_void_and_single() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum Mixed {
         Ex, // TODO: This can't be named None because of the macro
         One(u32),
@@ -79,13 +79,13 @@ fn mixed_void_and_single() {
 // TODO: Enable test
 #[test]
 fn wierd_unit_variants() {
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum Unnamed {
         One(),
         Two(),
     }
 
-    #[derive(Read, Write, Debug, PartialEq, Clone)]
+    #[derive(Encode, Decode, Debug, PartialEq, Clone)]
     enum Named {
         One{},
         Two{},
@@ -96,7 +96,7 @@ fn wierd_unit_variants() {
 // TODO: Enable test
 #[test]
 fn struct_value() {
-    #[derive(Read, Write, Debug, PartialEq)]
+    #[derive(Encode, Decode, Debug, PartialEq)]
     enum HasStruct {
         S { one: u32, two: u32 },
     }

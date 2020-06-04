@@ -7,12 +7,12 @@ use num_traits::AsPrimitive;
 use std::convert::TryInto as _;
 use std::mem::size_of;
 
-pub fn decompress<T: 'static + Copy>(bytes: &[u8]) -> ReadResult<Vec<T>>
+pub fn decompress<T: 'static + Copy>(bytes: &[u8]) -> DecodeResult<Vec<T>>
 where
     f64: AsPrimitive<T>,
 {
     // FIXME: Should do schema mismatch for f32 -> f64
-    let num_bits_last_elm = bytes.last().ok_or_else(|| ReadError::InvalidFormat)?;
+    let num_bits_last_elm = bytes.last().ok_or_else(|| DecodeError::InvalidFormat)?;
     let bytes = &bytes[..bytes.len() - 1];
     let last = &bytes[bytes.len() - (bytes.len() % 8)..];
     let bytes = &bytes[..bytes.len() - last.len()];
@@ -23,10 +23,10 @@ where
     let last = u64::from_le_bytes(last_2);
     // TODO: Change this to check that num_bits_last_elm is correct
     if bytes.len() % size_of::<u64>() != 0 {
-        return Err(ReadError::InvalidFormat);
+        return Err(DecodeError::InvalidFormat);
     }
     // TODO: (Performance) The following can use unchecked, since we just verified the size is valid.
-    let mut data = read_all(bytes, |bytes, offset| {
+    let mut data = decode_all(bytes, |bytes, offset| {
         let start = *offset;
         let end = start + size_of::<u64>();
         let le_bytes = &bytes[start..end];
