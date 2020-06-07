@@ -33,8 +33,8 @@ impl<T: Decodable> Decodable for Box<T> {
 
 #[cfg(feature = "encode")]
 impl<T: Encodable> EncoderArray<Box<T>> for BoxEncoderArray<T::EncoderArray> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Box<T>) {
-        self.inner.buffer(&value)
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b Box<T>) {
+        self.inner.buffer_one(&value)
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         self.inner.flush(stream)

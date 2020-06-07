@@ -23,13 +23,13 @@ impl<K: Encodable, V: Encodable, S: Default + BuildHasher> Encodable for HashMap
             _ => {
                 let mut keys_encoder = K::EncoderArray::default();
                 for key in self.keys() {
-                    keys_encoder.buffer(key);
+                    keys_encoder.buffer_one(key);
                 }
                 stream.encode_with_id(|stream| keys_encoder.flush(stream));
-
+                // TODO: Verify that iterating keys and values is always the same order!
                 let mut values_encoder = V::EncoderArray::default();
                 for value in self.values() {
-                    values_encoder.buffer(value);
+                    values_encoder.buffer_one(value);
                 }
                 stream.encode_with_id(|stream| values_encoder.flush(stream));
             }
@@ -93,13 +93,13 @@ pub struct HashMapArrayDecoder<K, V, S> {
 
 #[cfg(feature = "encode")]
 impl<K: Encodable, V: Encodable, S: Default + BuildHasher> EncoderArray<HashMap<K, V, S>> for HashMapArrayEncoder<K::EncoderArray, V::EncoderArray, S> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b HashMap<K, V, S>) {
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b HashMap<K, V, S>) {
         profile!("EncoderArray::buffer");
-        self.len.buffer(&(value.len() as u64));
+        self.len.buffer_one(&(value.len() as u64));
         let (keys, values) = self.items.get_or_insert_with(Default::default);
         for (key, value) in value.iter() {
-            keys.buffer(key);
-            values.buffer(value);
+            keys.buffer_one(key);
+            values.buffer_one(value);
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {

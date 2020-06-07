@@ -31,7 +31,7 @@ fn impl_struct_encode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStrea
 
     let buffers = fields.iter().map(|NamedField { ident, .. }| {
         quote! {
-            self.#ident.buffer(&value.#ident);
+            self.#ident.buffer_one(&value.#ident);
         }
     });
 
@@ -101,7 +101,7 @@ fn fill_encode_skeleton<A: ToTokens>(
         }
 
         impl ::tree_buf::internal::EncoderArray<#name> for #array_encoder_name {
-            fn buffer<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
+            fn buffer_one<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
                 #buffer
             }
             fn flush<O: ::tree_buf::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
@@ -167,7 +167,7 @@ fn impl_enum_encode(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                             self.tree_buf_next_discriminant += 1;
                             current
                         };
-                        self.tree_buf_discriminant.buffer(&t);
+                        self.tree_buf_discriminant.buffer_one(&t);
                     }
                 });
                 flushes.push(quote! {
@@ -209,8 +209,8 @@ fn impl_enum_encode(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
                                     self.tree_buf_next_discriminant += 1;
                                 }
                                 let t = self.#variant_ident.as_mut().unwrap();
-                                self.tree_buf_discriminant.buffer(&t.0);
-                                t.1.buffer(_0);
+                                self.tree_buf_discriminant.buffer_one(&t.0);
+                                t.1.buffer_one(_0);
                             }
                         });
                         flushes.push(quote! {

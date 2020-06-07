@@ -27,19 +27,9 @@ macro_rules! impl_fixed {
                             // requires the same number of bits per item
                             encode_usize(self.len(), stream);
 
-                            // TODO: When there are types that are already
-                            // primitive (eg: Vec<f64>) it doesn't make sense
-                            // to buffer at this level. Specialization may
-                            // be useful here.
-                            //
-                            // TODO: See below, and just call buffer on the vec
-                            // and flush it!
-                            let mut encoder = T::EncoderArray::default();
-                            for item in self.iter() {
-                                encoder.buffer(item);
-                            }
-
-                            stream.encode_with_id(|stream| encoder.flush(stream));
+                            stream.encode_with_id(|stream| {
+                                T::EncoderArray::encode_all(&self[..], stream)
+                            });
 
                             RootTypeId::ArrayN
                         }
@@ -115,18 +105,10 @@ macro_rules! impl_fixed {
 
             #[cfg(feature = "encode")]
             impl<T: Encodable> EncoderArray<[T; $size]> for ArrayEncoder<T::EncoderArray> {
-                fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b [T; $size]) {
-                    // TODO: Consider whether buffer should actually just
-                    // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
-                    // and the flattening could happen later at flush time. This may reduce memory cost.
-                    // Careful though.
-                    // I feel though that somehow this outer buffer type
-                    // could fix the specialization problem above for single-vec
-                    // values.
-                    for item in value.iter() {
-                        self.values.buffer(item);
-                    }
+                fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b [T; $size]) {
+                    self.values.buffer_many(value);
                 }
+                // TODO: Overload for encode_all?
                 fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                     profile!("flush");
                     let Self { values } = self;

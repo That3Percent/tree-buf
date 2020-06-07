@@ -33,10 +33,10 @@ pub struct NullableEncoder<V> {
 
 #[cfg(feature = "encode")]
 impl<T: Encodable> EncoderArray<Option<T>> for NullableEncoder<T::EncoderArray> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Option<T>) {
-        self.opt.buffer(&value.is_some());
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b Option<T>) {
+        self.opt.buffer_one(&value.is_some());
         if let Some(value) = value {
-            self.value.get_or_insert_with(T::EncoderArray::default).buffer(value);
+            self.value.get_or_insert_with(T::EncoderArray::default).buffer_one(value);
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {

@@ -19,19 +19,7 @@ impl<T: Encodable> Encodable for Vec<T> {
                 // requires the same number of bits per item
                 encode_usize(self.len(), stream);
 
-                // TODO: When there are types that are already
-                // primitive (eg: Vec<f64>) it doesn't make sense
-                // to buffer at this level. Specialization may
-                // be useful here.
-                //
-                // TODO: See below, and just call buffer on the vec
-                // and flush it!
-                let mut encoder = T::EncoderArray::default();
-                for item in self {
-                    encoder.buffer(item);
-                }
-
-                stream.encode_with_id(|stream| encoder.flush(stream));
+                stream.encode_with_id(|stream| T::EncoderArray::encode_all(&self[..], stream));
 
                 RootTypeId::ArrayN
             }
@@ -102,19 +90,10 @@ pub struct VecArrayDecoder<T> {
 
 #[cfg(feature = "encode")]
 impl<T: Encodable> EncoderArray<Vec<T>> for VecArrayEncoder<T::EncoderArray> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b Vec<T>) {
-        // TODO: Consider whether buffer should actually just
-        // do something non-flat, (like literally push the Vec<T> into another Vec<T>)
-        // and the flattening could happen later at flush time. This may reduce memory cost.
-        // Careful though.
-        // I feel though that somehow this outer buffer type
-        // could fix the specialization problem above for single-vec
-        // values.
-        self.len.buffer(&(value.len() as u64));
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b Vec<T>) {
+        self.len.buffer_one(&(value.len() as u64));
         let values = self.values.get_or_insert_with(Default::default);
-        for item in value {
-            values.buffer(item);
-        }
+        values.buffer_many(&value[..]);
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile!("flush");

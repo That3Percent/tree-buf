@@ -1,6 +1,7 @@
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use rle::RLE;
+use std::borrow::Borrow;
 use std::vec::IntoIter;
 
 // TODO: Consider compressed unicode (SCSU?) for String in general,
@@ -28,7 +29,7 @@ pub fn decode_str<'a>(bytes: &'a [u8], offset: &'_ mut usize) -> DecodeResult<&'
 
 #[cfg(feature = "encode")]
 impl Encodable for String {
-    type EncoderArray = Vec<&'static str>;
+    type EncoderArray = Vec<&'static String>;
     fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
         let value = self.as_str();
         match value.len() {
@@ -56,8 +57,8 @@ impl Encodable for String {
 }
 
 #[cfg(feature = "encode")]
-impl EncoderArray<String> for Vec<&'static str> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b String) {
+impl EncoderArray<String> for Vec<&'static String> {
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b String) {
         // TODO: Working around lifetime issues for lack of GAT
         // A quick check makes this appear to be sound, since the signature
         // requires that the value outlive self.
@@ -65,14 +66,17 @@ impl EncoderArray<String> for Vec<&'static str> {
         // The big safety problem is that whe then give these references
         // away when flushing. We happen to know that nothing saves the references,
         // but when things like threading come into play it's hard to know.
-        self.push(unsafe { std::mem::transmute(value.as_str()) });
+        //
+        // TODO: Use extend_lifetime crate
+        self.push(unsafe { std::mem::transmute(value) });
     }
+
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile!("EncoderArray::flush");
 
         let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)));
 
-        compress(&self, stream, &compressors)
+        compress(&self[..], stream, &compressors)
     }
 }
 
@@ -123,23 +127,27 @@ impl InfallibleDecoderArray for IntoIter<String> {
 }
 
 #[cfg(feature = "encode")]
-impl<'a> Compressor<&'a str> for Utf8Compressor {
-    fn fast_size_for(&self, data: &[&'a str]) -> Option<usize> {
+pub(crate) struct Utf8Compressor;
+
+// TODO: The Borrow<String> here is interesting. Can we get rid of other lifetimes?
+#[cfg(feature = "encode")]
+impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
+    fn fast_size_for(&self, data: &[T]) -> Option<usize> {
         profile!("Compressor::fast_size_for");
         let mut total = 0;
         for s in data {
-            total += size_for_varint(s.len() as u64);
-            total += s.as_bytes().len();
+            total += size_for_varint(s.borrow().len() as u64);
+            total += s.borrow().as_bytes().len();
         }
         Some(total)
     }
-    fn compress<O: EncodeOptions>(&self, data: &[&'a str], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("Compressor::compress");
 
         stream.encode_with_len(|stream| {
             for value in data.iter() {
-                encode_prefix_varint(value.len() as u64, stream.bytes);
-                stream.bytes.extend_from_slice(value.as_bytes());
+                encode_prefix_varint(value.borrow().len() as u64, stream.bytes);
+                stream.bytes.extend_from_slice(value.borrow().as_bytes());
             }
         });
 

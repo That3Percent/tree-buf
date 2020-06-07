@@ -97,10 +97,11 @@ pub enum DynArrayBranch<'a> {
     // TODO:
     // In any array context, we can have a 'dynamic' value, which resolves to an array of DynRootBranch (like a nested file)
     // This generally should not be used, but the existance of it is an escape hatch bringing the capability to use truly unstructured
-    // data when necessary. // TODO: The hard-line appraoch would be to enforce the use of enum instead.
+    // data when necessary. // TODO: The hard-line approach would be to enforce the use of enum instead.
     // Dynamic(Bytes<'a>)
 }
 
+// TODO: Make this stack based instead of recursion based to not crash on deep inputs
 pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
     let id = ArrayTypeId::decode_next(bytes, offset)?;
 
@@ -157,8 +158,6 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
             match len {
                 DynArrayBranch::Void => DynArrayBranch::Array0,
                 _ => {
-                    // FIXME: Verify that len is Integer here. If not, the file is invalid.
-                    // This may not be verified later if the schema is selectively matched.
                     let len = Box::new(len);
                     let values = decode_next_array(bytes, offset, lens)?;
                     let values = Box::new(values);
@@ -177,8 +176,6 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
             match len {
                 DynArrayBranch::Void => DynArrayBranch::Map0,
                 _ => {
-                    // FIXME: Verify that len is Integer here. If not, the file is invalid.
-                    // This may not be verified later if the schema is selectively matched.
                     let len = Box::new(len);
                     let keys = decode_next_array(bytes, offset, lens)?;
                     let keys = Box::new(keys);

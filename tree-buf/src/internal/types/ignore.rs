@@ -21,7 +21,8 @@ impl Decodable for Ignore {
 
 #[cfg(feature = "encode")]
 impl EncoderArray<Ignore> for Ignore {
-    fn buffer<'a, 'b: 'a>(&'a mut self, _value: &'b Ignore) {}
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, _value: &'b Ignore) {}
+    fn buffer_many<'a, 'b: 'a>(&'a mut self, _values: &'b [Ignore]) {}
     fn flush<O: EncodeOptions>(self, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         ArrayTypeId::Void
     }

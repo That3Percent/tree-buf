@@ -52,28 +52,36 @@ macro_rules! impl_lowerable {
             }
         }
 
+
+
         #[cfg(feature = "encode")]
         impl EncoderArray<$Ty> for Vec<$Ty> {
-            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
+            fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
                 self.push(*value);
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("EncoderArray::flush");
-                let max = self.iter().max();
+            fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
+                self.extend_from_slice(values);
+            }
+            fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                profile!("encode_all");
+                let max = values.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
                     // Lower to bool if possible. This is especially nice for enums
                     // with 2 variants.
                     // TODO: Lowering to bool works in all tests, but not benchmarks
                     if *max < 2 {
-                        let bools = self.iter().map(|i| *i == 1).collect::<Vec<_>>();
+                        let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
                         bools.flush(stream)
                     } else {
-                        $fn(&self, *max, stream)
+                        $fn(values, *max, stream)
                     }
                 } else {
                     ArrayTypeId::Void
                 }
+            }
+            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                Self::encode_all(&self[..], stream)
             }
         }
 

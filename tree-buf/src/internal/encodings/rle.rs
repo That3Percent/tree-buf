@@ -80,7 +80,7 @@ impl<S> RLE<S> {
     }
 }
 
-impl<T: PartialEq + Copy + Default + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
+impl<T: PartialEq + Copy + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Nesting creates performance problems
         if get_in_rle() {

@@ -20,6 +20,7 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
             *capacity -= count;
         } else {
             let remainder = count - *capacity;
+            // FIXME: Observed a "attempted to shift right with overflow" in geojson benchmark on this line
             *buffer ^= bits >> remainder;
             bytes.extend_from_slice(&buffer.to_le_bytes());
             *capacity = 64 - remainder;

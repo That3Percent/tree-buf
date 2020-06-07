@@ -30,15 +30,21 @@ impl Decodable for bool {
 
 #[cfg(feature = "encode")]
 impl EncoderArray<bool> for Vec<bool> {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
         self.push(*value);
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("flush");
+    fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [bool]) {
+        self.extend_from_slice(values);
+    }
+    fn encode_all<O: EncodeOptions>(values: &[bool], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        profile!("encode_all");
 
         let compressors = (PackedBoolCompressor, RLEBoolCompressor);
 
-        compress(&self, stream, &compressors)
+        compress(values, stream, &compressors)
+    }
+    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        Self::encode_all(&self[..], stream)
     }
 }
 

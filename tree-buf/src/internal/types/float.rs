@@ -169,18 +169,24 @@ macro_rules! impl_float {
 
         #[cfg(feature = "encode")]
         impl EncoderArray<$T> for Vec<$T> {
-            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b $T) {
+            fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b $T) {
                 self.push(*value);
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("flush");
+            fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$T]) {
+                self.extend_from_slice(values);
+            }
+            fn encode_all<O: EncodeOptions>(values: &[$T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                profile!("encode_all");
 
                 let compressors = (
                     Fixed, //Zfp,
                     Gorilla,
                 );
 
-                compress(&self, stream, &compressors)
+                compress(values, stream, &compressors)
+            }
+            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                Self::encode_all(&self[..], stream)
             }
         }
 

@@ -20,8 +20,6 @@ pub mod gorilla {
 
 //pub mod zfp;
 
-#[cfg(feature = "encode")]
-pub(crate) struct Utf8Compressor;
 
 #[cfg(feature = "decode")]
 /// Decodes all items from some byte aligned encoding

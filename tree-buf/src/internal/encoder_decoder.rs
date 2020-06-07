@@ -79,8 +79,18 @@ pub trait Decodable: Sized {
 // allocations further.
 
 #[cfg(feature = "encode")]
-pub trait EncoderArray<T: ?Sized>: Default {
-    fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b T);
+pub trait EncoderArray<T>: Default {
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b T);
+    fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [T]) {
+        for elem in values {
+            self.buffer_one(elem);
+        }
+    }
+    fn encode_all<O: EncodeOptions>(values: &[T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        let mut s = Self::default();
+        s.buffer_many(values);
+        s.flush(stream)
+    }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId;
 }
 

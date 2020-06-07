@@ -78,9 +78,9 @@ macro_rules! impl_tuple {
 
         #[cfg(feature = "encode")]
         impl<$($ts: Encodable),+> EncoderArray<($($ts),+)> for ($($ts::EncoderArray),+) {
-            fn buffer<'a, 'b: 'a>(&'a mut self, value: &'b ($($ts),+)) {
+            fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b ($($ts),+)) {
                 $(
-                    tuple_index!(self, $ti).buffer(&tuple_index!(value, $ti));
+                    tuple_index!(self, $ti).buffer_one(&tuple_index!(value, $ti));
                 )+
             }
             fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "encode")]
-pub(crate) fn compress<T: PartialEq + Default, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
+pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "compress");
 
     // Remove trailing default values.
