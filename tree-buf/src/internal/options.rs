@@ -42,6 +42,8 @@ macro_rules! options {
     };
 }
 
+// TODO: Option for parallel
+// TODO: Put scratch in options?
 options!(EncodeOptions, EncodeOptionsDefault, EncodeOptionsOverride, EncodeOptionsHierarchy, {
     lossy_float_tolerance: Option<i32> = None
 });

@@ -6,6 +6,8 @@
 pub mod branch;
 #[macro_use]
 pub mod encodings;
+pub mod buffer;
+pub mod chunk;
 pub mod encoder_decoder;
 pub mod error;
 pub mod markers;
@@ -14,7 +16,7 @@ pub mod parallel;
 pub mod rust_std;
 pub mod types;
 
-pub use {branch::*, encoder_decoder::*, encodings::*, options::*, parallel::*, rust_std::*, types::*};
+pub use {branch::*, buffer::*, encoder_decoder::*, encodings::*, options::*, parallel::*, rust_std::*, types::*};
 
 pub(crate) use markers::*;
 

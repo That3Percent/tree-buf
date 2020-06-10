@@ -51,6 +51,8 @@ pub mod prelude {
     pub(crate) use flame;
 
     pub(crate) use profile;
+
+    pub(crate) use crate::experimental::*;
 }
 
 #[cfg(feature = "decode")]
