@@ -1,5 +1,21 @@
 use crate::prelude::*;
 
+pub(crate) struct CompressingBuffer<Stream, Compressors, T> {
+    pub buffer: Buffer<T>,
+    pub stream: Stream,
+    pub compressors: Compressors,
+}
+
+impl<Stream, Compressors: CompressorSet<T> + Default, T: Copy> CompressingBuffer<Stream, Compressors, T> {
+    pub fn new(scratch: &scratch::Scratch, stream: Stream) -> Self {
+        Self {
+            stream,
+            compressors: Default::default(),
+            buffer: scratch.take_buffer(),
+        }
+    }
+}
+
 #[cfg(feature = "encode")]
 pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "compress");

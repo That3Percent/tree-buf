@@ -28,6 +28,30 @@ impl Decodable for bool {
     }
 }
 
+type BoolCompressorSet = (PackedBoolCompressor, RLEBoolCompressor);
+
+impl<O: EncodeOptions> EncoderArray<bool, O> for CompressingBuffer<EncoderStream<'_>, BoolCompressorSet, bool> {
+    fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
+        // FIXME: Assuming can write
+        self.buffer.try_push(value).unwrap()
+    }
+    fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [bool]) {
+        // FIXME: Assuming can write
+        self.buffer.try_extend(values).unwrap();
+    }
+    fn encode_all(values: &[bool], options: O, stream: &mut EncoderStream<'_>) -> ArrayTypeId {
+        profile!("encode_all");
+
+        let compressors = (PackedBoolCompressor, RLEBoolCompressor);
+
+        compress(values, stream, &compressors)
+    }
+    fn flush(self, stream: &mut EncoderStream<'_>) -> ArrayTypeId {
+        Self::encode_all(&self.buffer[..], stream)
+    }
+}
+
+/*
 #[cfg(feature = "encode")]
 impl EncoderArray<bool> for Vec<bool> {
     fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b bool) {
@@ -47,6 +71,7 @@ impl EncoderArray<bool> for Vec<bool> {
         Self::encode_all(&self[..], stream)
     }
 }
+*/
 
 struct PackedBoolCompressor;
 impl Compressor<bool> for PackedBoolCompressor {

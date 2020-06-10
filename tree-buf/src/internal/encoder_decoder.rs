@@ -1,19 +1,33 @@
 use crate::internal::encodings::varint::{encode_varint_into, size_for_varint};
 use crate::prelude::*;
+use std::cell::{RefCell, RefMut};
+use std::rc::Rc;
 
-// REMEMBER: The reason this is not a trait is because of partial borrows.
-// If this is a trait, you can't borrow both bytes and lens at the same time.
 #[cfg(feature = "encode")]
-pub struct EncoderStream<'a, O> {
-    pub bytes: &'a mut Vec<u8>,
-    pub lens: &'a mut Vec<usize>,
-    pub options: &'a O,
+#[derive(Clone)]
+pub struct EncoderStream<'a> {
+    bytes: Rc<RefCell<&'a mut Vec<u8>>,
+    // TODO: Dump the whole schema here instead of just the lens
+    lens: Rc<RefCell<&'a mut Vec<usize>>,
+    scratch: scratch::Scratch,
 }
 
 #[cfg(feature = "encode")]
-impl<'a, O: EncodeOptions> EncoderStream<'a, O> {
-    pub fn new(bytes: &'a mut Vec<u8>, lens: &'a mut Vec<usize>, options: &'a O) -> Self {
-        Self { bytes, lens, options }
+impl<'a> EncoderStream<'a> {
+    pub fn new(bytes: &'a mut Vec<u8>, lens: &'a mut Vec<usize>) -> Self {
+        Self { bytes, lens }
+    }
+
+    pub fn bytes(&self) -> RefMut<'_, &'a mut Vec<u8>> {
+        self.bytes.borrow_mut()
+    }
+
+    pub fn lens(&self) -> RefMut<'_, &'a mut Vec<usize>> {
+        self.lens.borrow_mut()
+    }
+
+    pub fn scratch(&self) -> &scratch::Scratch {
+        &self.scratch
     }
 
     // TODO: Not yet used
@@ -38,8 +52,6 @@ impl<'a, O: EncodeOptions> EncoderStream<'a, O> {
         encode_varint_into(v, &mut self.bytes[start..end]);
     }
 
-    // See also: a0b1e0fa-e33c-4bda-8141-d184a1160143
-    // Duplicated code.
     pub fn encode_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let type_index = self.bytes.len();
         self.bytes.push(0);
@@ -79,19 +91,22 @@ pub trait Decodable: Sized {
 // allocations further.
 
 #[cfg(feature = "encode")]
-pub trait EncoderArray<T>: Default {
+pub trait EncoderArray<T, O> {
+    // TODO: Pass in the scratch here
+    // TODO: Same arguments to new as encode_all
+    fn new(options: &O, stream: &EncoderStream<'_>) -> Self;
     fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b T);
     fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [T]) {
         for elem in values {
             self.buffer_one(elem);
         }
     }
-    fn encode_all<O: EncodeOptions>(values: &[T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+    fn encode_all(values: &[T], options: &O, stream: &mut EncoderStream<'_>) -> ArrayTypeId {
         let mut s = Self::default();
         s.buffer_many(values);
         s.flush(stream)
     }
-    fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId;
+    fn flush(self) -> ArrayTypeId;
 }
 
 #[cfg(feature = "decode")]
