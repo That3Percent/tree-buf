@@ -124,7 +124,7 @@ impl<T> Buffer<T> {
 }
 
 #[derive(Default)]
-pub struct BufferPool {
+pub(crate) struct BufferPool {
     pool: Vec<Buffer<u8>>,
 }
 
