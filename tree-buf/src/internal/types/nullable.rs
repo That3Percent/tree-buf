@@ -16,7 +16,7 @@ impl<T: Encodable> Encodable for Option<T> {
 impl<T: Decodable> Decodable for Option<T> {
     type DecoderArray = Option<NullableDecoder<T::DecoderArray>>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Decodable::decode");
+        profile!("Nullable Decodable::decode");
         match sticks {
             DynRootBranch::Void => Ok(None),
             _ => Ok(Some(T::decode(sticks, options)?)),
@@ -62,7 +62,7 @@ impl<T: DecoderArray> DecoderArray for Option<NullableDecoder<T>> {
     type Decode = Option<T::Decode>;
     type Error = T::Error;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("DecoderArray::new");
+        profile!("Nullable DecoderArray::new");
 
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {

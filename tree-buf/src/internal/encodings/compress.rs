@@ -19,12 +19,22 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
         return compressors.compress(0, data, stream).unwrap();
     }
 
+    #[cfg(feature = "profile")]
+    let samples = flame::start_guard("Samples");
     let restore_bytes = stream.bytes.len();
     // TODO: Yuck!. This is ugly and error prone to restore these
     // and update the byte count with the assumed compressor for lens
     let restore_lens = stream.lens.len();
     let sample_size = data.len().min(256);
     let sample = &data[..sample_size];
+
+    // TODO: Don't re-do compression when possible
+    // TODO: Many fast-size-for
+    /*
+    if data.len() == sample_size {
+        dbg!(data.len());
+    }
+    */
 
     // Rank compressors by how well they do on a sample of the data
     // TODO: Use second-stack
@@ -33,6 +43,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
     // is at the end, then we can just keep it in the case where it wins
     let mut by_size = Vec::new();
     for i in 0..compressors.len() {
+        // FIXME: A lot of these implementations are wrong, because they do not account for the lens
         if let Some(size) = compressors.fast_size_for(i, sample) {
             by_size.push((i, size));
         } else {
@@ -47,6 +58,12 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
             stream.lens.truncate(restore_lens);
         }
     }
+
+    #[cfg(feature = "profile")]
+    drop(samples);
+
+    #[cfg(feature = "profile")]
+    let _final = flame::start_guard("Final");
 
     // Sorting stable allows us to have a preference for one encoder over another.
     by_size.sort_by_key(|&(_, size)| size);

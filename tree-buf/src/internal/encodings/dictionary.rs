@@ -66,7 +66,7 @@ impl<S> Dictionary<S> {
 impl<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Compressor<T> for Dictionary<S> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
-        profile!("compress");
+        profile!("compress dictionary");
         // It will always be more efficient to just defer to another encoding.
         if data.len() < 2 {
             return Err(());

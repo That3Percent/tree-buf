@@ -12,7 +12,6 @@ pub struct BoxEncoderArray<T> {
 impl<T: Encodable> Encodable for Box<T> {
     type EncoderArray = BoxEncoderArray<T::EncoderArray>;
     fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-        profile!("encode_root");
         self.deref().encode_root(stream)
     }
 }
@@ -26,7 +25,6 @@ pub struct BoxDecoderArray<T> {
 impl<T: Decodable> Decodable for Box<T> {
     type DecoderArray = BoxDecoderArray<T::DecoderArray>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Decodable::decode");
         Ok(Box::new(T::decode(sticks, options)?))
     }
 }
@@ -46,7 +44,6 @@ impl<T: DecoderArray> DecoderArray for BoxDecoderArray<T> {
     type Decode = Box<T::Decode>;
     type Error = T::Error;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("DecoderArray::new");
         Ok(BoxDecoderArray { inner: T::new(sticks, options)? })
     }
     fn decode_next(&mut self) -> Result<Self::Decode, Self::Error> {

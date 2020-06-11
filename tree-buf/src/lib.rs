@@ -9,8 +9,10 @@ macro_rules! profile {
         // Tried various things to make this const,
         // but even lazy_static runs into issues around
         // accessing the type generics.
-        let _profile_guard_name = format!("{} - {}", $name, ::std::any::type_name::<$T>());
-        let _profile_guard = ::flame::start_guard(_profile_guard_name);
+        //let _profile_guard_name = format!("{} - {}", $name, ::std::any::type_name::<$T>());
+        //let _profile_guard = ::flame::start_guard(_profile_guard_name);
+        // It was found that the overhead of profiling is significant, the heap allocations even moreso
+        let _profile_guard = ::flame::start_guard($name);
     };
     ($name:expr) => {
         profile!(Self, $name);

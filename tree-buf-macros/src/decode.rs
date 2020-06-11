@@ -125,7 +125,13 @@ fn impl_struct_decode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStrea
     fill_decode_skeleton(ast, decode, array_fields, new, decode_next)
 }
 
-fn fill_decode_skeleton<A: ToTokens>(ast: &DeriveInput, decode: impl ToTokens, array_fields: impl Iterator<Item = A>, new: impl ToTokens, decode_next: impl ToTokens) -> TokenStream {
+fn fill_decode_skeleton<A: ToTokens>(
+    ast: &DeriveInput,
+    decode: impl ToTokens,
+    array_fields: impl Iterator<Item = A>,
+    new: impl ToTokens,
+    decode_next: impl ToTokens,
+) -> TokenStream {
     let name = &ast.ident;
     let vis = &ast.vis;
     let array_decoder_name = format_ident!("{}TreeBufDecoderArray", name);

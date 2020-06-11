@@ -72,7 +72,7 @@ impl EncoderArray<String> for Vec<&'static String> {
     }
 
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("EncoderArray::flush");
+        profile!("String EncoderArray::flush");
 
         let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)));
 
@@ -85,7 +85,7 @@ impl Decodable for String {
     // TODO: Use lifetimes to make this decode lazy rather than IntoIter
     type DecoderArray = IntoIter<String>;
     fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Decodable::decode");
+        profile!("String Decodable::decode");
         match sticks {
             DynRootBranch::String(s) => Ok(s.to_owned()),
             _ => Err(DecodeError::SchemaMismatch),
@@ -98,7 +98,7 @@ impl InfallibleDecoderArray for IntoIter<String> {
     type Decode = String;
 
     fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("DecoderArray::new");
+        profile!("String new_infallible");
 
         match sticks {
             DynArrayBranch::String(bytes) => {
@@ -133,7 +133,7 @@ pub(crate) struct Utf8Compressor;
 #[cfg(feature = "encode")]
 impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
     fn fast_size_for(&self, data: &[T]) -> Option<usize> {
-        profile!("Compressor::fast_size_for");
+        profile!("Utf8 fast_size_for");
         let mut total = 0;
         for s in data {
             total += size_for_varint(s.borrow().len() as u64);
@@ -142,7 +142,7 @@ impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
         Some(total)
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("Compressor::compress");
+        profile!("Utf8 compress");
 
         stream.encode_with_len(|stream| {
             for value in data.iter() {

@@ -13,7 +13,7 @@ macro_rules! impl_fixed {
             impl<T: Encodable> Encodable for [T; $size] {
                 type EncoderArray = ArrayEncoder<T::EncoderArray>;
                 fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-                    profile!("encode_root");
+                    profile!("ArrayFixed encode_root");
                     match self.len() {
                         0 => RootTypeId::Array0,
                         1 => {
@@ -42,7 +42,7 @@ macro_rules! impl_fixed {
             impl<T: Decodable + Sized> Decodable for [T; $size] where DecodeError : From<<T::DecoderArray as DecoderArray>::Error> {
                 type DecoderArray = ArrayDecoder<T::DecoderArray>;
                 fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                    profile!("Decodable::decode");
+                    profile!("ArrayFixed Decodable::decode");
                     match sticks {
                         DynRootBranch::Array0 => {
                             if $size != 0 {
@@ -110,7 +110,7 @@ macro_rules! impl_fixed {
                 }
                 // TODO: Overload for encode_all?
                 fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                    profile!("flush");
+                    profile!("ArrayFixed flush");
                     let Self { values } = self;
                     encode_usize($size, stream);
                     if $size != 0 {
@@ -126,7 +126,7 @@ macro_rules! impl_fixed {
                 type Decode = [T::Decode; $size];
                 type Error = T::Error;
                 fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                    profile!("DecoderArray::new");
+                    profile!("ArrayFixed DecoderArray::new");
 
                     match sticks {
                         DynArrayBranch::ArrayFixed { len, values } => {

@@ -63,7 +63,7 @@ macro_rules! impl_lowerable {
                 self.extend_from_slice(values);
             }
             fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("encode_all");
+                profile!("Integer encode_all");
                 let max = values.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
@@ -89,7 +89,7 @@ macro_rules! impl_lowerable {
         impl Decodable for $Ty {
             type DecoderArray = IntoIter<$Ty>;
             fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Decodable::decode");
+                profile!("Integer Decodable::decode");
                 match sticks {
                     DynRootBranch::Integer(root_int) => {
                         match root_int {
@@ -106,7 +106,7 @@ macro_rules! impl_lowerable {
         impl InfallibleDecoderArray for IntoIter<$Ty> {
             type Decode = $Ty;
             fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!(Self::Decode, "DecoderArray::new");
+                profile!(Self::Decode, "Integer DecoderArray::new");
 
                 match sticks {
                     // TODO: Support eg: delta/zigzag
@@ -172,7 +172,6 @@ macro_rules! impl_lowerable {
         #[cfg(feature = "encode")]
         fn $fn<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
             (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-            profile!($Ty, "lowering_fn");
 
             // TODO: (Performance) When getting ranges, use SIMD
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
@@ -184,7 +183,6 @@ macro_rules! impl_lowerable {
             }
 
             fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!(&[$Ty], "encode_inner");
 
                 let compressors = (
                     $(<$compressions>::new(),)+
@@ -273,7 +271,7 @@ impl PrefixVarIntCompressor {
 
 impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
     fn fast_size_for(&self, data: &[T]) -> Option<usize> {
-        profile!("Compressor::fast_size_for");
+        profile!("PrefixVarInt fast_size_for");
         let mut size = 0;
         for item in data {
             size += size_for_varint((*item).into());
@@ -281,7 +279,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         Some(size)
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("compress");
+        profile!("PrefixVarInt compress");
         stream.encode_with_len(|stream| {
             for item in data {
                 encode_prefix_varint((*item).into(), &mut stream.bytes);
@@ -301,7 +299,7 @@ impl Simple16Compressor {
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("compress");
+        profile!("Simple16 compress");
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
 
@@ -311,7 +309,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
             let mut v = Vec::new();
             for item in data {
                 let item = *item;
-                let item = item.try_into().map_err(|_| ())?;
+                let item = item.into();
                 v.push(item);
             }
             v
@@ -320,6 +318,27 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
         stream.encode_with_len(|stream| compress_simple_16(&v, stream.bytes)).map_err(|_| ())?;
 
         Ok(ArrayTypeId::IntSimple16)
+    }
+
+    fn fast_size_for(&self, data: &[T]) -> Option<usize> {
+        profile!("Simple16 fast_size_for");
+        let v = {
+            #[cfg(feature = "profile")]
+            flame::start_guard("Needless copy to u32");
+            let mut v = Vec::new();
+            for item in data {
+                let item = *item;
+                let item = item.into();
+                v.push(item);
+            }
+            v
+        };
+
+        match simple_16::calculate_size(&v) {
+            Ok(v) => Some(v),
+            // FIXME: This is a wierd way to propagate an error
+            Err(_) => Some(usize::MAX),
+        }
     }
 }
 
@@ -332,7 +351,7 @@ impl BytesCompressor {
 
 impl Compressor<u8> for BytesCompressor {
     fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("compress");
+        profile!("Bytes compress");
         stream.encode_with_len(|stream| stream.bytes.extend_from_slice(data));
         Ok(ArrayTypeId::U8)
     }
