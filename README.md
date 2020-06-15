@@ -1,12 +1,10 @@
 # What's Tree-Buf?
 
-Tree-Buf is an efficient data oriented serialization system built for real-world data sets and applications.
+Tree-Buf is a data-oriented, data-driven serializer built for real-world data.
 
-It's key features are:
- * Compact representation
- * Very fast encode and decode
- * Flexible schemas
- * Self-describing
+ * Better than GZip compression, faster than other uncompressed formats
+ * Self-describing files that can be read with no schema
+ * Flexible format supports Rust style enums and more
 
 ## Benchmarks
 
@@ -57,7 +55,7 @@ This test compares the serialization of a GeoJson file containing a Feature Coll
 
 In this test, Tree-Buf is over **10 times as fast** as GeoJson, while producing a file that is **2/7th the size**.
 
-There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::encode_with_options(data, &encode_options! { options::LossyFloatTolerance(-12) })`. 12 binary points of precision is better than 1 meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, without sacrificing speed.
+There is another entry for "Tree-Buf 1m". Here, compile-time options have been specified that allow Tree-Buf to use a lossy float compression technique. Code: `tree_buf::encode_with_options(data, &encode_options! { options::LossyFloatTolerance(-12) })`. 12 binary points of precision is better than 1-meter accuracy for latitude longitude points. This results in a file size that is just **1/10th the size** of GeoJson, without sacrificing speed.
 
 Another thing we can try is to selectively load some portion of the data using a modified schema. If we instruct Tree-Buf to only load the names and other attributes of the countries from the file without loading their geometries this takes 240µs - more than **1,500 times as fast** as loading the data as GeoJson because Tree-Buf does not need to parse fields that do not need to be loaded, whereas Json needs to parse this data in order to skip over it.
 
