@@ -1,28 +1,11 @@
-#[cfg(feature = "profile")]
-extern crate flame;
-
-#[cfg(feature = "profile")]
 #[macro_export]
 macro_rules! profile {
     ($T:ty, $name:expr) => {
-        // TODO: This does heap allocations.
-        // Tried various things to make this const,
-        // but even lazy_static runs into issues around
-        // accessing the type generics.
-        //let _profile_guard_name = format!("{} - {}", $name, ::std::any::type_name::<$T>());
-        //let _profile_guard = ::flame::start_guard(_profile_guard_name);
-        // It was found that the overhead of profiling is significant, the heap allocations even moreso
-        let _profile_guard = ::flame::start_guard($name);
+        let _profile_guard = ::firestorm::start_guard(::firestorm::FmtStr::Str3(::std::any::type_name::<$T>(), "::", $name));
     };
     ($name:expr) => {
         profile!(Self, $name);
     };
-}
-
-#[cfg(not(feature = "profile"))]
-#[macro_export]
-macro_rules! profile {
-    ($($arg:tt)*) => {};
 }
 
 #[doc(hidden)]
@@ -49,8 +32,7 @@ pub mod prelude {
     #[cfg(feature = "decode")]
     pub(crate) type DecodeResult<T> = Result<T, DecodeError>;
 
-    #[cfg(feature = "profile")]
-    pub(crate) use flame;
+    pub(crate) use firestorm;
 
     pub(crate) use profile;
 

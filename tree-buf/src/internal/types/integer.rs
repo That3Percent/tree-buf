@@ -114,8 +114,7 @@ macro_rules! impl_lowerable {
                         let ArrayInteger { bytes, encoding } = array_int;
                         match encoding {
                             ArrayIntegerEncoding::PrefixVarInt => {
-                                #[cfg(feature="profile")]
-                                let _g = flame::start_guard("PrefixVarInt");
+                                let _g = firestorm::start_guard("PrefixVarInt");
 
                                 let v: Vec<$Ty> = decode_all(
                                         &bytes,
@@ -127,8 +126,7 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             }
                             ArrayIntegerEncoding::Simple16 => {
-                                #[cfg(feature="profile")]
-                                let _g = flame::start_guard("Simple16");
+                                let _g = firestorm::start_guard("Simple16");
 
                                 let mut v = Vec::new();
                                 simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
@@ -137,8 +135,7 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             },
                             ArrayIntegerEncoding::U8 => {
-                                #[cfg(feature="profile")]
-                                let _g = flame::start_guard("U8");
+                                let _g = firestorm::start_guard("U8");
 
                                 let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
                                 Ok(v.into_iter())
@@ -304,8 +301,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
 
         let v = {
-            #[cfg(feature = "profile")]
-            flame::start_guard("Needless copy to u32");
+            let _g = firestorm::start_guard("Needless copy to u32");
             let mut v = Vec::new();
             for item in data {
                 let item = *item;
@@ -323,8 +319,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
     fn fast_size_for(&self, data: &[T]) -> Option<usize> {
         profile!("Simple16 fast_size_for");
         let v = {
-            #[cfg(feature = "profile")]
-            flame::start_guard("Needless copy to u32");
+            let _g = firestorm::start_guard("Needless copy to u32");
             let mut v = Vec::new();
             for item in data {
                 let item = *item;

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[cfg(feature = "encode")]
 pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
-    profile!(T, "compress");
+    profile!(T, "master compress");
 
     // Remove trailing default values.
     // All the decoders always generate defaults when values "run out".
@@ -19,8 +19,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
         return compressors.compress(0, data, stream).unwrap();
     }
 
-    #[cfg(feature = "profile")]
-    let samples = flame::start_guard("Samples");
+    let samples = firestorm::start_guard("Samples");
     let restore_bytes = stream.bytes.len();
     // TODO: Yuck!. This is ugly and error prone to restore these
     // and update the byte count with the assumed compressor for lens
@@ -30,11 +29,6 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 
     // TODO: Don't re-do compression when possible
     // TODO: Many fast-size-for
-    /*
-    if data.len() == sample_size {
-        dbg!(data.len());
-    }
-    */
 
     // Rank compressors by how well they do on a sample of the data
     // TODO: Use second-stack
@@ -59,11 +53,9 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
         }
     }
 
-    #[cfg(feature = "profile")]
     drop(samples);
 
-    #[cfg(feature = "profile")]
-    let _final = flame::start_guard("Final");
+    let _final = firestorm::start_guard("Final");
 
     // Sorting stable allows us to have a preference for one encoder over another.
     by_size.sort_by_key(|&(_, size)| size);

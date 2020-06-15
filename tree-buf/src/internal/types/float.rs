@@ -27,8 +27,7 @@ macro_rules! impl_float {
         use std::mem::size_of;
         use std::vec::IntoIter;
 
-        #[cfg(feature = "profile")]
-        use flame;
+        use firestorm;
 
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "encode")]
@@ -123,16 +122,14 @@ macro_rules! impl_float {
                     DynArrayBranch::Float(float) => {
                         match float {
                             ArrayFloat::F64(bytes) => {
-                                #[cfg(feature = "profile")]
-                                let _g = flame::start_guard("f64");
+                                let _g = firestorm::start_guard("f64");
 
                                 // FIXME: Should do schema mismatch for f32 -> f64
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f64::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
-                                #[cfg(feature = "profile")]
-                                let _g = flame::start_guard("f32");
+                                let _g = firestorm::start_guard("f32");
 
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f32::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())

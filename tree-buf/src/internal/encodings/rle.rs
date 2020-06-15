@@ -80,50 +80,58 @@ impl<S> RLE<S> {
     }
 }
 
+fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
+    // Nesting creates performance problems
+    if get_in_rle() {
+        return Err(());
+    }
+
+    // It will always be more efficient to just defer to another encoding. Also, this prevents a panic.
+    if data.len() < 2 {
+        return Err(());
+    }
+
+    // Prevent panic on indexing first item.
+    profile!(&[T], "RLE get runs");
+
+    let mut runs = Vec::new();
+    let mut current_run = 0u64;
+    let mut current_value = data[0];
+    let mut values = vec![];
+    for item in data[1..].iter() {
+        if current_value == *item {
+            current_run += 1;
+        } else {
+            runs.push(current_run);
+            values.push(current_value);
+            current_value = *item;
+            current_run = 0;
+        }
+    }
+    runs.push(current_run);
+    values.push(current_value);
+    debug_assert!(runs.len() == values.len());
+
+    // If no values are removed, it is determined
+    // that this cannot possibly be better,
+    // so don't go through the compression step
+    // for nothing.
+    if values.len() == data.len() {
+        Err(())
+    } else {
+        Ok((runs, values))
+    }
+}
+
 impl<T: PartialEq + Copy + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
+    // TODO: Fast size for
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        // Nesting creates performance problems
-        if get_in_rle() {
-            return Err(());
-        }
+        profile!("RLE compress");
 
-        // It will always be more efficient to just defer to another encoding. Also, this prevents a panic.
-        if data.len() < 2 {
-            return Err(());
-        }
-
-        // Prevent panic on indexing first item.
-        profile!(&[T], "RLE::compress");
-
-        let mut runs = Vec::new();
-        let mut current_run = 0u64;
-        let mut current_value = data[0];
-        let mut values = vec![];
-        for item in data[1..].iter() {
-            if current_value == *item {
-                current_run += 1;
-            } else {
-                runs.push(current_run);
-                values.push(current_value);
-                current_value = *item;
-                current_run = 0;
-            }
-        }
-        runs.push(current_run);
-        values.push(current_value);
-        debug_assert!(runs.len() == values.len());
-
-        // If no values are removed, it is determined
-        // that this cannot possibly be better,
-        // so don't go through the compression step
-        // for nothing.
-        if values.len() == data.len() {
-            return Err(());
-        }
-
-        stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
+        let (runs, values) = get_runs(data)?;
 
         set_in_rle(true);
+        stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
         stream.encode_with_id(|stream| runs.flush(stream));
         set_in_rle(false);
 

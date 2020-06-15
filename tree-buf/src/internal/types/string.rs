@@ -102,8 +102,7 @@ impl InfallibleDecoderArray for IntoIter<String> {
 
         match sticks {
             DynArrayBranch::String(bytes) => {
-                #[cfg(feature = "profile")]
-                let _g = flame::start_guard("String");
+                let _g = firestorm::start_guard("String");
 
                 let strs = decode_all(&bytes, |b, o| decode_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
