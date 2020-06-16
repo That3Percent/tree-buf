@@ -13,35 +13,36 @@ This test compares the serialization of a complex GraphQL response containing 10
 
 |                | Size in Bytes  | Round Trip CPU Time |
 | --------------:| --------------:| -------------------:|
-| Message Pack   |         200728 |              1035µs |
-| Tree-Buf       |          51423 |               960µs |
+| Message Pack   |         151331 |              1100µs |
+| Tree-Buf       |          27354 |               855µs |
 
-Tree-Buf compresses to about **1/4 the size** as compared to Message Pack, and finishes reading and writing faster.
+Tree-Buf compresses to less than **1/5 the size** as compared to Message Pack, yet finishes reading and writing in less time.
 
 Entities look like this:
 ```json
 {
-    "createdAt": "1582911422",
-    "id": "0x002af0226cea014fb968cdb2e50abff6544d79fad74c6a3ff2f2763168b44678",
+    "createdAt": "1582140851",
     "nft": {
-    "wearable": {
-        "bodyShapes": [
-            "BaseMale",
-            "BaseFemale"
-        ],
-        "category": "upper_body",
-        "collection": "community_contest",
-        "name": "Tuxedo T Shirt",
-        "owner": {
-            "mana": "0"
+        "bids": [{
+            "bidder": "0x8a9d9b361dca26afecaf9d64f6b6e335e1b7df8a",
+            "blockNumber": "9521798",
+            "status": "open"
+        }],
+        "searchIsLand": false,
+        "searchIsWearableAccessory": false,
+        "wearable": {
+            "bodyShapes": ["BaseFemale"],
+            "category": "feet",
+            "collection": "halloween_2019",
+            "name": "Bee Suit Shoes",
+            "owner": { "mana": "0" },
+            "rarity": "epic",
+            "representationId": "bee_suit_feet"
+        }
         },
-        "rarity": "epic",
-        "representationId": "cw_tuxedo_tshirt_upper_body"
-    }
-    },
-    "price": "89000000000000000000",
+    "price": "200000000000000000000",
     "status": "cancelled"
-}
+},
 ```
 
 ### Tree-Buf vs GeoJson
