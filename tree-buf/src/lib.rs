@@ -27,6 +27,7 @@ pub mod prelude {
 
     // This section makes everything interesting available to the rest of the crate
     // without bothering to manage imports.
+    pub(crate) use crate::internal::encodings::varint::size_for_varint;
     pub(crate) use crate::{internal::error::*, internal::*};
 
     #[cfg(feature = "decode")]

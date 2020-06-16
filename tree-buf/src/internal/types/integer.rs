@@ -23,9 +23,12 @@ impl Bounded for U0 {
 fn encode_u0<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
     unreachable!();
 }
+fn fast_size_for_u0<T, O>(_data: &[T], _max: T, _options: O) -> usize {
+    unreachable!();
+}
 
 macro_rules! impl_lowerable {
-    ($Ty:ty, $fn:ident, $Lty:ty, $lfn:ident, ($($lower:ty),*), ($($compressions:ty),+)) => {
+    ($Ty:ty, $fn:ident, $fn_fast:ident, $Lty:ty, $lfn:ident, $lfn_fast:ident, ($($lower:ty),*), ($($compressions:ty),+)) => {
         impl TryFrom<$Ty> for U0 {
             type Error=();
             fn try_from(_value: $Ty) -> Result<U0, Self::Error> {
@@ -64,12 +67,13 @@ macro_rules! impl_lowerable {
             }
             fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                 profile!("Integer encode_all");
+                // TODO: (Performance) When getting ranges, use SIMD
+
                 let max = values.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
                     // Lower to bool if possible. This is especially nice for enums
                     // with 2 variants.
-                    // TODO: Lowering to bool works in all tests, but not benchmarks
                     if *max < 2 {
                         let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
                         bools.flush(stream)
@@ -82,6 +86,26 @@ macro_rules! impl_lowerable {
             }
             fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                 Self::encode_all(&self[..], stream)
+            }
+        }
+
+        #[cfg(feature = "encode")]
+        impl PrimitiveEncoderArray<$Ty> for Vec<$Ty> {
+            fn fast_size_for_all<O: EncodeOptions>(values: &[$Ty], options: &O) -> usize {
+                let max = values.iter().max();
+                if let Some(max) = max {
+                    // TODO: (Performance) Use second-stack
+                    // Lower to bool if possible. This is especially nice for enums
+                    // with 2 variants.
+                    if *max < 2 {
+                        let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
+                        Vec::<bool>::fast_size_for_all(&bools[..], options)
+                    } else {
+                        $fn_fast(values, *max, options)
+                    }
+                } else {
+                    0
+                }
             }
         }
 
@@ -167,10 +191,44 @@ macro_rules! impl_lowerable {
         }
 
         #[cfg(feature = "encode")]
+        fn $fn_fast<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
+            (data: &[T], max: T, options: &O) -> usize {
+
+            let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
+
+            if let Ok(lower_max) = lower_max {
+                if lower_max >= max.as_() {
+                    return $lfn_fast(data, max, options)
+                }
+            }
+
+            fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O) -> usize {
+                let compressors = (
+                    $(<$compressions>::new(),)+
+                    RLE::new(($(<$compressions>::new(),)+))
+                );
+                fast_size_for(data, &compressors, options)
+            }
+
+            // Convert data to as<T>, using a transmute if that's already correct
+            if TypeId::of::<$Ty>() == TypeId::of::<T>() {
+                // Safety - this is a unit conversion.
+                let data = unsafe { transmute(data) };
+                fast_inner(data, options)
+            } else {
+                // TODO: (Performance) Use second-stack
+                let v = {
+                    profile!($Ty, "CopyToLowered");
+                    data.iter().map(|i| i.as_()).collect::<Vec<_>>()
+                };
+                fast_inner(&v, options)
+            }
+        }
+
+        #[cfg(feature = "encode")]
         fn $fn<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
             (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
 
-            // TODO: (Performance) When getting ranges, use SIMD
             let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
 
             if let Ok(lower_max) = lower_max {
@@ -180,7 +238,6 @@ macro_rules! impl_lowerable {
             }
 
             fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-
                 let compressors = (
                     $(<$compressions>::new(),)+
                     RLE::new(($(<$compressions>::new(),)+))
@@ -195,10 +252,10 @@ macro_rules! impl_lowerable {
                 encode_inner(data, stream)
             } else {
                 // TODO: (Performance) Use second-stack
-                let mut v = Vec::new();
-                for item in data.iter() {
-                    v.push(item.as_());
-                }
+                let v = {
+                    profile!($Ty, "CopyToLowered");
+                    data.iter().map(|i| i.as_()).collect::<Vec<_>>()
+                };
                 encode_inner(&v, stream)
             }
         }
@@ -212,10 +269,28 @@ macro_rules! impl_lowerable {
 // Broadly we only want to downcast if it allows for some other kind of compressor to be used.
 
 // Type, array encoder, next lower, next lower encoder, non-inferred lowers
-impl_lowerable!(u64, encode_u64, u32, encode_u32, (u16), (PrefixVarIntCompressor));
-impl_lowerable!(u32, encode_u32, u16, encode_u16, (), (Simple16Compressor, PrefixVarIntCompressor)); // TODO: Consider replacing PrefixVarInt at this level with Fixed.
-impl_lowerable!(u16, encode_u16, u8, encode_u8, (), (Simple16Compressor, PrefixVarIntCompressor));
-impl_lowerable!(u8, encode_u8, U0, encode_u0, (), (Simple16Compressor, BytesCompressor));
+impl_lowerable!(u64, encode_u64, fast_size_for_u64, u32, encode_u32, fast_size_for_u32, (u16), (PrefixVarIntCompressor));
+impl_lowerable!(
+    u32,
+    encode_u32,
+    fast_size_for_u32,
+    u16,
+    encode_u16,
+    fast_size_for_u16,
+    (),
+    (Simple16Compressor, PrefixVarIntCompressor)
+); // TODO: Consider adding Fixed.
+impl_lowerable!(
+    u16,
+    encode_u16,
+    fast_size_for_u16,
+    u8,
+    encode_u8,
+    fast_size_for_u8,
+    (),
+    (Simple16Compressor, PrefixVarIntCompressor)
+);
+impl_lowerable!(u8, encode_u8, fast_size_for_u8, U0, encode_u0, fast_size_for_u0, (), (Simple16Compressor, BytesCompressor));
 
 #[cfg(feature = "encode")]
 fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -267,13 +342,13 @@ impl PrefixVarIntCompressor {
 }
 
 impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
-    fn fast_size_for(&self, data: &[T]) -> Option<usize> {
-        profile!("PrefixVarInt fast_size_for");
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+        profile!("fast_size_for");
         let mut size = 0;
         for item in data {
             size += size_for_varint((*item).into());
         }
-        Some(size)
+        Ok(size)
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("PrefixVarInt compress");
@@ -316,9 +391,10 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
         Ok(ArrayTypeId::IntSimple16)
     }
 
-    fn fast_size_for(&self, data: &[T]) -> Option<usize> {
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
         profile!("Simple16 fast_size_for");
         let v = {
+            // TODO: Remove copy, if not always than at least when the type is u32
             let _g = firestorm::start_guard("Needless copy to u32");
             let mut v = Vec::new();
             for item in data {
@@ -329,11 +405,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
             v
         };
 
-        match simple_16::calculate_size(&v) {
-            Ok(v) => Some(v),
-            // FIXME: This is a wierd way to propagate an error
-            Err(_) => Some(usize::MAX),
-        }
+        simple_16::calculate_size(&v).map_err(|_| ())
     }
 }
 
@@ -350,8 +422,9 @@ impl Compressor<u8> for BytesCompressor {
         stream.encode_with_len(|stream| stream.bytes.extend_from_slice(data));
         Ok(ArrayTypeId::U8)
     }
-    fn fast_size_for(&self, data: &[u8]) -> Option<usize> {
-        Some(data.len())
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[u8], _options: &O) -> Result<usize, ()> {
+        let len_size = size_for_varint(data.len() as u64);
+        Ok(data.len() + len_size)
     }
 }
 

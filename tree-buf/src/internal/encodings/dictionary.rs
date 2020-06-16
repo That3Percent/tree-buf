@@ -53,7 +53,6 @@ impl<T: Send + Clone> DictionaryIterator<T> {
 }
 
 pub(crate) struct Dictionary<S> {
-    // TODO: (Performance) Do not require the allocation of this Vec
     sub_compressors: S,
 }
 
@@ -63,46 +62,70 @@ impl<S> Dictionary<S> {
     }
 }
 
+// See also 2a3a69eb-eba1-4c95-9399-f1b9daf48733
+fn get_lookup_table<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
+    profile!(T, "get_lookup_table");
+
+    // It will always be more efficient to just defer to another encoding.
+    if data.len() < 2 {
+        return Err(());
+    }
+
+    // TODO: This calls for a specialized data structure
+    let mut indices = Vec::<u64>::new();
+    let mut values = Vec::new();
+    let mut lookup = HashMap::new();
+
+    for value in data.iter() {
+        let index = if let Some(i) = lookup.get(value) {
+            *i
+        } else {
+            let i = lookup.len();
+            lookup.insert(value, i);
+            values.push(*value);
+            i
+        };
+        indices.push(index.try_into().map_err(|_| ())?);
+    }
+
+    debug_assert!(lookup.len() == values.len());
+    debug_assert!(indices.len() == data.len());
+
+    // If no values are removed, it is determined
+    // that this cannot possibly be better,
+    // so don't go through the compression step
+    // for nothing.
+    if indices.len() == values.len() {
+        return Err(());
+    }
+
+    Ok((indices, values))
+}
+
 impl<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Compressor<T> for Dictionary<S> {
+    // TODO: fast_size_for
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
-        profile!("compress dictionary");
-        // It will always be more efficient to just defer to another encoding.
-        if data.len() < 2 {
-            return Err(());
-        }
+        profile!("compress");
 
-        // TODO: This calls for a specialized data structure
-        let mut indices = Vec::<u64>::new();
-        let mut values = Vec::new();
-        let mut lookup = HashMap::new();
-
-        for value in data.iter() {
-            let index = if let Some(i) = lookup.get(value) {
-                *i
-            } else {
-                let i = lookup.len();
-                lookup.insert(value, i);
-                values.push(*value);
-                i
-            };
-            indices.push(index.try_into().map_err(|_| ())?);
-        }
-
-        debug_assert!(lookup.len() == values.len());
-        debug_assert!(indices.len() == data.len());
-
-        // If no values are removed, it is determined
-        // that this cannot possibly be better,
-        // so don't go through the compression step
-        // for nothing.
-        if indices.len() == values.len() {
-            return Err(());
-        }
+        let (indices, values) = get_lookup_table(data)?;
 
         stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
         stream.encode_with_id(|stream| indices.flush(stream));
 
         Ok(ArrayTypeId::Dictionary)
+    }
+
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+        profile!("fast_size_for");
+
+        let (indices, values) = get_lookup_table(data)?;
+
+        let from_values = fast_size_for(&values[..], &self.sub_compressors, options);
+        let from_indices = Vec::<u64>::fast_size_for_all(&indices[..], options);
+
+        let from_ids = 2;
+
+        Ok(from_ids + from_indices + from_values)
     }
 }

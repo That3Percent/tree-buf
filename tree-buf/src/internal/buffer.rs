@@ -1,3 +1,5 @@
+// TODO: Remove this allow
+#![allow(dead_code)]
 use std::alloc::{alloc, dealloc, Layout};
 use std::mem::{align_of, size_of, transmute};
 use std::ops::Deref;

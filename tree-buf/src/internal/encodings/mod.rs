@@ -14,12 +14,11 @@ pub(crate) use rle::*;
 mod gorilla_new;
 mod gorilla_old;
 pub mod gorilla {
-    pub use super::gorilla_new::compress;
+    pub use super::gorilla_new::{compress, size_for};
     pub use super::gorilla_old::decompress;
 }
 
 //pub mod zfp;
-
 
 #[cfg(feature = "decode")]
 /// Decodes all items from some byte aligned encoding

@@ -4,16 +4,6 @@ use crate::prelude::*;
 pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
     profile!(T, "master compress");
 
-    // Remove trailing default values.
-    // All the decoders always generate defaults when values "run out".
-    // These cause problems with nested encodings like Dictionary and RLE
-    // TODO: Bring back in "root" compression schemes?
-    /*
-    let default = T::default(); // TODO: (Performance) Minor benefit here by not allocating String and having an "IsDefault" trait.
-    let trailing_defaults = data.iter().rev().take_while(|i| *i == &default);
-    let data = &data[0..data.len() - trailing_defaults.count()];
-    */
-
     // If there aren't multiple compressors, no need to be dynamic
     if compressors.len() == 1 {
         return compressors.compress(0, data, stream).unwrap();
@@ -27,29 +17,14 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
     let sample_size = data.len().min(256);
     let sample = &data[..sample_size];
 
-    // TODO: Don't re-do compression when possible
-    // TODO: Many fast-size-for
-
     // Rank compressors by how well they do on a sample of the data
-    // TODO: Use second-stack
-    // TODO (Performance): This is silly how sometimes the sample size is the
-    // entire value, but we end up encoding twice. If the most likely best
-    // is at the end, then we can just keep it in the case where it wins
+    // TODO: Use second-stack, or considering how few items there are fixed tuples with sort or iter.
     let mut by_size = Vec::new();
     for i in 0..compressors.len() {
-        // FIXME: A lot of these implementations are wrong, because they do not account for the lens
-        if let Some(size) = compressors.fast_size_for(i, sample) {
+        // FIXME: A lot of these implementations are wrong, because they do not account for the lens or type id
+        // If a compressor returns Err, that's because it determines as an early out that another compressor is always going to be better.
+        if let Ok(size) = compressors.fast_size_for(i, sample, stream.options) {
             by_size.push((i, size));
-        } else {
-            if compressors.compress(i, sample, stream).is_ok() {
-                let mut size = stream.bytes.len() - restore_bytes;
-                for len in &stream.lens[restore_lens..stream.lens.len()] {
-                    size += crate::internal::encodings::varint::size_for_varint(*len as u64);
-                }
-                by_size.push((i, size));
-            }
-            stream.bytes.truncate(restore_bytes);
-            stream.lens.truncate(restore_lens);
         }
     }
 
@@ -57,8 +32,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 
     let _final = firestorm::start_guard("Final");
 
-    // Sorting stable allows us to have a preference for one encoder over another.
-    by_size.sort_by_key(|&(_, size)| size);
+    by_size.sort_unstable_by_key(|&(_, size)| size);
 
     // Return the first compressor that succeeds
     for ranked in by_size.iter() {
@@ -75,17 +49,33 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 }
 
 #[cfg(feature = "encode")]
-pub(crate) trait Compressor<T> {
-    /// If it's possible to figure out how big the data will be without
-    /// compressing it, implement that here.
-    fn fast_size_for(&self, _data: &[T]) -> Option<usize> {
-        None
+pub(crate) fn fast_size_for<T: PartialEq, O: EncodeOptions>(data: &[T], compressors: &impl CompressorSet<T>, options: &O) -> usize {
+    profile!(T, "master fast_size_for");
+
+    let mut min = usize::MAX;
+    for i in 0..compressors.len() {
+        // If a compressor returns Err, that's because it determines as an early out that another compressor is always going to be better.
+        if let Ok(size) = compressors.fast_size_for(i, data, options) {
+            min = size.min(min);
+        }
     }
+    debug_assert!(min != usize::MAX);
+    // TODO: When compiled in debug, verify the size of some of these.
+    min
+}
+
+#[cfg(feature = "encode")]
+pub(crate) trait Compressor<T> {
+    /// Report how big the data will be without actually doing the work of compressing.
+    /// Only return Err in 2 cases:
+    ///   * If the compressor would fail to compress the data
+    ///   * If it is known that another compressor surely can compress better
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()>;
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
 
 pub(crate) trait CompressorSet<T> {
     fn len(&self) -> usize;
-    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize>;
+    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()>;
     fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }

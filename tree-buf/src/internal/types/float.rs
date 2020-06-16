@@ -175,6 +175,7 @@ macro_rules! impl_float {
             fn encode_all<O: EncodeOptions>(values: &[$T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                 profile!("Float encode_all");
 
+                // See also 558c24b8-dc75-4f08-8ea2-0f839af4da2e
                 let compressors = (
                     Fixed, //Zfp,
                     Gorilla,
@@ -187,10 +188,22 @@ macro_rules! impl_float {
             }
         }
 
+        impl PrimitiveEncoderArray<$T> for Vec<$T> {
+            fn fast_size_for_all<O: EncodeOptions>(values: &[$T], options: &O) -> usize {
+                // See also 558c24b8-dc75-4f08-8ea2-0f839af4da2e
+                let compressors = (
+                    Fixed, //Zfp,
+                    Gorilla,
+                );
+                fast_size_for(values, &compressors, options)
+            }
+        }
+
         struct Fixed;
         impl Compressor<$T> for Fixed {
-            fn fast_size_for(&self, data: &[$T]) -> Option<usize> {
-                Some(size_of::<$T>() * data.len())
+            fn fast_size_for<O: EncodeOptions>(&self, data: &[$T], _options: &O) -> Result<usize, ()> {
+                let arr_size = size_of::<$T>() * data.len();
+                Ok(arr_size + size_for_varint(arr_size as u64))
             }
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!("Float compress");
@@ -203,12 +216,23 @@ macro_rules! impl_float {
             }
         }
 
-        // FIXME: Not clear if this is canon. The source for gibbon is a bit shaky.
-        // Alternatively, there is the tsz crate, but that doesn't offer a separate
-        // double-stream (just joined time+double stream). Both of the implementations
-        // aren't perfect for our API.
         struct Gorilla;
         impl Compressor<$T> for Gorilla {
+            fn fast_size_for<O: EncodeOptions>(&self, data: &[$T], options: &O) -> Result<usize, ()> {
+                profile!($T, "Gorilla.fast_size_for");
+
+                if let Some(tolerance) = options.lossy_float_tolerance() {
+                    // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
+                    // before a real lossy compressor (Eg: fzip) is used.
+                    let multiplier = (2.0 as $T).powi(tolerance * -1);
+                    let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
+                    gorilla::size_for(data)
+                } else {
+                    let data = data.iter().map(|f| *f as f64);
+                    gorilla::size_for(data)
+                }
+            }
+
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
                 profile!($T, "Gorilla.compress");
 

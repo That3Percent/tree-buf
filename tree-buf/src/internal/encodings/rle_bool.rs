@@ -16,19 +16,24 @@ pub fn decode_rle_bool(runs: IntoIter<u64>, first: bool) -> IntoIter<bool> {
     results.into_iter()
 }
 
-#[cfg(feature = "encode")]
-pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-    profile!(&[bool], "encode_rle_bool");
-
-    // This encoding is not useful for this case, since we can store 8 values
-    // in 1 byte for PackedBool. Also prevents panic later.
-    if items.len() < 8 {
+// TODO: Performance: Runs has to be u64 for correctness, but most data won't actually have more than u32 worth (probably even less).
+// Consider specializing the impl for different lengths of the items array.
+// See also 2a3a69eb-eba1-4c95-9399-f1b9daf48733
+#[inline(always)]
+fn bool_runs_and_id(items: &[bool]) -> Result<(Vec<u64>, ArrayTypeId), ()> {
+    // This encoding is not useful for less than 25 items.
+    // 24 items requires 3 bytes for PackedBool, and that is the
+    // minimum possible for this encoding to just identify the runs
+    // type id, the len of the runs bytes buffer, and at least 1 value
+    // encoded in there as some non-zero int.
+    if items.len() < 25 {
         return Err(());
     }
 
     let mut current_value = items[0];
     let type_id = if current_value { ArrayTypeId::RLEBoolTrue } else { ArrayTypeId::RLEBoolFalse };
     let mut current_run: u64 = 0;
+    // TODO: (Performance) use second-stack
     let mut runs = Vec::new();
     let items = &items[1..];
     for item in items {
@@ -42,7 +47,23 @@ pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut EncoderStr
     }
     runs.push(current_run);
 
+    Ok((runs, type_id))
+}
+
+#[cfg(feature = "encode")]
+pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+    profile!(&[bool], "encode_rle_bool");
+
+    let (runs, type_id) = bool_runs_and_id(items)?;
     stream.encode_with_id(|stream| runs.flush(stream));
 
     Ok(type_id)
+}
+
+#[cfg(feature = "encode")]
+pub fn size_of_rle_bool<O: EncodeOptions>(items: &[bool], options: &O) -> Result<usize, ()> {
+    let (runs, _) = bool_runs_and_id(items)?;
+    let runs_size = Vec::<u64>::fast_size_for_all(&runs[..], options);
+    // + the type id for runs
+    Ok(runs_size + 1)
 }

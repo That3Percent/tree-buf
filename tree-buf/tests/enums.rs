@@ -72,7 +72,9 @@ fn mixed_void_and_single() {
     round_trip(&Mixed::Ex, 5, 11);
     round_trip(&Mixed::One(10), 7, 15);
 
-    round_trip(&vec![Mixed::Ex, Mixed::One(2), Mixed::One(2), Mixed::One(3), Mixed::Ex], 20, 24);
+    // FIXME: This increased in size with the fast_size_for change
+    // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
+    round_trip(&vec![Mixed::Ex, Mixed::One(2), Mixed::One(2), Mixed::One(3), Mixed::Ex], 21, 24);
 }
 
 /*

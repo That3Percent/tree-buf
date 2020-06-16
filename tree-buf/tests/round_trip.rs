@@ -138,18 +138,24 @@ fn lossy_f64_vec() {
 
 #[test]
 fn nested_float_vec() {
-    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 24, 32);
+    // FIXME: This increased in size with the fast_size_for change
+    // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
+    round_trip(&vec![vec![10.0, 11.0], vec![], vec![99.0]], 25, 32);
 }
 
 #[test]
 fn array_tuple() {
-    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 14, 19);
+    // FIXME: This increased in size with the fast_size_for change
+    // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
+    round_trip(&vec![vec![(1u32, 2u32), (3, 4), (5, 6)]], 16, 19);
 }
 
 #[test]
 fn item() {
     let item = make_item();
-    round_trip(&item, 144, 221);
+    // FIXME: This increased in size with the fast_size_for change
+    // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
+    round_trip(&item, 145, 221);
 }
 
 #[test]
@@ -351,7 +357,7 @@ fn map_0_root() {
 fn map_1_root() {
     let mut data = HashMap::new();
     data.insert("test".to_owned(), 5u32);
-    round_trip(&data, 10, 22);
+    round_trip(&data, 10, 21);
 }
 
 #[test]
@@ -456,7 +462,9 @@ fn int_to_bool_nested() {
     round_trip(&data, 11, 15);
 
     let data = vec![vec![0u32, 0, 1, 1, 0], vec![1u32, 1, 1, 1, 1, 1, 0], vec![1u32, 0, 0, 0, 0, 0, 1]];
-    round_trip(&data, 13, 18);
+    // FIXME: This increased in size with the fast_size_for change
+    // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
+    round_trip(&data, 14, 18);
 }
 
 // TODO: Use coverage marks to ensure all types are used

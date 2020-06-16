@@ -187,9 +187,9 @@ impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
     fn len(&self) -> usize {
         1
     }
-    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
         match compressor {
-            0 => self.0.fast_size_for(data),
+            0 => self.0.fast_size_for(data, options),
             _ => unreachable!("No compressor at that index"),
         }
     }
@@ -205,10 +205,10 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
     fn len(&self) -> usize {
         2
     }
-    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
         match compressor {
-            0 => self.0.fast_size_for(data),
-            1 => self.1.fast_size_for(data),
+            0 => self.0.fast_size_for(data, options),
+            1 => self.1.fast_size_for(data, options),
             _ => unreachable!("No compressor at that index"),
         }
     }
@@ -225,11 +225,11 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T
     fn len(&self) -> usize {
         3
     }
-    fn fast_size_for(&self, compressor: usize, data: &[T]) -> Option<usize> {
+    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
         match compressor {
-            0 => self.0.fast_size_for(data),
-            1 => self.1.fast_size_for(data),
-            2 => self.2.fast_size_for(data),
+            0 => self.0.fast_size_for(data, options),
+            1 => self.1.fast_size_for(data, options),
+            2 => self.2.fast_size_for(data, options),
             _ => unreachable!("No compressor at that index"),
         }
     }

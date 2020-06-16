@@ -39,8 +39,8 @@ impl EncoderArray<bool> for Vec<bool> {
     fn encode_all<O: EncodeOptions>(values: &[bool], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile!("Boolean encode_all");
 
+        // See also 42d5f4b4-823f-4ab4-8448-6e1a341ff28b
         let compressors = (PackedBoolCompressor, RLEBoolCompressor);
-
         compress(values, stream, &compressors)
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
@@ -48,10 +48,20 @@ impl EncoderArray<bool> for Vec<bool> {
     }
 }
 
+impl PrimitiveEncoderArray<bool> for Vec<bool> {
+    fn fast_size_for_all<O: EncodeOptions>(values: &[bool], options: &O) -> usize {
+        // See also 42d5f4b4-823f-4ab4-8448-6e1a341ff28b
+        let compressors = (PackedBoolCompressor, RLEBoolCompressor);
+        fast_size_for(values, &compressors, options)
+    }
+}
+
 struct PackedBoolCompressor;
 impl Compressor<bool> for PackedBoolCompressor {
-    fn fast_size_for(&self, data: &[bool]) -> Option<usize> {
-        Some((data.len() + 7) / 8)
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[bool], _options: &O) -> Result<usize, ()> {
+        let buffer_len = (data.len() + 7) / 8;
+        let len_len = size_for_varint(buffer_len as u64);
+        Ok(buffer_len + len_len)
     }
     fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile!("compress PackedBool");
@@ -61,15 +71,14 @@ impl Compressor<bool> for PackedBoolCompressor {
 }
 
 struct RLEBoolCompressor;
+
 impl Compressor<bool> for RLEBoolCompressor {
+    // TODO: fast_size_for
     fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        if get_in_rle() {
-            return Err(());
-        }
-        set_in_rle(true);
-        let result = encode_rle_bool(data, stream);
-        set_in_rle(false);
-        result
+        within_rle(|| encode_rle_bool(data, stream))
+    }
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[bool], options: &O) -> Result<usize, ()> {
+        within_rle(|| size_of_rle_bool(data, options))
     }
 }
 

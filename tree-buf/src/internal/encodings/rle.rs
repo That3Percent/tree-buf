@@ -5,16 +5,21 @@ use std::vec::IntoIter;
 
 // FIXME: This won't fly when encodes are mult-threaded.
 // Should use options here, but the wanted closure API isn't
-// easy for some reason. Also, this API is fragile.
+// easy for some reason. Also, this API is fragile and won't withstand panic.
+// That will have to be fixed when using arbitrary writers.
 thread_local! {
     static IN_RLE_ENCODE: RefCell<bool> = RefCell::new(false);
 }
 
-pub fn get_in_rle() -> bool {
-    IN_RLE_ENCODE.with(|v| *v.borrow())
-}
-pub fn set_in_rle(value: bool) {
-    IN_RLE_ENCODE.with(|v| *v.borrow_mut() = value);
+pub(crate) fn within_rle<T>(f: impl FnOnce() -> Result<T, ()>) -> Result<T, ()> {
+    if IN_RLE_ENCODE.with(|v| *v.borrow()) {
+        Err(())
+    } else {
+        IN_RLE_ENCODE.with(|v| *v.borrow_mut() = true);
+        let result = f();
+        IN_RLE_ENCODE.with(|v| *v.borrow_mut() = false);
+        result
+    }
 }
 
 // TODO: Use DecoderArray or InfallableDecoderArray
@@ -80,12 +85,8 @@ impl<S> RLE<S> {
     }
 }
 
+// See also 2a3a69eb-eba1-4c95-9399-f1b9daf48733
 fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
-    // Nesting creates performance problems
-    if get_in_rle() {
-        return Err(());
-    }
-
     // It will always be more efficient to just defer to another encoding. Also, this prevents a panic.
     if data.len() < 2 {
         return Err(());
@@ -124,17 +125,31 @@ fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
 }
 
 impl<T: PartialEq + Copy + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
-    // TODO: Fast size for
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("RLE compress");
+        profile!("compress");
 
-        let (runs, values) = get_runs(data)?;
+        within_rle(|| {
+            let (runs, values) = get_runs(data)?;
 
-        set_in_rle(true);
-        stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
-        stream.encode_with_id(|stream| runs.flush(stream));
-        set_in_rle(false);
+            stream.encode_with_id(|stream| compress(&values[..], stream, &self.sub_compressors));
+            stream.encode_with_id(|stream| runs.flush(stream));
 
-        Ok(ArrayTypeId::RLE)
+            Ok(ArrayTypeId::RLE)
+        })
+    }
+
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+        profile!("fast_size_for");
+
+        within_rle(|| {
+            let (runs, values) = get_runs(data)?;
+
+            let from_values = fast_size_for(&values[..], &self.sub_compressors, options);
+            let from_runs = Vec::<u64>::fast_size_for_all(&runs[..], options);
+
+            let from_ids = 2;
+
+            Ok(from_ids + from_runs + from_values)
+        })
     }
 }

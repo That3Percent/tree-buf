@@ -1,4 +1,4 @@
-use crate::internal::encodings::varint::{encode_varint_into, size_for_varint};
+use crate::internal::encodings::varint::encode_varint_into;
 use crate::prelude::*;
 
 // REMEMBER: The reason this is not a trait is because of partial borrows.
@@ -92,6 +92,10 @@ pub trait EncoderArray<T>: Default {
         s.flush(stream)
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId;
+}
+
+pub trait PrimitiveEncoderArray<T>: EncoderArray<T> {
+    fn fast_size_for_all<O: EncodeOptions>(_values: &[T], _options: &O) -> usize;
 }
 
 #[cfg(feature = "decode")]

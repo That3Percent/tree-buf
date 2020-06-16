@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use num_traits::AsPrimitive;
+use std::mem::size_of;
 
 // TODO: Remove warning
 #[allow(dead_code)]
@@ -8,6 +9,76 @@ where
     f64: AsPrimitive<T>,
 {
     todo!()
+}
+
+pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
+    // FIXME: Verify current platform is little endian
+    let mut data = data.map(f64::to_bits);
+    let mut bytes = 0usize;
+
+    // TODO: This probably can be removed in favor of a simple bit count
+    let encode = move |count, capacity: &mut u8, bytes: &mut usize| {
+        if count <= *capacity {
+            *capacity -= count;
+        } else {
+            *bytes += size_of::<u64>();
+            *capacity = 64 - (count - *capacity);
+        }
+    };
+
+    let mut buffer = match data.next() {
+        Some(first) => first,
+        None => return Err(()),
+    };
+
+    let mut previous = buffer;
+    let mut prev_xor = buffer;
+    let mut capacity = 0;
+    let capacity = &mut capacity;
+    let buffer = &mut buffer;
+
+    // TODO: This was written this way to match output the existing gorilla compressor, and may not
+    // match the actual paper. Investigate.
+    for value in data {
+        let xored = previous ^ value;
+
+        match xored {
+            0 => encode(1, capacity, &mut bytes),
+            _ => {
+                let lz = xored.leading_zeros().min(31) as u64;
+                let tz = xored.trailing_zeros() as u64;
+                let prev_lz = prev_xor.leading_zeros() as u64;
+                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as u64 };
+                if lz >= prev_lz && tz >= prev_tz {
+                    let meaningful_bit_count = 64 - prev_tz - prev_lz;
+
+                    encode(2, capacity, &mut bytes);
+                    encode(meaningful_bit_count as u8, capacity, &mut bytes);
+                } else {
+                    let meaningful_bit_count = 64 - tz - lz;
+
+                    encode(2, capacity, &mut bytes);
+                    encode(5, capacity, &mut bytes);
+                    encode(6, capacity, &mut bytes);
+                    encode(meaningful_bit_count as u8, capacity, &mut bytes);
+                }
+            }
+        };
+
+        previous = value;
+        prev_xor = xored;
+    }
+
+    // Add whatever is left
+    let remaining = 64 - *capacity;
+    let mut byte_count = remaining / 8;
+    if byte_count * 8 != remaining {
+        byte_count += 1;
+    }
+    bytes += byte_count as usize;
+    bytes += 1;
+
+    Ok(bytes)
 }
 
 pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<ArrayTypeId, ()> {
