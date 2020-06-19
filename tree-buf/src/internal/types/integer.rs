@@ -7,6 +7,7 @@ use std::any::TypeId;
 use std::convert::{TryFrom, TryInto};
 use std::mem::transmute;
 use std::vec::IntoIter;
+use zigzag::ZigZag;
 
 #[derive(Copy, Clone)]
 struct U0;
@@ -163,6 +164,22 @@ macro_rules! impl_lowerable {
 
                                 let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
                                 Ok(v.into_iter())
+                            },
+                            ArrayIntegerEncoding::DeltaZig => {
+                                let _g = firestorm::start_guard("DeltaZig");
+                                let mut v = Vec::new();
+                                let mut prev: u32 = 0;
+                                let mut offset = 0;
+                                while offset < bytes.len() {
+                                    // TODO: Not hardcoded to u32
+                                    // See also e394b0c7-d5af-40b8-b944-cb68bac33fe9
+                                    let next: u32 = decode_prefix_varint(&bytes, &mut offset)?.try_into().map_err(|_| DecodeError::InvalidFormat)?;
+                                    let next: i32 = ZigZag::decode(next);
+                                    let next = prev.wrapping_add(next as u32);
+                                    prev = next;
+                                    v.push(next.try_into().map_err(|_| DecodeError::InvalidFormat)?);
+                                }
+                                Ok(v.into_iter())
                             }
                         }
                     },
@@ -278,7 +295,7 @@ impl_lowerable!(
     encode_u16,
     fast_size_for_u16,
     (),
-    (Simple16Compressor, PrefixVarIntCompressor)
+    (Simple16Compressor, DeltaZigZagCompressor, PrefixVarIntCompressor)
 ); // TODO: Consider adding Fixed.
 impl_lowerable!(
     u16,
@@ -333,6 +350,49 @@ fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
+// TODO: One-offing this isn't great.
+// Get unsigned integers implemented
+// TODO: Wrapping over smaller sizes
+struct DeltaZigZagCompressor;
+impl DeltaZigZagCompressor {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+// TODO: Use second-stack
+fn get_delta_zigs(data: &[u32]) -> Result<Vec<u32>, ()> {
+    // TODO: Rename? This isn't really in rle
+    within_rle(|| {
+        if data.len() < 2 {
+            return Err(());
+        }
+        let mut result = Vec::new();
+        let mut current = 0;
+        for next in data.iter() {
+            // TODO: Not hard-coded to u32
+            // See also e394b0c7-d5af-40b8-b944-cb68bac33fe9
+            let diff = next.wrapping_sub(current) as i32;
+            let zig = ZigZag::encode(diff);
+            result.push(zig);
+            current = *next;
+        }
+        Ok(result)
+    })
+}
+
+impl Compressor<u32> for DeltaZigZagCompressor {
+    fn compress<O: EncodeOptions>(&self, data: &[u32], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+        let deltas = get_delta_zigs(data)?;
+        let _ignore_id = PrefixVarIntCompressor.compress(&deltas, stream);
+        Ok(ArrayTypeId::DeltaZig)
+    }
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[u32], options: &O) -> Result<usize, ()> {
+        let deltas = get_delta_zigs(data)?;
+        PrefixVarIntCompressor.fast_size_for(&deltas, options)
+    }
+}
+
 struct PrefixVarIntCompressor;
 
 impl PrefixVarIntCompressor {
@@ -342,7 +402,7 @@ impl PrefixVarIntCompressor {
 }
 
 impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
-    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
         profile!("fast_size_for");
         let mut size = 0;
         for item in data {
@@ -391,7 +451,7 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
         Ok(ArrayTypeId::IntSimple16)
     }
 
-    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
         profile!("Simple16 fast_size_for");
         let v = {
             // TODO: Remove copy, if not always than at least when the type is u32

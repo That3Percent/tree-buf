@@ -242,3 +242,27 @@ impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T
         }
     }
 }
+
+impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>, T3: Compressor<T>> CompressorSet<T> for (T0, T1, T2, T3) {
+    fn len(&self) -> usize {
+        4
+    }
+    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
+        match compressor {
+            0 => self.0.fast_size_for(data, options),
+            1 => self.1.fast_size_for(data, options),
+            2 => self.2.fast_size_for(data, options),
+            3 => self.3.fast_size_for(data, options),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+        match compressor {
+            0 => self.0.compress(data, stream),
+            1 => self.1.compress(data, stream),
+            2 => self.2.compress(data, stream),
+            3 => self.3.compress(data, stream),
+            _ => unreachable!("No compressor at that index"),
+        }
+    }
+}

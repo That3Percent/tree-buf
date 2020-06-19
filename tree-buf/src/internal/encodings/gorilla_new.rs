@@ -17,6 +17,7 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     let mut bytes = 0usize;
 
     // TODO: This probably can be removed in favor of a simple bit count
+    // Want to implement the checks for correct fast_size_for first though
     let encode = move |count, capacity: &mut u8, bytes: &mut usize| {
         if count <= *capacity {
             *capacity -= count;
@@ -26,7 +27,7 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
         }
     };
 
-    let mut buffer = match data.next() {
+    let buffer = match data.next() {
         Some(first) => first,
         None => return Err(()),
     };
@@ -35,7 +36,6 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     let mut prev_xor = buffer;
     let mut capacity = 0;
     let capacity = &mut capacity;
-    let buffer = &mut buffer;
 
     // TODO: This was written this way to match output the existing gorilla compressor, and may not
     // match the actual paper. Investigate.

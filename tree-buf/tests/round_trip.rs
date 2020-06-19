@@ -52,7 +52,7 @@ fn make_item() -> Bits {
 
 #[test]
 fn broken_int() {
-    round_trip(&75339u64, 4, 10);
+    round_trip(&75339u64, 4, 8);
 }
 
 #[test]
@@ -465,6 +465,27 @@ fn int_to_bool_nested() {
     // FIXME: This increased in size with the fast_size_for change
     // See also 279e9860-d1f6-4a6e-a4bc-1a64c47b8370
     round_trip(&data, 14, 18);
+}
+
+#[test]
+fn delta_prefix_var() {
+    let data = vec![
+        1_000_000_000u32,
+        1_000_000_001,
+        1_000_000_002,
+        1_000_000_010,
+        1_000_000_100,
+        1_000_000_50,
+        1_000_000_125,
+        1_000_000_122,
+        999_000_000,
+        998_001_000,
+        999_000_000,
+        1,
+        3_000_000_100,
+        1_000,
+    ];
+    round_trip(&data, 49, 96);
 }
 
 // TODO: Use coverage marks to ensure all types are used

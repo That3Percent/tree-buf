@@ -124,6 +124,7 @@ fn visit_array(path: Path, branch: &DynArrayBranch, breakdown: &mut SizeBreakdow
             ArrayIntegerEncoding::PrefixVarInt => breakdown.add(&path, "Prefix Varint", bytes),
             ArrayIntegerEncoding::Simple16 => breakdown.add(&path, "Simple16", bytes),
             ArrayIntegerEncoding::U8 => breakdown.add(&path, "U8 Fixed", bytes),
+            ArrayIntegerEncoding::DeltaZig => breakdown.add(&path, "DeltaZig", bytes),
         },
         DynArrayBranch::Map { len, keys, values } => {
             visit_array(path.a(&"len", &"Map"), len, breakdown);

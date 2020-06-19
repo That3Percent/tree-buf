@@ -1,3 +1,5 @@
+// TODO: Remove this allow when scratch is used
+#![allow(dead_code)]
 use crate::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,6 +24,6 @@ pub fn scratch<T: Encodable>() -> Scratch {
     Scratch { buffers: Default::default() }
 }
 
-pub fn encode_into_with_scratch<T: Encodable>(value: &T, scratch: &mut Scratch, into: &mut Vec<u8>) {
+pub fn encode_into_with_scratch<T: Encodable>(_value: &T, _scratch: &mut Scratch, _into: &mut Vec<u8>) {
     todo!()
 }

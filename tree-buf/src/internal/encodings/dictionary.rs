@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use std::collections::HashMap;
-use std::convert::TryInto as _;
 use std::hash::Hash;
 use std::vec::IntoIter;
 
@@ -62,14 +61,16 @@ impl<S> Dictionary<S> {
     }
 }
 
+// TODO: (Performance) Drop to u32 or below when possible. This showed small but non-negligible improvement.
+// That improvement would apply to other types as well (eg: enum variants, rle)
 // See also 2a3a69eb-eba1-4c95-9399-f1b9daf48733
 fn get_lookup_table<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
-    profile!(T, "get_lookup_table");
-
     // It will always be more efficient to just defer to another encoding.
     if data.len() < 2 {
         return Err(());
     }
+
+    profile!(T, "get_lookup_table");
 
     // TODO: This calls for a specialized data structure
     let mut indices = Vec::<u64>::new();
@@ -85,7 +86,8 @@ fn get_lookup_table<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq>(data: &[T
             values.push(*value);
             i
         };
-        indices.push(index.try_into().map_err(|_| ())?);
+        //indices.push(index.try_into().map_err(|_| ())?);
+        indices.push(index as u64);
     }
 
     debug_assert!(lookup.len() == values.len());

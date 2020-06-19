@@ -131,7 +131,7 @@ pub(crate) struct Utf8Compressor;
 // TODO: The Borrow<String> here is interesting. Can we get rid of other lifetimes?
 #[cfg(feature = "encode")]
 impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
-    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
         profile!("Utf8 fast_size_for");
         let mut total = 0;
         for s in data {

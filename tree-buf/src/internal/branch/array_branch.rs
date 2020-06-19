@@ -209,6 +209,7 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
         IntSimple16 => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::Simple16)?,
         IntPrefixVar => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::PrefixVarInt)?,
         U8 => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::U8)?,
+        DeltaZig => decode_ints(bytes, offset, lens, ArrayIntegerEncoding::DeltaZig)?,
         F32 => {
             let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::F32(bytes))
@@ -292,6 +293,7 @@ impl_type_id!(ArrayTypeId, [
     Dictionary: 17,
     RLEBoolTrue: 18,
     RLEBoolFalse: 19,
+    DeltaZig: 20,
 ]);
 
 #[derive(Debug)]
@@ -307,4 +309,5 @@ pub enum ArrayIntegerEncoding {
     PrefixVarInt,
     Simple16,
     U8,
+    DeltaZig,
 }
