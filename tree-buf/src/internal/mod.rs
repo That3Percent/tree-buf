@@ -21,3 +21,5 @@ pub use {branch::*, buffer::*, encoder_decoder::*, encodings::*, options::*, par
 pub(crate) use markers::*;
 
 pub use crate::profile;
+
+pub use firestorm;

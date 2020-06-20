@@ -82,11 +82,13 @@ pub trait Decodable: Sized {
 pub trait EncoderArray<T>: Default {
     fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b T);
     fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [T]) {
+        profile!("buffer_many");
         for elem in values {
             self.buffer_one(elem);
         }
     }
     fn encode_all<O: EncodeOptions>(values: &[T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        profile!("encode_all");
         let mut s = Self::default();
         s.buffer_many(values);
         s.flush(stream)

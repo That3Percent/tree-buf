@@ -96,7 +96,7 @@ impl<T: Encodable> EncoderArray<Vec<T>> for VecArrayEncoder<T::EncoderArray> {
         values.buffer_many(&value[..]);
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("Array flush");
+        profile!("flush");
         let Self { len, values } = self;
         if let Some(values) = values {
             if len.iter().all(|l| *l == len[0]) {

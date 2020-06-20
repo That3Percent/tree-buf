@@ -40,6 +40,7 @@ impl<T: Encodable> EncoderArray<Option<T>> for NullableEncoder<T::EncoderArray> 
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        profile!("flush");
         let Self { opt, value } = self;
         if let Some(value) = value {
             stream.encode_with_id(|stream| opt.flush(stream));

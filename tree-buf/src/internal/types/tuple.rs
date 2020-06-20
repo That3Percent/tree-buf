@@ -84,7 +84,7 @@ macro_rules! impl_tuple {
                 )+
             }
             fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("Tuple flush");
+                profile!("flush");
                 let ($($ts,)+) = self;
                 $(
                     stream.encode_with_id(|stream|

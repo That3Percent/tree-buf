@@ -103,7 +103,7 @@ impl<K: Encodable, V: Encodable, S: Default + BuildHasher> EncoderArray<HashMap<
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("HashMap EncoderArray::flush");
+        profile!("flush");
         let Self { len, items, _marker } = self;
         if let Some((keys, values)) = items {
             stream.encode_with_id(|stream| len.flush(stream));

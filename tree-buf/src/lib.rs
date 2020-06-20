@@ -35,7 +35,7 @@ pub mod prelude {
 
     pub(crate) use firestorm;
 
-    pub(crate) use profile;
+    pub use profile;
 
     pub(crate) use crate::experimental::*;
 }

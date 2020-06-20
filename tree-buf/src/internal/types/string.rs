@@ -72,7 +72,7 @@ impl EncoderArray<String> for Vec<&'static String> {
     }
 
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("String EncoderArray::flush");
+        profile!("flush");
 
         let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)));
 

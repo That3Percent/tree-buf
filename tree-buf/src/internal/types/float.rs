@@ -170,10 +170,11 @@ macro_rules! impl_float {
                 self.push(*value);
             }
             fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$T]) {
+                profile!("buffer_many");
                 self.extend_from_slice(values);
             }
             fn encode_all<O: EncodeOptions>(values: &[$T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("Float encode_all");
+                profile!("encode_all");
 
                 // See also 558c24b8-dc75-4f08-8ea2-0f839af4da2e
                 let compressors = (

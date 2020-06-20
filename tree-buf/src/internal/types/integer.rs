@@ -64,10 +64,11 @@ macro_rules! impl_lowerable {
                 self.push(*value);
             }
             fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
+                profile!("buffer_many");
                 self.extend_from_slice(values);
             }
             fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("Integer encode_all");
+                profile!("encode_all");
                 // TODO: (Performance) When getting ranges, use SIMD
 
                 let max = values.iter().max();

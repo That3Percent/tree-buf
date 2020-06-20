@@ -34,10 +34,11 @@ impl EncoderArray<bool> for Vec<bool> {
         self.push(*value);
     }
     fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [bool]) {
+        profile!("buffer_many");
         self.extend_from_slice(values);
     }
     fn encode_all<O: EncodeOptions>(values: &[bool], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("Boolean encode_all");
+        profile!("encode_all");
 
         // See also 42d5f4b4-823f-4ab4-8448-6e1a341ff28b
         let compressors = (PackedBoolCompressor, RLEBoolCompressor);

@@ -110,7 +110,7 @@ macro_rules! impl_fixed {
                 }
                 // TODO: Overload for encode_all?
                 fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                    profile!("ArrayFixed flush");
+                    profile!("flush");
                     let Self { values } = self;
                     encode_usize($size, stream);
                     if $size != 0 {
