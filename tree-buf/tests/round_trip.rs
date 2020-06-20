@@ -431,16 +431,8 @@ fn strings_using_dictionary() {
 
 #[test]
 fn nested_strings_using_rle() {
-    let data = (
-        //owned_vec(vec![]),
-        owned_vec(vec!["abc", "abc", "abc"]),
-        owned_vec(vec!["def", "def", "def"]),
-        1u32,
-    );
+    let data = (owned_vec(vec!["abc", "abc", "abc"]), owned_vec(vec!["def", "def", "def"]), 1u32);
 
-    //let data = owned_vec(vec!["abc", "abc", "abc"]);
-
-    // TODO: Add sizes
     round_trip(&data, 26, 30);
 }
 

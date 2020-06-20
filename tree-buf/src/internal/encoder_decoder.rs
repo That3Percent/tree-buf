@@ -1,4 +1,3 @@
-use crate::internal::encodings::varint::encode_varint_into;
 use crate::prelude::*;
 
 // REMEMBER: The reason this is not a trait is because of partial borrows.
@@ -16,30 +15,6 @@ impl<'a, O: EncodeOptions> EncoderStream<'a, O> {
         Self { bytes, lens, options }
     }
 
-    // TODO: Not yet used
-    pub fn restore_if_void<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let restore = self.bytes.len();
-        let id = f(self);
-        if id == T::void() {
-            self.bytes.drain(restore..);
-        }
-        id
-    }
-    // TODO: Not yet used
-    pub fn reserve_and_encode_with_varint(&mut self, max: u64, f: impl FnOnce(&mut Self) -> u64) {
-        let reserved = size_for_varint(max);
-        let start = self.bytes.len();
-        for _ in 0..reserved {
-            self.bytes.push(0);
-        }
-        let end = self.bytes.len();
-        let v = f(self);
-        debug_assert!(v <= max);
-        encode_varint_into(v, &mut self.bytes[start..end]);
-    }
-
-    // See also: a0b1e0fa-e33c-4bda-8141-d184a1160143
-    // Duplicated code.
     pub fn encode_with_id<T: TypeId>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let type_index = self.bytes.len();
         self.bytes.push(0);

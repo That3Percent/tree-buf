@@ -135,7 +135,6 @@ macro_rules! impl_lowerable {
                 profile!(Self::Decode, "Integer DecoderArray::new");
 
                 match sticks {
-                    // TODO: Support eg: delta/zigzag
                     DynArrayBranch::Integer(array_int) => {
                         let ArrayInteger { bytes, encoding } = array_int;
                         match encoding {

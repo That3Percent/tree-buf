@@ -45,13 +45,6 @@ fn impl_struct_encode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStrea
 
     let num_fields = fields.len();
 
-    /*
-    quote! {
-        ::tree_buf::internal::encode_fields(#num_fields, stream, |stream| move {
-            #(#encoders)*
-        })
-    };
-    */
     // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
     let (prefix, suffix) = match num_fields {
         0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), Span::call_site())),

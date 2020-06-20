@@ -16,10 +16,6 @@ use std::convert::{TryFrom, TryInto};
 // TODO: Other kinds of self-description may also be interesting, since this is for data self-description is higher value
 // TODO: Bytes/Blog = [u8] compressed (eg: gzip), uncompressed
 
-// TODO: Try each compression on a sample of the data (first 1024 or so?) in turn to decide which to use.
-// 8-Array & different fixed/variable sizes - 0,1,2,128,custom(follows). Fixed 0 necessarily has Void child
-// 1-128 bits
-
 #[derive(Debug)]
 pub enum DynRootBranch<'a> {
     Object {

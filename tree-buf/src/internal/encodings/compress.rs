@@ -11,8 +11,6 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 
     let samples = firestorm::start_guard("Samples");
     let restore_bytes = stream.bytes.len();
-    // TODO: Yuck!. This is ugly and error prone to restore these
-    // and update the byte count with the assumed compressor for lens
     let restore_lens = stream.lens.len();
     let sample_size = data.len().min(256);
     let sample = &data[..sample_size];

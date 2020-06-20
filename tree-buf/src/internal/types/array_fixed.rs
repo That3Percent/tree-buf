@@ -108,7 +108,6 @@ macro_rules! impl_fixed {
                 fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b [T; $size]) {
                     self.values.buffer_many(value);
                 }
-                // TODO: Overload for encode_all?
                 fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                     profile!("flush");
                     let Self { values } = self;
