@@ -164,24 +164,26 @@ macro_rules! impl_tuple {
                 )+))
             }
         }
+
+        impl<T, $($ts: Compressor<T>,)+> CompressorSet<T> for ($($ts,)+) {
+            fn len(&self) -> usize {
+                $count
+            }
+            fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
+                match compressor {
+                    $($ti => tuple_index!(self, $ti).fast_size_for(data, options),)+
+                    _ => unreachable!("No compressor at that index"),
+                }
+            }
+            fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+                match compressor {
+                    $($ti => tuple_index!(self, $ti).compress(data, stream),)+
+                    _ => unreachable!("No compressor at that index"),
+                }
+            }
+        }
     };
 }
-
-// TODO: Consider 0 and 1 sized tuples.
-// These should probably be no serialization at all,
-// and pass-through serialization respectively and just
-// not use the tuple construct. The tuple construct isn't invalid
-// though, which opens considerations for matching either for a schema
-// which may not be trivial - like a recursive descent parser.
-impl_tuple!(2, RootTypeId::Tuple2, ArrayTypeId::Tuple2, T0, 0, T1, 1,);
-impl_tuple!(3, RootTypeId::Tuple3, ArrayTypeId::Tuple3, T0, 0, T1, 1, T2, 2,);
-impl_tuple!(4, RootTypeId::Tuple4, ArrayTypeId::Tuple4, T0, 0, T1, 1, T2, 2, T3, 3,);
-impl_tuple!(5, RootTypeId::Tuple5, ArrayTypeId::Tuple5, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4,);
-impl_tuple!(6, RootTypeId::Tuple6, ArrayTypeId::Tuple6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
-
-// TODO: Support tuple structs in the macro
-
-// TODO: Move these into macro
 
 impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
     fn len(&self) -> usize {
@@ -201,68 +203,16 @@ impl<T, T0: Compressor<T>> CompressorSet<T> for (T0,) {
     }
 }
 
-impl<T, T0: Compressor<T>, T1: Compressor<T>> CompressorSet<T> for (T0, T1) {
-    fn len(&self) -> usize {
-        2
-    }
-    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
-        match compressor {
-            0 => self.0.fast_size_for(data, options),
-            1 => self.1.fast_size_for(data, options),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        match compressor {
-            0 => self.0.compress(data, stream),
-            1 => self.1.compress(data, stream),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-}
+// TODO: Consider 0 and 1 sized tuples.
+// These should probably be no serialization at all,
+// and pass-through serialization respectively and just
+// not use the tuple construct. The tuple construct isn't invalid
+// though, which opens considerations for matching either for a schema
+// which may not be trivial - like a recursive descent parser.
+impl_tuple!(2, RootTypeId::Tuple2, ArrayTypeId::Tuple2, T0, 0, T1, 1,);
+impl_tuple!(3, RootTypeId::Tuple3, ArrayTypeId::Tuple3, T0, 0, T1, 1, T2, 2,);
+impl_tuple!(4, RootTypeId::Tuple4, ArrayTypeId::Tuple4, T0, 0, T1, 1, T2, 2, T3, 3,);
+impl_tuple!(5, RootTypeId::Tuple5, ArrayTypeId::Tuple5, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4,);
+impl_tuple!(6, RootTypeId::Tuple6, ArrayTypeId::Tuple6, T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5,);
 
-impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>> CompressorSet<T> for (T0, T1, T2) {
-    fn len(&self) -> usize {
-        3
-    }
-    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
-        match compressor {
-            0 => self.0.fast_size_for(data, options),
-            1 => self.1.fast_size_for(data, options),
-            2 => self.2.fast_size_for(data, options),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        match compressor {
-            0 => self.0.compress(data, stream),
-            1 => self.1.compress(data, stream),
-            2 => self.2.compress(data, stream),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-}
-
-impl<T, T0: Compressor<T>, T1: Compressor<T>, T2: Compressor<T>, T3: Compressor<T>> CompressorSet<T> for (T0, T1, T2, T3) {
-    fn len(&self) -> usize {
-        4
-    }
-    fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()> {
-        match compressor {
-            0 => self.0.fast_size_for(data, options),
-            1 => self.1.fast_size_for(data, options),
-            2 => self.2.fast_size_for(data, options),
-            3 => self.3.fast_size_for(data, options),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-    fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        match compressor {
-            0 => self.0.compress(data, stream),
-            1 => self.1.compress(data, stream),
-            2 => self.2.compress(data, stream),
-            3 => self.3.compress(data, stream),
-            _ => unreachable!("No compressor at that index"),
-        }
-    }
-}
+// TODO: Support tuple structs in the macro
