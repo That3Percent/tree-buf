@@ -64,11 +64,11 @@ macro_rules! impl_lowerable {
                 self.push(*value);
             }
             fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
-                profile!("buffer_many");
+                profile_method!(buffer_many);
                 self.extend_from_slice(values);
             }
             fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("encode_all");
+                profile_method!(encode_all);
                 // TODO: (Performance) When getting ranges, use SIMD
 
                 let max = values.iter().max();
@@ -115,7 +115,7 @@ macro_rules! impl_lowerable {
         impl Decodable for $Ty {
             type DecoderArray = IntoIter<$Ty>;
             fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Integer Decodable::decode");
+                profile_method!(decode);
                 match sticks {
                     DynRootBranch::Integer(root_int) => {
                         match root_int {
@@ -132,14 +132,14 @@ macro_rules! impl_lowerable {
         impl InfallibleDecoderArray for IntoIter<$Ty> {
             type Decode = $Ty;
             fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!(Self::Decode, "Integer DecoderArray::new");
+                profile_method!(new_infallible);
 
                 match sticks {
                     DynArrayBranch::Integer(array_int) => {
                         let ArrayInteger { bytes, encoding } = array_int;
                         match encoding {
                             ArrayIntegerEncoding::PrefixVarInt => {
-                                let _g = firestorm::start_guard("PrefixVarInt");
+                                profile_section!(prefix_var_int);
 
                                 let v: Vec<$Ty> = decode_all(
                                         &bytes,
@@ -151,7 +151,7 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             }
                             ArrayIntegerEncoding::Simple16 => {
-                                let _g = firestorm::start_guard("Simple16");
+                                profile_section!(simple_16);
 
                                 let mut v = Vec::new();
                                 simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
@@ -160,13 +160,13 @@ macro_rules! impl_lowerable {
                                 Ok(v.into_iter())
                             },
                             ArrayIntegerEncoding::U8 => {
-                                let _g = firestorm::start_guard("U8");
+                                profile_section!(fixed_u8);
 
                                 let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
                                 Ok(v.into_iter())
                             },
                             ArrayIntegerEncoding::DeltaZig => {
-                                let _g = firestorm::start_guard("DeltaZig");
+                                profile_section!(delta_zig);
                                 let mut v = Vec::new();
                                 let mut prev: u32 = 0;
                                 let mut offset = 0;
@@ -235,7 +235,7 @@ macro_rules! impl_lowerable {
             } else {
                 // TODO: (Performance) Use second-stack
                 let v = {
-                    profile!($Ty, "CopyToLowered");
+                    profile_section!(copy_to_lowered);
                     data.iter().map(|i| i.as_()).collect::<Vec<_>>()
                 };
                 fast_inner(&v, options)
@@ -270,7 +270,7 @@ macro_rules! impl_lowerable {
             } else {
                 // TODO: (Performance) Use second-stack
                 let v = {
-                    profile!($Ty, "CopyToLowered");
+                    profile_section!(copy_to_lowered);
                     data.iter().map(|i| i.as_()).collect::<Vec<_>>()
                 };
                 encode_inner(&v, stream)
@@ -403,7 +403,7 @@ impl PrefixVarIntCompressor {
 
 impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
-        profile!("fast_size_for");
+        profile_method!(fast_size_for);
         let mut size = 0;
         for item in data {
             size += size_for_varint((*item).into());
@@ -411,7 +411,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         Ok(size)
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("PrefixVarInt compress");
+        profile_method!(compress);
         stream.encode_with_len(|stream| {
             for item in data {
                 encode_prefix_varint((*item).into(), &mut stream.bytes);
@@ -431,12 +431,12 @@ impl Simple16Compressor {
 
 impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("Simple16 compress");
+        profile_method!(compress);
         // TODO: (Performance) Use second-stack.
         // TODO: (Performance) This just copies to another Vec in the case where T is u32
 
         let v = {
-            let _g = firestorm::start_guard("Needless copy to u32");
+            profile_section!(needless_copy);
             let mut v = Vec::new();
             for item in data {
                 let item = *item;
@@ -452,10 +452,10 @@ impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
     }
 
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
-        profile!("Simple16 fast_size_for");
+        profile_method!(fast_size_for);
         let v = {
             // TODO: Remove copy, if not always than at least when the type is u32
-            let _g = firestorm::start_guard("Needless copy to u32");
+            profile_section!(needless_copy);
             let mut v = Vec::new();
             for item in data {
                 let item = *item;
@@ -478,7 +478,7 @@ impl BytesCompressor {
 
 impl Compressor<u8> for BytesCompressor {
     fn compress<O: EncodeOptions>(&self, data: &[u8], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("Bytes compress");
+        profile_method!(compress);
         stream.encode_with_len(|stream| stream.bytes.extend_from_slice(data));
         Ok(ArrayTypeId::U8)
     }

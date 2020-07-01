@@ -2,14 +2,14 @@ use crate::prelude::*;
 
 #[cfg(feature = "encode")]
 pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut EncoderStream<'_, O>, compressors: &impl CompressorSet<T>) -> ArrayTypeId {
-    profile!(T, "master compress");
+    profile_fn!(master_compress);
 
     // If there aren't multiple compressors, no need to be dynamic
     if compressors.len() == 1 {
         return compressors.compress(0, data, stream).unwrap();
     }
 
-    let samples = firestorm::start_guard("Samples");
+    profile_section!(samples);
     let restore_bytes = stream.bytes.len();
     let restore_lens = stream.lens.len();
     let sample_size = data.len().min(256);
@@ -28,7 +28,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 
     drop(samples);
 
-    let _final = firestorm::start_guard("Final");
+    profile_section!(actual_compress);
 
     by_size.sort_unstable_by_key(|&(_, size)| size);
 
@@ -48,7 +48,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
 
 #[cfg(feature = "encode")]
 pub(crate) fn fast_size_for<T: PartialEq, O: EncodeOptions>(data: &[T], compressors: &impl CompressorSet<T>, options: &O) -> usize {
-    profile!(T, "master fast_size_for");
+    profile_fn!(master fast_size_for);
 
     let mut min = usize::MAX;
     for i in 0..compressors.len() {

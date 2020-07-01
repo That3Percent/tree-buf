@@ -20,7 +20,7 @@ impl Encodable for bool {
 impl Decodable for bool {
     type DecoderArray = IntoIter<bool>;
     fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Boolean Decodable::decode");
+        profile_method!(decode);
         match sticks {
             DynRootBranch::Boolean(v) => Ok(v),
             _ => Err(DecodeError::SchemaMismatch),
@@ -34,11 +34,11 @@ impl EncoderArray<bool> for Vec<bool> {
         self.push(*value);
     }
     fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [bool]) {
-        profile!("buffer_many");
+        profile_method!(buffer_many);
         self.extend_from_slice(values);
     }
     fn encode_all<O: EncodeOptions>(values: &[bool], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("encode_all");
+        profile_method!(encode_all);
 
         // See also 42d5f4b4-823f-4ab4-8448-6e1a341ff28b
         let compressors = (PackedBoolCompressor, RLEBoolCompressor);
@@ -65,7 +65,7 @@ impl Compressor<bool> for PackedBoolCompressor {
         Ok(buffer_len + len_len)
     }
     fn compress<O: EncodeOptions>(&self, data: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("compress PackedBool");
+        profile_method!(compress);
         stream.encode_with_len(|stream| encode_packed_bool(data, stream.bytes));
         Ok(ArrayTypeId::PackedBool)
     }
@@ -88,7 +88,7 @@ impl InfallibleDecoderArray for IntoIter<bool> {
     type Decode = bool;
 
     fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Boolean DecoderArray::new");
+        profile_method!(new_infallible);
 
         match sticks {
             DynArrayBranch::Boolean(encoding) => {

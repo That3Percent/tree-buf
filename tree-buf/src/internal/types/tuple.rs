@@ -68,7 +68,7 @@ macro_rules! impl_tuple {
         impl <$($ts: Encodable),+> Encodable for ($($ts),+) {
             type EncoderArray=($($ts::EncoderArray),+);
             fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-                profile!("Tuple encode_root");
+                profile_method!(encode_root);
                 $(
                     stream.encode_with_id(|stream| tuple_index!(self, $ti).encode_root(stream));
                 )+
@@ -84,7 +84,7 @@ macro_rules! impl_tuple {
                 )+
             }
             fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("flush");
+                profile_method!(flush);
                 let ($($ts,)+) = self;
                 $(
                     stream.encode_with_id(|stream|
@@ -101,7 +101,7 @@ macro_rules! impl_tuple {
         where $(DecodeError : From<<$ts::DecoderArray as DecoderArray>::Error>),+ {
             type DecoderArray=($($ts::DecoderArray),+);
             fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Tuple decode");
+                profile_method!(decode);
                 match sticks {
                     DynRootBranch::Tuple { mut fields } => {
                         // See also abb368f2-6c99-4c44-8f9f-4b00868adaaf
@@ -135,7 +135,7 @@ macro_rules! impl_tuple {
             // can achieve this.
             type Error=DecodeError;
             fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Tuple new");
+                profile_method!(new);
 
                 match sticks {
                     DynArrayBranch::Tuple { mut fields } => {

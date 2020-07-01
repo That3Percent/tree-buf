@@ -141,7 +141,8 @@ fn fill_decode_skeleton<A: ToTokens>(
         impl ::tree_buf::internal::Decodable for #name {
             type DecoderArray = #array_decoder_name;
             fn decode(sticks: ::tree_buf::internal::DynRootBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::DecodeError> {
-                let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "decode"));
+                // TODO: Re-enable profiling. See also a3b84cdc-be0f-4de2-8195-efb540004d2f
+                //let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "decode"));
                 #decode
             }
         }
@@ -157,7 +158,8 @@ fn fill_decode_skeleton<A: ToTokens>(
             // TODO: See if sometimes we can use Infallible here.
             type Error=::tree_buf::DecodeError;
             fn new(sticks: ::tree_buf::internal::DynArrayBranch<'_>, options: &impl ::tree_buf::options::DecodeOptions) -> Result<Self, ::tree_buf::DecodeError> {
-                let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "decode"));
+                // TODO: Re-enable profiling. See also a3b84cdc-be0f-4de2-8195-efb540004d2f
+                //let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "decode"));
                 #new
             }
             fn decode_next(&mut self) -> ::std::result::Result<Self::Decode, Self::Error> {

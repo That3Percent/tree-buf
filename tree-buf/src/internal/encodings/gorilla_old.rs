@@ -32,13 +32,13 @@ where
         Ok(result)
     })?;
     data.push(last);
-    firestorm::start("Construct");
+    profile_section!(construct);
     let reader = VecReader::new(&data, *num_bits_last_elm);
     let iterator = DoubleStreamIterator::new(reader);
-    firestorm::end();
+    drop(construct);
     // FIXME: It seems like this collect can panic if the data is invalid.
-    firestorm::start("Collect");
+    profile_section!(collect);
     let values: Vec<_> = iterator.map(|v| v.as_()).collect();
-    firestorm::end();
+    drop(collect);
     Ok(values)
 }

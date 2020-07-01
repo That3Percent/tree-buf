@@ -23,7 +23,7 @@ pub mod gorilla {
 #[cfg(feature = "decode")]
 /// Decodes all items from some byte aligned encoding
 pub fn decode_all<T>(bytes: &[u8], f: impl Fn(&[u8], &mut usize) -> DecodeResult<T>) -> DecodeResult<Vec<T>> {
-    profile!(T, "decode_all");
+    profile_fn!(decode_all);
     let mut offset = 0;
     let mut result = Vec::new();
     while offset < bytes.len() {

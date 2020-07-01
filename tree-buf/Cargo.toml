@@ -15,13 +15,12 @@ maintenance = { status = "experimental"}
 [dependencies]
 tree-buf-macros = {version = "0.9.0", path="../tree-buf-macros", optional = true }
 simple-16 = "0.1.1"
-#simple-16 = { path = "../../simple-16"}
+
 num-traits = "0.2.11"
 gibbon = "0.1.3"
 rayon = "1.3.0"
 transmute = "0.1.1"
-
-firestorm = "0.2.0"
+firestorm = "0.3.0"
 coercible_errors = "0.1.4"
 #zfp-sys-cc = "0.1.0"
 defer = "0.1.0"

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[cfg(feature = "encode")]
 pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
-    profile!(&[bool], "encode_packed_bool");
+    profile_fn!(encode_packed_bool);
 
     let mut offset = 0;
     while offset + 7 < items.len() {
@@ -29,7 +29,7 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
 
 #[cfg(feature = "decode")]
 pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
-    profile!(Vec<bool>, "decode_packed_bool");
+    profile_fn!(decode_packed_bool);
 
     let capacity = bytes.len() * 8;
     let mut result = Vec::with_capacity(capacity);

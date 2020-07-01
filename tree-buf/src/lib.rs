@@ -1,13 +1,3 @@
-#[macro_export]
-macro_rules! profile {
-    ($T:ty, $name:expr) => {
-        let _profile_guard = ::firestorm::start_guard(::firestorm::FmtStr::Str3(::std::any::type_name::<$T>(), "::", $name));
-    };
-    ($name:expr) => {
-        profile!(Self, $name);
-    };
-}
-
 #[doc(hidden)]
 pub mod internal;
 
@@ -33,9 +23,7 @@ pub mod prelude {
     #[cfg(feature = "decode")]
     pub(crate) type DecodeResult<T> = Result<T, DecodeError>;
 
-    pub(crate) use firestorm;
-
-    pub use profile;
+    pub(crate) use firestorm::{profile_fn, profile_method, profile_section};
 
     pub(crate) use crate::experimental::*;
 }
@@ -62,7 +50,7 @@ pub fn encode<T: Encodable>(value: &T) -> Vec<u8> {
 
 #[cfg(feature = "encode")]
 pub fn encode_with_options<T: Encodable>(value: &T, options: &impl EncodeOptions) -> Vec<u8> {
-    profile!(T, "encode_with_options");
+    profile_fn!(encode_with_options);
     use internal::encodings::varint::encode_suffix_varint;
 
     let mut lens = Vec::new();
@@ -85,7 +73,7 @@ pub fn decode<T: Decodable>(bytes: &[u8]) -> DecodeResult<T> {
 
 #[cfg(feature = "decode")]
 pub fn decode_with_options<T: Decodable>(bytes: &[u8], options: &impl DecodeOptions) -> DecodeResult<T> {
-    profile!(T, "decode_with_options");
+    profile_fn!(T, decode_with_options);
     let sticks = decode_root(bytes)?;
     T::decode(sticks, options)
 }

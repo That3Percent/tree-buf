@@ -7,7 +7,7 @@ use std::vec::IntoIter;
 impl<K: Encodable, V: Encodable, S: Default + BuildHasher> Encodable for HashMap<K, V, S> {
     type EncoderArray = HashMapArrayEncoder<K::EncoderArray, V::EncoderArray, S>;
     fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-        profile!("HashMap encode_root");
+        profile_method!(encode_root);
 
         encode_usize(self.len(), stream);
         match self.len() {
@@ -49,7 +49,7 @@ where
 {
     type DecoderArray = Option<HashMapArrayDecoder<K::DecoderArray, V::DecoderArray, S>>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("HashMap Decodable::decode");
+        profile_method!(decode);
 
         let mut v = Default::default(); // TODO: (Performance) Capacity
         match sticks {
@@ -94,7 +94,7 @@ pub struct HashMapArrayDecoder<K, V, S> {
 #[cfg(feature = "encode")]
 impl<K: Encodable, V: Encodable, S: Default + BuildHasher> EncoderArray<HashMap<K, V, S>> for HashMapArrayEncoder<K::EncoderArray, V::EncoderArray, S> {
     fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b HashMap<K, V, S>) {
-        profile!("HashMap EncoderArray::buffer");
+        profile_method!(EncoderArray::buffer);
         self.len.buffer_one(&(value.len() as u64));
         let (keys, values) = self.items.get_or_insert_with(Default::default);
         for (key, value) in value.iter() {
@@ -103,7 +103,7 @@ impl<K: Encodable, V: Encodable, S: Default + BuildHasher> EncoderArray<HashMap<
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("flush");
+        profile_method!(flush);
         let Self { len, items, _marker } = self;
         if let Some((keys, values)) = items {
             stream.encode_with_id(|stream| len.flush(stream));
@@ -129,7 +129,7 @@ where
     type Error = DecodeError;
 
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("HashMap DecoderArray::new");
+        profile_method!(DecoderArray::new);
 
         match sticks {
             DynArrayBranch::Map0 => Ok(None),

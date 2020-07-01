@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 impl<T: Encodable> Encodable for Vec<T> {
     type EncoderArray = VecArrayEncoder<T::EncoderArray>;
     fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-        profile!("Array encode_root");
+        profile_method!(encode_root);
         match self.len() {
             0 => RootTypeId::Array0,
             1 => {
@@ -35,7 +35,7 @@ where
 {
     type DecoderArray = Option<VecArrayDecoder<T::DecoderArray>>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Array Decodable::decode");
+        profile_method!(decode);
         match sticks {
             DynRootBranch::Array0 => Ok(Vec::new()),
             DynRootBranch::Array1(inner) => {
@@ -96,7 +96,7 @@ impl<T: Encodable> EncoderArray<Vec<T>> for VecArrayEncoder<T::EncoderArray> {
         values.buffer_many(&value[..]);
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("flush");
+        profile_method!(flush);
         let Self { len, values } = self;
         if let Some(values) = values {
             if len.iter().all(|l| *l == len[0]) {
@@ -121,7 +121,7 @@ impl<T: DecoderArray> DecoderArray for Option<VecArrayDecoder<T>> {
     type Error = T::Error;
 
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Array DecoderArray::new");
+        profile_method!(new);
 
         match sticks {
             DynArrayBranch::Array0 => Ok(None),

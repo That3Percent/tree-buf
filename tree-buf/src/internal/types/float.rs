@@ -72,7 +72,7 @@ macro_rules! impl_float {
         impl Decodable for $T {
             type DecoderArray = IntoIter<$T>;
             fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Float Decodable::decode");
+                profile_method!(decode);
                 match sticks {
                     DynRootBranch::Integer(root_integer) => {
                         // FIXME: Fast and lose to get refactoring done. Double check here.
@@ -116,20 +116,20 @@ macro_rules! impl_float {
         impl InfallibleDecoderArray for IntoIter<$T> {
             type Decode = $T;
             fn new_infallible(sticks: DynArrayBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile!("Float DecoderArray::new");
+                profile_method!(new_infallibe);
 
                 match sticks {
                     DynArrayBranch::Float(float) => {
                         match float {
                             ArrayFloat::F64(bytes) => {
-                                let _g = firestorm::start_guard("f64");
+                                profile_section!(array_f64);
 
                                 // FIXME: Should do schema mismatch for f32 -> f64
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f64::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
                             ArrayFloat::F32(bytes) => {
-                                let _g = firestorm::start_guard("f32");
+                                profile_section!(array_f32);
 
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f32::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
@@ -170,11 +170,11 @@ macro_rules! impl_float {
                 self.push(*value);
             }
             fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$T]) {
-                profile!("buffer_many");
+                profile_method!(buffer_many);
                 self.extend_from_slice(values);
             }
             fn encode_all<O: EncodeOptions>(values: &[$T], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile!("encode_all");
+                profile_method!(encode_all);
 
                 // See also 558c24b8-dc75-4f08-8ea2-0f839af4da2e
                 let compressors = (
@@ -207,7 +207,7 @@ macro_rules! impl_float {
                 Ok(arr_size + size_for_varint(arr_size as u64))
             }
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-                profile!("Float compress");
+                profile_method!(compress);
                 stream.encode_with_len(|stream| {
                     for item in data {
                         encode_item(*item, &mut stream.bytes);
@@ -220,7 +220,7 @@ macro_rules! impl_float {
         struct Gorilla;
         impl Compressor<$T> for Gorilla {
             fn fast_size_for<O: EncodeOptions>(&self, data: &[$T], options: &O) -> Result<usize, ()> {
-                profile!($T, "Gorilla.fast_size_for");
+                profile_method!(fast_size_for);
 
                 if let Some(tolerance) = options.lossy_float_tolerance() {
                     // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
@@ -235,7 +235,7 @@ macro_rules! impl_float {
             }
 
             fn compress<O: EncodeOptions>(&self, data: &[$T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-                profile!($T, "Gorilla.compress");
+                profile_method!(compress);
 
                 stream.encode_with_len(|stream| {
                     if let Some(tolerance) = stream.options.lossy_float_tolerance() {
@@ -260,7 +260,7 @@ struct Zfp64 {
 }
 impl Compressor<f64> for Zfp64 {
     fn compress<O: EncodeOptions>(&self, data: &[f64], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("ZFP compress");
+        profile_method!(compress);
         stream.encode_with_len(|stream| zfp::compress(data, &mut stream.bytes, self.tolerance));
     }
 }
@@ -270,7 +270,7 @@ struct Zfp32 {
 }
 impl Compressor<f32> for Zfp32 {
     fn compress<O: EncodeOptions>(&self, data: &[f32], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("ZFP compress");
+        profile_method!(compress);
         stream.encode_with_len(|stream| zfp::compress(data, bytes, self.tolerance));
     }
 }

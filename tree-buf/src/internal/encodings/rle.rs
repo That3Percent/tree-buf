@@ -93,7 +93,7 @@ fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
     }
 
     // Prevent panic on indexing first item.
-    profile!(&[T], "RLE get runs");
+    profile_fn!(rle_get_runs);
 
     let mut runs = Vec::new();
     let mut current_run = 0u64;
@@ -126,7 +126,7 @@ fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
 
 impl<T: PartialEq + Copy + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> for RLE<S> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("compress");
+        profile_method!(compress);
 
         within_rle(|| {
             let (runs, values) = get_runs(data)?;
@@ -139,7 +139,7 @@ impl<T: PartialEq + Copy + std::fmt::Debug, S: CompressorSet<T>> Compressor<T> f
     }
 
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
-        profile!("fast_size_for");
+        profile_method!(fast_size_for);
 
         within_rle(|| {
             let (runs, values) = get_runs(data)?;

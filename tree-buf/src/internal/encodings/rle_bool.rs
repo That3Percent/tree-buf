@@ -52,7 +52,7 @@ fn bool_runs_and_id(items: &[bool]) -> Result<(Vec<u64>, ArrayTypeId), ()> {
 
 #[cfg(feature = "encode")]
 pub fn encode_rle_bool<O: EncodeOptions>(items: &[bool], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-    profile!(&[bool], "encode_rle_bool");
+    profile_fn!(encode_rle_bool);
 
     let (runs, type_id) = bool_runs_and_id(items)?;
     stream.encode_with_id(|stream| runs.flush(stream));

@@ -117,7 +117,7 @@ pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
 
 #[cfg(feature = "decode")]
 pub fn decode_root(bytes: &[u8]) -> DecodeResult<DynRootBranch<'_>> {
-    profile!(&[u8], "decode_root");
+    profile_fn!(decode_root);
     if bytes.len() == 0 {
         return Ok(DynRootBranch::Void);
     }

@@ -72,7 +72,7 @@ impl EncoderArray<String> for Vec<&'static String> {
     }
 
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("flush");
+        profile_method!(flush);
 
         let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)));
 
@@ -85,7 +85,7 @@ impl Decodable for String {
     // TODO: Use lifetimes to make this decode lazy rather than IntoIter
     type DecoderArray = IntoIter<String>;
     fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("String Decodable::decode");
+        profile_method!(decode);
         match sticks {
             DynRootBranch::String(s) => Ok(s.to_owned()),
             _ => Err(DecodeError::SchemaMismatch),
@@ -98,11 +98,11 @@ impl InfallibleDecoderArray for IntoIter<String> {
     type Decode = String;
 
     fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("String new_infallible");
+        profile_method!(new_infallible);
 
         match sticks {
             DynArrayBranch::String(bytes) => {
-                let _g = firestorm::start_guard("String");
+                profile_section!(str_utf8);
 
                 let strs = decode_all(&bytes, |b, o| decode_str(b, o).and_then(|v| Ok(v.to_owned())))?;
                 Ok(strs.into_iter())
@@ -132,7 +132,7 @@ pub(crate) struct Utf8Compressor;
 #[cfg(feature = "encode")]
 impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
-        profile!("Utf8 fast_size_for");
+        profile_method!(fast_size_for);
         let mut total = 0;
         for s in data {
             total += size_for_varint(s.borrow().len() as u64);
@@ -141,7 +141,7 @@ impl<T: Borrow<String>> Compressor<T> for Utf8Compressor {
         Ok(total + size_for_varint(total as u64))
     }
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        profile!("Utf8 compress");
+        profile_method!(compress);
 
         stream.encode_with_len(|stream| {
             for value in data.iter() {

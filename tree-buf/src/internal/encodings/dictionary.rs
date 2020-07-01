@@ -70,7 +70,7 @@ fn get_lookup_table<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq>(data: &[T
         return Err(());
     }
 
-    profile!(T, "get_lookup_table");
+    profile_fn!(get_lookup_table);
 
     // TODO: This calls for a specialized data structure
     let mut indices = Vec::<u64>::new();
@@ -108,7 +108,7 @@ impl<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Com
     // TODO: fast_size_for
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         // Prevent panic on indexing first item.
-        profile!("compress");
+        profile_method!(compress);
 
         let (indices, values) = get_lookup_table(data)?;
 
@@ -119,7 +119,7 @@ impl<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq, S: CompressorSet<T>> Com
     }
 
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], options: &O) -> Result<usize, ()> {
-        profile!("fast_size_for");
+        profile_method!(fast_size_for);
 
         let (indices, values) = get_lookup_table(data)?;
 

@@ -4,3 +4,6 @@ members = [
     "tree-buf",
     "tree-buf-macros"
 ]
+
+[patch.crates-io]
+#simple-16 = { path = "../../simple-16"}

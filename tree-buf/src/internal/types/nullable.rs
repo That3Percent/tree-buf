@@ -16,7 +16,7 @@ impl<T: Encodable> Encodable for Option<T> {
 impl<T: Decodable> Decodable for Option<T> {
     type DecoderArray = Option<NullableDecoder<T::DecoderArray>>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Nullable Decodable::decode");
+        profile_method!(decode);
         match sticks {
             DynRootBranch::Void => Ok(None),
             _ => Ok(Some(T::decode(sticks, options)?)),
@@ -40,7 +40,7 @@ impl<T: Encodable> EncoderArray<Option<T>> for NullableEncoder<T::EncoderArray> 
         }
     }
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-        profile!("flush");
+        profile_method!(flush);
         let Self { opt, value } = self;
         if let Some(value) = value {
             stream.encode_with_id(|stream| opt.flush(stream));
@@ -63,7 +63,7 @@ impl<T: DecoderArray> DecoderArray for Option<NullableDecoder<T>> {
     type Decode = Option<T::Decode>;
     type Error = T::Error;
     fn new(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-        profile!("Nullable DecoderArray::new");
+        profile_method!(new);
 
         match sticks {
             DynArrayBranch::Nullable { opt, values } => {
