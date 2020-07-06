@@ -14,7 +14,7 @@ maintenance = { status = "experimental"}
 
 [dependencies]
 tree-buf-macros = {version = "0.9.0", path="../tree-buf-macros", optional = true }
-simple-16 = "0.1.1"
+simple-16 = "0.2.0"
 
 num-traits = "0.2.11"
 gibbon = "0.1.3"

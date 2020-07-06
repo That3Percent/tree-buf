@@ -2,7 +2,7 @@ use crate::internal::encodings::compress;
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use num_traits::{AsPrimitive, Bounded};
-use simple_16::compress as compress_simple_16;
+use simple_16::{compress as compress_simple_16, Simple16};
 use std::any::TypeId;
 use std::convert::{TryFrom, TryInto};
 use std::mem::transmute;
@@ -72,6 +72,7 @@ macro_rules! impl_lowerable {
                 // TODO: (Performance) When getting ranges, use SIMD
 
                 let max = values.iter().max();
+                //dbg!(max);
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
                     // Lower to bool if possible. This is especially nice for enums
@@ -219,10 +220,10 @@ macro_rules! impl_lowerable {
                 }
             }
 
-            fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O) -> usize {
+            fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O, max: $Ty) -> usize {
                 let compressors = (
-                    $(<$compressions>::new(),)+
-                    RLE::new(($(<$compressions>::new(),)+))
+                    $(<$compressions>::new(max),)+
+                    RLE::new(($(<$compressions>::new(max),)+))
                 );
                 fast_size_for(data, &compressors, options)
             }
@@ -231,14 +232,14 @@ macro_rules! impl_lowerable {
             if TypeId::of::<$Ty>() == TypeId::of::<T>() {
                 // Safety - this is a unit conversion.
                 let data = unsafe { transmute(data) };
-                fast_inner(data, options)
+                fast_inner(data, options, max.as_())
             } else {
                 // TODO: (Performance) Use second-stack
                 let v = {
                     profile_section!(copy_to_lowered);
                     data.iter().map(|i| i.as_()).collect::<Vec<_>>()
                 };
-                fast_inner(&v, options)
+                fast_inner(&v, options, max.as_())
             }
         }
 
@@ -254,10 +255,10 @@ macro_rules! impl_lowerable {
                 }
             }
 
-            fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+            fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>, max: $Ty) -> ArrayTypeId {
                 let compressors = (
-                    $(<$compressions>::new(),)+
-                    RLE::new(($(<$compressions>::new(),)+))
+                    $(<$compressions>::new(max),)+
+                    RLE::new(($(<$compressions>::new(max),)+))
                 );
                 compress(data, stream, &compressors)
             }
@@ -266,14 +267,14 @@ macro_rules! impl_lowerable {
             if TypeId::of::<$Ty>() == TypeId::of::<T>() {
                 // Safety - this is a unit conversion.
                 let data = unsafe { transmute(data) };
-                encode_inner(data, stream)
+                encode_inner(data, stream, max.as_())
             } else {
                 // TODO: (Performance) Use second-stack
                 let v = {
-                    profile_section!(copy_to_lowered);
+                    profile_section!(needless_lowered_copy);
                     data.iter().map(|i| i.as_()).collect::<Vec<_>>()
                 };
-                encode_inner(&v, stream)
+                encode_inner(&v, stream, max.as_())
             }
         }
     };
@@ -295,7 +296,7 @@ impl_lowerable!(
     encode_u16,
     fast_size_for_u16,
     (),
-    (Simple16Compressor, DeltaZigZagCompressor, PrefixVarIntCompressor)
+    (Simple16Compressor<u32>, DeltaZigZagCompressor, PrefixVarIntCompressor)
 ); // TODO: Consider adding Fixed.
 impl_lowerable!(
     u16,
@@ -305,9 +306,18 @@ impl_lowerable!(
     encode_u8,
     fast_size_for_u8,
     (),
-    (Simple16Compressor, PrefixVarIntCompressor)
+    (Simple16Compressor<u16>, PrefixVarIntCompressor)
 );
-impl_lowerable!(u8, encode_u8, fast_size_for_u8, U0, encode_u0, fast_size_for_u0, (), (Simple16Compressor, BytesCompressor));
+impl_lowerable!(
+    u8,
+    encode_u8,
+    fast_size_for_u8,
+    U0,
+    encode_u0,
+    fast_size_for_u0,
+    (),
+    (Simple16Compressor<u8>, BytesCompressor)
+);
 
 #[cfg(feature = "encode")]
 fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -355,7 +365,8 @@ fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
 // TODO: Wrapping over smaller sizes
 struct DeltaZigZagCompressor;
 impl DeltaZigZagCompressor {
-    pub fn new() -> Self {
+    #[inline(always)]
+    pub fn new<T>(_max: T) -> Self {
         Self
     }
 }
@@ -396,7 +407,8 @@ impl Compressor<u32> for DeltaZigZagCompressor {
 struct PrefixVarIntCompressor;
 
 impl PrefixVarIntCompressor {
-    pub fn new() -> Self {
+    #[inline(always)]
+    pub fn new<T>(_max: T) -> Self {
         Self
     }
 }
@@ -421,57 +433,47 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
     }
 }
 
-struct Simple16Compressor;
+struct Simple16Compressor<T>(T);
 
-impl Simple16Compressor {
-    pub fn new() -> Self {
-        Self
+impl<T> Simple16Compressor<T> {
+    #[inline(always)]
+    pub fn new(max: T) -> Self {
+        Self(max)
     }
 }
 
-impl<T: Into<u32> + Copy> Compressor<T> for Simple16Compressor {
+impl<T: Simple16> Simple16Compressor<T> {
+    fn check_range(&self) -> Result<(), ()> {
+        T::check(&[self.0]).map_err(|_| ())
+    }
+}
+
+impl<T: Simple16 + PartialOrd> Compressor<T> for Simple16Compressor<T> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile_method!(compress);
-        // TODO: (Performance) Use second-stack.
-        // TODO: (Performance) This just copies to another Vec in the case where T is u32
 
-        let v = {
-            profile_section!(needless_copy);
-            let mut v = Vec::new();
-            for item in data {
-                let item = *item;
-                let item = item.into();
-                v.push(item);
-            }
-            v
-        };
+        self.check_range()?;
 
-        stream.encode_with_len(|stream| compress_simple_16(&v, stream.bytes)).map_err(|_| ())?;
+        stream.encode_with_len(|stream| unsafe { simple_16::compress_unchecked(&data, stream.bytes) });
 
         Ok(ArrayTypeId::IntSimple16)
     }
 
     fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
         profile_method!(fast_size_for);
-        let v = {
-            // TODO: Remove copy, if not always than at least when the type is u32
-            profile_section!(needless_copy);
-            let mut v = Vec::new();
-            for item in data {
-                let item = *item;
-                let item = item.into();
-                v.push(item);
-            }
-            v
-        };
 
-        simple_16::calculate_size(&v).map_err(|_| ())
+        self.check_range()?;
+
+        let size = unsafe { simple_16::calculate_size_unchecked(&data) };
+
+        Ok(size)
     }
 }
 
 struct BytesCompressor;
 impl BytesCompressor {
-    pub fn new() -> Self {
+    #[inline(always)]
+    pub fn new<T>(_max: T) -> Self {
         Self
     }
 }
