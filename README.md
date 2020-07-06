@@ -14,9 +14,9 @@ This test compares the serialization of a complex GraphQL response containing 10
 |                | Size in Bytes  | Round Trip CPU Time |
 | --------------:| --------------:| -------------------:|
 | Message Pack   |         242558 |              1303µs |
-| Tree-Buf       |          13545 |               667µs |
+| Tree-Buf       |          13545 |               629µs |
 
-Tree-Buf compresses to less than **1/17 the size** as compared to Message Pack, yet finishes reading and writing nearly **1/2 the time**.
+Tree-Buf compresses to less than **1/17 the size** as compared to Message Pack, yet finishes reading and writing less than **1/2 the time**.
 
 Entities look like this:
 ```json
