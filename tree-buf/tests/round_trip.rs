@@ -485,25 +485,14 @@ fn delta_prefix_var() {
 
 // This was useful for narrowing down a subset of a broken compressor.
 // It may be useful in the future
-/*
 #[test]
+#[ignore]
 fn broken_gorilla() {
     use rand::Rng;
     use std::convert::TryInto as _;
     use tree_buf::internal::encodings::gorilla;
 
-    let broken = [-75.01536474599993, -75.00911189799993, 114.37647545700004];
-
-    let mut bytes = Vec::new();
-    gorilla::compress((&broken[..]).iter().copied(), &mut bytes).unwrap();
-    let out: Vec<f64> = gorilla::decompress(&bytes[..]).unwrap();
-    assert_eq!(&broken[..], &out[..]);
-
-    // 356301 - 356304
-
-    // 457009 - 457012
-
-    let data = std::fs::decode("C:\\git\\floats.dat").unwrap();
+    let data = std::fs::read("C:\\git\\floats.dat").unwrap();
     let mut offset = 0;
     let mut values = Vec::new();
     while offset < data.len() {
@@ -513,8 +502,6 @@ fn broken_gorilla() {
         values.push(f);
     }
 
-    return;
-
     fn attempt(values: &[f64], min: usize, max: usize) -> bool {
         let values = &values[min..max];
         std::panic::catch_unwind(|| {
@@ -522,6 +509,7 @@ fn broken_gorilla() {
             gorilla::compress(values.iter().copied(), &mut bytes).unwrap();
             let out: Vec<f64> = gorilla::decompress(&bytes[..]).unwrap();
             assert_eq!(values, &out[..]);
+            assert!(bytes.len() == tree_buf::internal::gorilla::size_for(values.iter().copied()).unwrap());
         })
         .is_ok()
     }
@@ -530,7 +518,7 @@ fn broken_gorilla() {
     let mut max = values.len();
 
     let mut rng = rand::thread_rng();
-    for _ in 0..100000 {
+    for _ in 0..10000 {
         let try_min = rng.gen_range(min, max);
         let try_max = rng.gen_range(try_min + 1, max + 1);
         if try_min == min && try_max == max {
@@ -542,4 +530,3 @@ fn broken_gorilla() {
         }
     }
 }
-*/
