@@ -14,18 +14,9 @@ where
 pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     // FIXME: Verify current platform is little endian
     let mut data = data.map(f64::to_bits);
-    let mut bytes = 0usize;
-
-    // TODO: This probably can be removed in favor of a simple bit count
-    // Want to implement the checks for correct fast_size_for first though
-    let encode = move |count, capacity: &mut u8, bytes: &mut usize| {
-        if count <= *capacity {
-            *capacity -= count;
-        } else {
-            *bytes += size_of::<u64>();
-            *capacity = 64 - (count - *capacity);
-        }
-    };
+    // Initialized to 72 to account for the first value,
+    // and 1 byte at end of "remaining bits"
+    let mut bits = 72usize;
 
     let buffer = match data.next() {
         Some(first) => first,
@@ -34,8 +25,6 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
 
     let mut previous = buffer;
     let mut prev_xor = buffer;
-    let mut capacity = 0;
-    let capacity = &mut capacity;
 
     // TODO: This was written this way to match output the existing gorilla compressor, and may not
     // match the actual paper. Investigate.
@@ -43,24 +32,16 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
         let xored = previous ^ value;
 
         match xored {
-            0 => encode(1, capacity, &mut bytes),
+            0 => bits += 1,
             _ => {
-                let lz = xored.leading_zeros().min(31) as u64;
-                let tz = xored.trailing_zeros() as u64;
-                let prev_lz = prev_xor.leading_zeros() as u64;
-                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as u64 };
+                let lz = xored.leading_zeros().min(31) as usize;
+                let tz = xored.trailing_zeros() as usize;
+                let prev_lz = prev_xor.leading_zeros() as usize;
+                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as usize };
                 if lz >= prev_lz && tz >= prev_tz {
-                    let meaningful_bit_count = 64 - prev_tz - prev_lz;
-
-                    encode(2, capacity, &mut bytes);
-                    encode(meaningful_bit_count as u8, capacity, &mut bytes);
+                    bits += 66 - prev_tz - prev_lz;
                 } else {
-                    let meaningful_bit_count = 64 - tz - lz;
-
-                    encode(2, capacity, &mut bytes);
-                    encode(5, capacity, &mut bytes);
-                    encode(6, capacity, &mut bytes);
-                    encode(meaningful_bit_count as u8, capacity, &mut bytes);
+                    bits += 77 - tz - lz;
                 }
             }
         };
@@ -69,14 +50,10 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
         prev_xor = xored;
     }
 
-    // Add whatever is left
-    let remaining = 64 - *capacity;
-    let mut byte_count = remaining / 8;
-    if byte_count * 8 != remaining {
-        byte_count += 1;
+    let mut bytes = bits / 8;
+    if bits % 8 != 0 {
+        bytes += 1;
     }
-    bytes += byte_count as usize;
-    bytes += 1;
 
     Ok(bytes)
 }
@@ -91,7 +68,7 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
             *capacity -= count;
         } else {
             let remainder = count - *capacity;
-            // This check avoids a panic. Suprisingly doesn't truncate like
+            // This check avoids a panic. Suprisingly >> doesn't truncate like
             // one might expect, and I didn't find an operator that did.
             if remainder != 64 {
                 *buffer ^= bits >> remainder;
