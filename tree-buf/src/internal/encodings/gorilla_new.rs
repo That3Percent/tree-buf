@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use num_traits::AsPrimitive;
-use std::mem::size_of;
 
 // TODO: Remove warning
 #[allow(dead_code)]

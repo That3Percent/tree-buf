@@ -24,8 +24,6 @@ pub mod prelude {
     pub(crate) type DecodeResult<T> = Result<T, DecodeError>;
 
     pub(crate) use firestorm::{profile_fn, profile_method, profile_section};
-
-    pub(crate) use crate::experimental::*;
 }
 
 #[cfg(feature = "decode")]

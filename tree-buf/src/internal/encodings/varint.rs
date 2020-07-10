@@ -2,6 +2,18 @@ use crate::prelude::*;
 
 #[cfg(feature = "encode")]
 pub fn size_for_varint(value: u64) -> usize {
+    /*
+    // Performance: Tried this lookup table and it was slower
+    const LOOKUP: [usize; 65] = [
+        9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2,
+        1, 1, 1, 1, 1, 1, 1, 1,
+    ];
+    unsafe { *LOOKUP.get_unchecked(value.leading_zeros() as usize) }
+    */
+    /*
+    // Performance: Tried this constant-time method and it was slower
+    (value.leading_zeros().saturating_sub(1) / 7).max(1) as usize
+    */
     if value < (1 << 7) {
         1
     } else if value < (1 << 14) {
@@ -153,6 +165,12 @@ pub fn encode_suffix_varint(value: u64, into: &mut Vec<u8>) {
 
 #[cfg(feature = "decode")]
 pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
+    // TODO: (Performance) When reading from an array, a series of values can be decoded unchecked.
+    // Eg: If there are 100 bytes, each number taken can read at most 9 bytes,
+    // so 11 values can be taken unchecked (up to 99 bytes). This will likely read less,
+    // so this can remain in an amortized check loop until the size of the remainder
+    // is less than 9 bytes.
+
     let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 

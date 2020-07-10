@@ -1,8 +1,10 @@
+// TODO: Try Streaming V-Byte (which has a Rust port)
+// https://lemire.me/blog/2017/09/27/stream-vbyte-breaking-new-speed-records-for-integer-compression/
 use crate::internal::encodings::compress;
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
 use num_traits::{AsPrimitive, Bounded};
-use simple_16::{compress as compress_simple_16, Simple16};
+use simple_16::Simple16;
 use std::any::TypeId;
 use std::convert::{TryFrom, TryInto};
 use std::mem::transmute;

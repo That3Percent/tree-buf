@@ -16,7 +16,8 @@ pub mod parallel;
 pub mod rust_std;
 pub mod types;
 
-pub use {branch::*, buffer::*, encoder_decoder::*, encodings::*, options::*, parallel::*, rust_std::*, types::*};
+pub use {branch::*, encoder_decoder::*, encodings::*, options::*, parallel::*, rust_std::*, types::*};
+pub(crate) use buffer::*;
 
 pub(crate) use markers::*;
 

@@ -27,8 +27,6 @@ macro_rules! impl_float {
         use std::mem::size_of;
         use std::vec::IntoIter;
 
-        use firestorm;
-
         // TODO: Check for lowering - f64 -> f63
         #[cfg(feature = "encode")]
         fn encode_item(item: $T, bytes: &mut Vec<u8>) {
