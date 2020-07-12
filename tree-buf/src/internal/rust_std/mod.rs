@@ -1,5 +1,5 @@
 mod smart_pointers;
-mod usize;
+mod usize_;
 
-pub use self::usize::*;
+pub use self::usize_::*;
 pub use smart_pointers::*;
