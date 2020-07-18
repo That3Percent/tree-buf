@@ -324,3 +324,7 @@ Let's compare these results to another popular binary format, Protobuf 3, to see
 Depending on the game, Tree-Buf may require on average only 17 bits per move. ~4.5 bits each for the coordinate deltas, plus ~8 bits or less for time deltas of up to 2 minutes, 7 seconds. That is to say, the moves list requires about 3.3 times as much space in Protobuf 3 as compared to Tree-Buf (17 bits * 3.3 = 56 bits).
 
 As compared to JSON? With 17 bits per move we can get... `"t` - Not quite `"time_seconds":`. The complete, minified move requires a whopping 336 bits, 19 times as much as Tree-Buf.
+
+
+## Special Thanks
+JetBrains has been kind enough to grant this project an open source license to use all their tools for free. I'm using CLion with the Rust plugin for Tree-Buf, but have also enjoyed using their other tools, like dotMemory, on other projects as well. Please check them out here: [JetBrains.com](https://www.jetbrains.com/?from=tree-buf)
