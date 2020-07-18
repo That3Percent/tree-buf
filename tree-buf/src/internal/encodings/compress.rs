@@ -74,6 +74,8 @@ pub(crate) trait Compressor<T> {
 
 pub(crate) trait CompressorSet<T> {
     fn len(&self) -> usize;
+    // TODO: Replace with fast_smallest_size(&self, data: &[T], options: &O) -> usize;
+    // Then make parallel
     fn fast_size_for<O: EncodeOptions>(&self, compressor: usize, data: &[T], options: &O) -> Result<usize, ()>;
     fn compress<O: EncodeOptions>(&self, compressor: usize, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()>;
 }
