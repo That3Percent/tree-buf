@@ -4,7 +4,7 @@ mod common;
 use common::*;
 use std::collections::HashMap;
 use tree_buf::encode_options;
-use tree_buf::options;
+use tree_buf::experimental::options;
 
 // Create this namespace to hide the prelude. This is a check that the hygenics do not require any types from tree_buf to be imported
 mod hide_namespace {
@@ -119,7 +119,7 @@ fn lossy_f64_vec() {
     }
     let tolerance = -10;
     let options = encode_options! { options::LossyFloatTolerance(tolerance) };
-    let binary = tree_buf::encode_with_options(&data, &options);
+    let binary = options::encode_with_options(&data, &options);
     assert_eq!(binary.len(), 104);
     let decoded = decode::<Vec<f64>>(&binary).unwrap();
     assert_eq!(data.len(), decoded.len());
@@ -129,7 +129,7 @@ fn lossy_f64_vec() {
 
     // Show how much smaller this is than lossless
     let options = encode_options! { options::LosslessFloat };
-    let binary = tree_buf::encode_with_options(&data, &options);
+    let binary = options::encode_with_options(&data, &options);
     assert_eq!(binary.len(), 376);
 
     // Show that this is much better than fixed, since this would be a minimum for exactly 0 schema overhead.

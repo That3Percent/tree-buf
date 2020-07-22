@@ -97,7 +97,7 @@ fn fill_encode_skeleton<A: ToTokens>(
             fn buffer_one<'a, 'b : 'a>(&'a mut self, value: &'b #name) {
                 #buffer
             }
-            fn flush<O: ::tree_buf::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
+            fn flush<O: ::tree_buf::experimental::options::EncodeOptions>(mut self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> ::tree_buf::internal::ArrayTypeId {
                 // TODO: Re-enable profiling. See also a3b84cdc-be0f-4de2-8195-efb540004d2f
                 //let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "flush"));
                 #flush
@@ -106,7 +106,7 @@ fn fill_encode_skeleton<A: ToTokens>(
 
         impl ::tree_buf::internal::Encodable for #name {
             type EncoderArray=#array_encoder_name;
-            fn encode_root<O: ::tree_buf::options::EncodeOptions>(&self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> tree_buf::internal::RootTypeId {
+            fn encode_root<O: ::tree_buf::experimental::options::EncodeOptions>(&self, stream: &mut ::tree_buf::internal::EncoderStream<'_, O>) -> tree_buf::internal::RootTypeId {
                 // TODO: Re-enable profiling. See also a3b84cdc-be0f-4de2-8195-efb540004d2f
                 //let _profile_guard = ::tree_buf::internal::firestorm::start_guard(::tree_buf::internal::firestorm::FmtStr::Str3(::std::any::type_name::<Self>(), "::", "flush"));
                 #encode_root

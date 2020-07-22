@@ -93,9 +93,9 @@ pub fn override_encode_options(options: impl EncodeOptions, overrides: impl Enco
 macro_rules! encode_options {
     ($($opts:expr),*) => {
         {
-            let options = $crate::options::EncodeOptionsDefault;
+            let options = $crate::internal::options::EncodeOptionsDefault;
             $(
-                let options = $crate::options::override_encode_options(options, $opts);
+                let options = $crate::internal::options::override_encode_options(options, $opts);
             )*
             options
         }
@@ -110,9 +110,9 @@ pub fn override_decode_options(options: impl DecodeOptions, overrides: impl Deco
 macro_rules! decode_options {
     ($($opts:expr),*) => {
         {
-            let options = $crate::options::DecodeOptionsDefault;
+            let options = $crate::internal::options::DecodeOptionsDefault;
             $(
-                let options = $crate::options::override_decode_options(options, $opts);
+                let options = $crate::internal::options::override_decode_options(options, $opts);
             )*
             options
         }

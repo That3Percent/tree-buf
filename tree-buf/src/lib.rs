@@ -35,46 +35,23 @@ pub use internal::Decodable;
 #[cfg(feature = "encode")]
 pub use internal::Encodable;
 
-pub use internal::options;
-
 pub use crate::prelude::*;
 
 pub use internal::Ignore;
 
 pub fn encode<T: Encodable>(value: &T) -> Vec<u8> {
     let options = EncodeOptionsDefault;
-    encode_with_options(value, &options)
+    crate::experimental::options::encode_with_options(value, &options)
 }
 
-#[cfg(feature = "encode")]
-pub fn encode_with_options<T: Encodable>(value: &T, options: &impl EncodeOptions) -> Vec<u8> {
-    profile_fn!(encode_with_options);
-    use internal::encodings::varint::encode_suffix_varint;
-
-    let mut lens = Vec::new();
-    let mut bytes = Vec::new();
-    let mut stream = EncoderStream::new(&mut bytes, &mut lens, options);
-    stream.encode_with_id(|stream| T::encode_root(value, stream));
-
-    for len in lens.iter().rev() {
-        encode_suffix_varint(*len as u64, &mut bytes);
-    }
-
-    bytes
-}
 
 #[cfg(feature = "decode")]
 pub fn decode<T: Decodable>(bytes: &[u8]) -> DecodeResult<T> {
     let options = DecodeOptionsDefault;
-    decode_with_options(bytes, &options)
+    crate::experimental::options::decode_with_options(bytes, &options)
 }
 
-#[cfg(feature = "decode")]
-pub fn decode_with_options<T: Decodable>(bytes: &[u8], options: &impl DecodeOptions) -> DecodeResult<T> {
-    profile_fn!(T, decode_with_options);
-    let sticks = decode_root(bytes)?;
-    T::decode(sticks, options)
-}
+
 
 // TODO: Figure out recursion, at least enough to handle this: https://docs.rs/serde_json/1.0.44/serde_json/value/enum.Value.html
 // TODO: Nullable should be able to handle recursion as well, even if Option doesn't. (Option<Box<T>> could though)
