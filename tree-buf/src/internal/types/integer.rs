@@ -11,8 +11,9 @@ use std::mem::transmute;
 use std::vec::IntoIter;
 use zigzag::ZigZag;
 
+/// This serves to make the macro work in all cases having a "lower" type.
 #[derive(Copy, Clone)]
-struct U0;
+pub struct U0;
 
 impl Bounded for U0 {
     fn min_value() -> Self {
@@ -22,77 +23,88 @@ impl Bounded for U0 {
         U0
     }
 }
+mod _0 {
+    use super::*;
+    pub type Type = U0;
 
-fn encode_u0<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-    unreachable!();
-}
-fn fast_size_for_u0<T, O>(_data: &[T], _max: T, _options: O) -> usize {
-    unreachable!();
+    pub fn encode_array<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+        unreachable!();
+    }
+    pub fn fast_size_for_array<T, O>(_data: &[T], _max: T, _options: O) -> usize {
+        unreachable!();
+    }
 }
 
 macro_rules! impl_lowerable {
-    ($Ty:ty, $fn:ident, $fn_fast:ident, $Lty:ty, $lfn:ident, $lfn_fast:ident, ($($lower:ty),*), ($($compressions:ty),+)) => {
-        impl TryFrom<$Ty> for U0 {
-            type Error=();
-            fn try_from(_value: $Ty) -> Result<U0, Self::Error> {
-                Err(())
-            }
-        }
-        impl TryFrom<U0> for $Ty {
-            type Error=();
-            fn try_from(_value: U0) -> Result<$Ty, Self::Error> {
-                Err(())
-            }
-        }
-        impl AsPrimitive<U0> for $Ty {
-            fn as_(self) -> U0 {
-                unreachable!()
-            }
-        }
+    ($Ty:ty, $mod_name:ident, $lower:ident, ($($lowers:ty),*), ($($compressions:ty),+)) => {
+        mod $mod_name {
+            use super::*;
 
-        #[cfg(feature = "encode")]
-        impl Encodable for $Ty {
-            type EncoderArray = Vec<$Ty>;
-            fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-                encode_root_uint(*self as u64, stream.bytes)
-            }
-        }
+            // This is allowed because nothing lowers to u64
+            #[allow(dead_code)]
+            pub type Type = $Ty;
 
-
-
-        #[cfg(feature = "encode")]
-        impl EncoderArray<$Ty> for Vec<$Ty> {
-            fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
-                self.push(*value);
-            }
-            fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
-                profile_method!(buffer_many);
-                self.extend_from_slice(values);
-            }
-            fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                profile_method!(encode_all);
-                // TODO: (Performance) When getting ranges, use SIMD
-
-                let max = values.iter().max();
-                //dbg!(max);
-                if let Some(max) = max {
-                    // TODO: (Performance) Use second-stack
-                    // Lower to bool if possible. This is especially nice for enums
-                    // with 2 variants.
-                    if *max < 2 {
-                        let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
-                        bools.flush(stream)
-                    } else {
-                        $fn(values, *max, stream)
-                    }
-                } else {
-                    ArrayTypeId::Void
+            impl TryFrom<$Ty> for U0 {
+                type Error=();
+                fn try_from(_value: $Ty) -> Result<U0, Self::Error> {
+                    Err(())
                 }
             }
-            fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
-                Self::encode_all(&self[..], stream)
+            impl TryFrom<U0> for $Ty {
+                type Error=();
+                fn try_from(_value: U0) -> Result<$Ty, Self::Error> {
+                    Err(())
+                }
             }
-        }
+            impl AsPrimitive<U0> for $Ty {
+                fn as_(self) -> U0 {
+                    unreachable!()
+                }
+            }
+
+            #[cfg(feature = "encode")]
+            impl Encodable for $Ty {
+                type EncoderArray = Vec<$Ty>;
+                fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
+                    encode_root_uint(*self as u64, stream.bytes)
+                }
+            }
+
+
+
+            #[cfg(feature = "encode")]
+            impl EncoderArray<$Ty> for Vec<$Ty> {
+                fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
+                    self.push(*value);
+                }
+                fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
+                    profile_method!(buffer_many);
+                    self.extend_from_slice(values);
+                }
+                fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                    profile_method!(encode_all);
+                    // TODO: (Performance) When getting ranges, use SIMD
+
+                    let max = values.iter().max();
+                    //dbg!(max);
+                    if let Some(max) = max {
+                        // TODO: (Performance) Use second-stack
+                        // Lower to bool if possible. This is especially nice for enums
+                        // with 2 variants.
+                        if *max < 2 {
+                            let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
+                            bools.flush(stream)
+                        } else {
+                            encode_array(values, *max, stream)
+                        }
+                    } else {
+                        ArrayTypeId::Void
+                    }
+                }
+                fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                    Self::encode_all(&self[..], stream)
+                }
+            }
 
         #[cfg(feature = "encode")]
         impl PrimitiveEncoderArray<$Ty> for Vec<$Ty> {
@@ -100,183 +112,184 @@ macro_rules! impl_lowerable {
                 let max = values.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
-                    // Lower to bool if possible. This is especially nice for enums
-                    // with 2 variants.
-                    if *max < 2 {
-                        let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
-                        Vec::<bool>::fast_size_for_all(&bools[..], options)
+                        // Lower to bool if possible. This is especially nice for enums
+                        // with 2 variants.
+                        if *max < 2 {
+                            let bools = values.iter().map(|i| *i == 1).collect::<Vec<_>>();
+                            Vec::<bool>::fast_size_for_all(&bools[..], options)
+                        } else {
+                            fast_size_for_array(values, *max, options)
+                        }
                     } else {
-                        $fn_fast(values, *max, options)
+                        0
                     }
-                } else {
-                    0
                 }
             }
-        }
 
-        #[cfg(feature = "decode")]
-        impl Decodable for $Ty {
-            type DecoderArray = IntoIter<$Ty>;
-            fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile_method!(decode);
-                match sticks {
-                    DynRootBranch::Integer(root_int) => {
-                        match root_int {
-                            RootInteger::U(v) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
-                            _ => Err(DecodeError::SchemaMismatch),
-                        }
-                    }
-                    _ => Err(DecodeError::SchemaMismatch),
-                }
-            }
-        }
-
-        #[cfg(feature = "decode")]
-        impl InfallibleDecoderArray for IntoIter<$Ty> {
-            type Decode = $Ty;
-            fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
-                profile_method!(new_infallible);
-
-                match sticks {
-                    DynArrayBranch::Integer(array_int) => {
-                        let ArrayInteger { bytes, encoding } = array_int;
-                        match encoding {
-                            ArrayIntegerEncoding::PrefixVarInt => {
-                                profile_section!(prefix_var_int);
-
-                                let v: Vec<$Ty> = decode_all(
-                                        &bytes,
-                                        |bytes, offset| {
-                                            let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| DecodeError::SchemaMismatch)?;
-                                            Ok(r)
-                                        }
-                                )?;
-                                Ok(v.into_iter())
+            #[cfg(feature = "decode")]
+            impl Decodable for $Ty {
+                type DecoderArray = IntoIter<$Ty>;
+                fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
+                    profile_method!(decode);
+                    match sticks {
+                        DynRootBranch::Integer(root_int) => {
+                            match root_int {
+                                RootInteger::U(v) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
+                                _ => Err(DecodeError::SchemaMismatch),
                             }
-                            ArrayIntegerEncoding::Simple16 => {
-                                profile_section!(simple_16);
+                        }
+                        _ => Err(DecodeError::SchemaMismatch),
+                    }
+                }
+            }
 
-                                let mut v = Vec::new();
-                                simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
-                                let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
-                                let v = result.map_err(|_| DecodeError::SchemaMismatch)?;
-                                Ok(v.into_iter())
-                            },
-                            ArrayIntegerEncoding::U8 => {
-                                profile_section!(fixed_u8);
+            #[cfg(feature = "decode")]
+            impl InfallibleDecoderArray for IntoIter<$Ty> {
+                type Decode = $Ty;
+                fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
+                    profile_method!(new_infallible);
 
-                                let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
-                                Ok(v.into_iter())
-                            },
-                            ArrayIntegerEncoding::DeltaZig => {
-                                profile_section!(delta_zig);
-                                let mut v = Vec::new();
-                                let mut prev: u32 = 0;
-                                let mut offset = 0;
-                                while offset < bytes.len() {
-                                    // TODO: Not hardcoded to u32
-                                    // See also e394b0c7-d5af-40b8-b944-cb68bac33fe9
-                                    let next: u32 = decode_prefix_varint(&bytes, &mut offset)?.try_into().map_err(|_| DecodeError::InvalidFormat)?;
-                                    let next: i32 = ZigZag::decode(next);
-                                    let next = prev.wrapping_add(next as u32);
-                                    prev = next;
-                                    v.push(next.try_into().map_err(|_| DecodeError::InvalidFormat)?);
+                    match sticks {
+                        DynArrayBranch::Integer(array_int) => {
+                            let ArrayInteger { bytes, encoding } = array_int;
+                            match encoding {
+                                ArrayIntegerEncoding::PrefixVarInt => {
+                                    profile_section!(prefix_var_int);
+
+                                    let v: Vec<$Ty> = decode_all(
+                                            &bytes,
+                                            |bytes, offset| {
+                                                let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| DecodeError::SchemaMismatch)?;
+                                                Ok(r)
+                                            }
+                                    )?;
+                                    Ok(v.into_iter())
                                 }
-                                Ok(v.into_iter())
+                                ArrayIntegerEncoding::Simple16 => {
+                                    profile_section!(simple_16);
+
+                                    let mut v = Vec::new();
+                                    simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
+                                    let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
+                                    let v = result.map_err(|_| DecodeError::SchemaMismatch)?;
+                                    Ok(v.into_iter())
+                                },
+                                ArrayIntegerEncoding::U8 => {
+                                    profile_section!(fixed_u8);
+
+                                    let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
+                                    Ok(v.into_iter())
+                                },
+                                ArrayIntegerEncoding::DeltaZig => {
+                                    profile_section!(delta_zig);
+                                    let mut v = Vec::new();
+                                    let mut prev: u32 = 0;
+                                    let mut offset = 0;
+                                    while offset < bytes.len() {
+                                        // TODO: Not hardcoded to u32
+                                        // See also e394b0c7-d5af-40b8-b944-cb68bac33fe9
+                                        let next: u32 = decode_prefix_varint(&bytes, &mut offset)?.try_into().map_err(|_| DecodeError::InvalidFormat)?;
+                                        let next: i32 = ZigZag::decode(next);
+                                        let next = prev.wrapping_add(next as u32);
+                                        prev = next;
+                                        v.push(next.try_into().map_err(|_| DecodeError::InvalidFormat)?);
+                                    }
+                                    Ok(v.into_iter())
+                                }
                             }
+                        },
+                        DynArrayBranch::RLE { runs, values } => {
+                            let rle = RleIterator::new(runs, values, options, |values| Self::new_infallible(values, options))?;
+                            let all = rle.collect::<Vec<_>>();
+                            Ok(all.into_iter())
+                        },
+                        // FIXME: This fixes a particular test.
+                        // It is unclear if this is canon.
+                        // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
+                        // TODO: Also apply this to other types
+                        DynArrayBranch::Void => {
+                            Ok(Vec::new().into_iter())
                         }
-                    },
-                    DynArrayBranch::RLE { runs, values } => {
-                        let rle = RleIterator::new(runs, values, options, |values| Self::new_infallible(values, options))?;
-                        let all = rle.collect::<Vec<_>>();
-                        Ok(all.into_iter())
-                    },
-                    // FIXME: This fixes a particular test.
-                    // It is unclear if this is canon.
-                    // See also: 84d15459-35e4-4f04-896f-0f4ea9ce52a9
-                    // TODO: Also apply this to other types
-                    DynArrayBranch::Void => {
-                        Ok(Vec::new().into_iter())
+                        other => {
+                            let bools = <IntoIter<bool> as InfallibleDecoderArray>::new_infallible(other, options)?;
+                            let mapped = bools.map(|i| if i {1} else {0}).collect::<Vec<_>>();
+                            Ok(mapped.into_iter())
+                        },
                     }
-                    other => {
-                        let bools = <IntoIter<bool> as InfallibleDecoderArray>::new_infallible(other, options)?;
-                        let mapped = bools.map(|i| if i {1} else {0}).collect::<Vec<_>>();
-                        Ok(mapped.into_iter())
-                    },
                 }
-            }
-            fn decode_next_infallible(&mut self) -> Self::Decode {
-                self.next().unwrap_or_default()
-            }
-        }
-
-        #[cfg(feature = "encode")]
-        fn $fn_fast<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
-            (data: &[T], max: T, options: &O) -> usize {
-
-            let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
-
-            if let Ok(lower_max) = lower_max {
-                if lower_max >= max.as_() {
-                    return $lfn_fast(data, max, options)
+                fn decode_next_infallible(&mut self) -> Self::Decode {
+                    self.next().unwrap_or_default()
                 }
             }
 
-            fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O, max: $Ty) -> usize {
-                let compressors = (
-                    $(<$compressions>::new(max),)+
-                    RLE::new(($(<$compressions>::new(max),)+))
-                );
-                fast_size_for(data, &compressors, options)
-            }
+            #[cfg(feature = "encode")]
+            pub fn fast_size_for_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::Type> $(+ AsPrimitive<$lowers>),*>
+                (data: &[T], max: T, options: &O) -> usize {
 
-            // Convert data to as<T>, using a transmute if that's already correct
-            if TypeId::of::<$Ty>() == TypeId::of::<T>() {
-                // Safety - this is a unit conversion.
-                let data = unsafe { transmute(data) };
-                fast_inner(data, options, max.as_())
-            } else {
-                // TODO: (Performance) Use second-stack
-                let v = {
-                    profile_section!(copy_to_lowered);
-                    data.iter().map(|i| i.as_()).collect::<Vec<_>>()
-                };
-                fast_inner(&v, options, max.as_())
-            }
-        }
+                let lower_max: Result<$Ty, _> = <$lower::Type as Bounded>::max_value().try_into();
 
-        #[cfg(feature = "encode")]
-        fn $fn<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$Lty> $(+ AsPrimitive<$lower>),*>
-            (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                if let Ok(lower_max) = lower_max {
+                    if lower_max >= max.as_() {
+                        return $lower::fast_size_for_array(data, max, options)
+                    }
+                }
 
-            let lower_max: Result<$Ty, _> = <$Lty as Bounded>::max_value().try_into();
+                fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O, max: $Ty) -> usize {
+                    let compressors = (
+                        $(<$compressions>::new(max),)+
+                        RLE::new(($(<$compressions>::new(max),)+))
+                    );
+                    fast_size_for(data, &compressors, options)
+                }
 
-            if let Ok(lower_max) = lower_max {
-                if lower_max >= max.as_() {
-                    return $lfn(data, max, stream)
+                // Convert data to as<T>, using a transmute if that's already correct
+                if TypeId::of::<$Ty>() == TypeId::of::<T>() {
+                    // Safety - this is a unit conversion.
+                    let data = unsafe { transmute(data) };
+                    fast_inner(data, options, max.as_())
+                } else {
+                    // TODO: (Performance) Use second-stack
+                    let v = {
+                        profile_section!(copy_to_lowered);
+                        data.iter().map(|i| i.as_()).collect::<Vec<_>>()
+                    };
+                    fast_inner(&v, options, max.as_())
                 }
             }
 
-            fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>, max: $Ty) -> ArrayTypeId {
-                let compressors = (
-                    $(<$compressions>::new(max),)+
-                    RLE::new(($(<$compressions>::new(max),)+))
-                );
-                compress(data, stream, &compressors)
-            }
+            #[cfg(feature = "encode")]
+            pub fn encode_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::Type> $(+ AsPrimitive<$lowers>),*>
+                (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
 
-            // Convert data to as<T>, using a transmute if that's already correct
-            if TypeId::of::<$Ty>() == TypeId::of::<T>() {
-                // Safety - this is a unit conversion.
-                let data = unsafe { transmute(data) };
-                encode_inner(data, stream, max.as_())
-            } else {
-                // TODO: (Performance) Use second-stack
-                let v = {
-                    profile_section!(needless_lowered_copy);
-                    data.iter().map(|i| i.as_()).collect::<Vec<_>>()
-                };
-                encode_inner(&v, stream, max.as_())
+                let lower_max: Result<$Ty, _> = <$lower::Type as Bounded>::max_value().try_into();
+
+                if let Ok(lower_max) = lower_max {
+                    if lower_max >= max.as_() {
+                        return $lower::encode_array(data, max, stream)
+                    }
+                }
+
+                fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>, max: $Ty) -> ArrayTypeId {
+                    let compressors = (
+                        $(<$compressions>::new(max),)+
+                        RLE::new(($(<$compressions>::new(max),)+))
+                    );
+                    compress(data, stream, &compressors)
+                }
+
+                // Convert data to as<T>, using a transmute if that's already correct
+                if TypeId::of::<$Ty>() == TypeId::of::<T>() {
+                    // Safety - this is a unit conversion.
+                    let data = unsafe { transmute(data) };
+                    encode_inner(data, stream, max.as_())
+                } else {
+                    // TODO: (Performance) Use second-stack
+                    let v = {
+                        profile_section!(needless_lowered_copy);
+                        data.iter().map(|i| i.as_()).collect::<Vec<_>>()
+                    };
+                    encode_inner(&v, stream, max.as_())
+                }
             }
         }
     };
@@ -289,37 +302,10 @@ macro_rules! impl_lowerable {
 // Broadly we only want to downcast if it allows for some other kind of compressor to be used.
 
 // Type, array encoder, next lower, next lower encoder, non-inferred lowers
-impl_lowerable!(u64, encode_u64, fast_size_for_u64, u32, encode_u32, fast_size_for_u32, (u16), (PrefixVarIntCompressor));
-impl_lowerable!(
-    u32,
-    encode_u32,
-    fast_size_for_u32,
-    u16,
-    encode_u16,
-    fast_size_for_u16,
-    (),
-    (Simple16Compressor<u32>, DeltaZigZagCompressor, PrefixVarIntCompressor)
-); // TODO: Consider adding Fixed.
-impl_lowerable!(
-    u16,
-    encode_u16,
-    fast_size_for_u16,
-    u8,
-    encode_u8,
-    fast_size_for_u8,
-    (),
-    (Simple16Compressor<u16>, PrefixVarIntCompressor)
-);
-impl_lowerable!(
-    u8,
-    encode_u8,
-    fast_size_for_u8,
-    U0,
-    encode_u0,
-    fast_size_for_u0,
-    (),
-    (Simple16Compressor<u8>, BytesCompressor)
-);
+impl_lowerable!(u64, _64, _32, (u16), (PrefixVarIntCompressor));
+impl_lowerable!(u32, _32, _16, (), (Simple16Compressor<u32>, DeltaZigZagCompressor, PrefixVarIntCompressor)); // TODO: Consider adding Fixed.
+impl_lowerable!(u16, _16, _8, (), (Simple16Compressor<u16>, PrefixVarIntCompressor));
+impl_lowerable!(u8, _8, _0, (), (Simple16Compressor<u8>, BytesCompressor));
 
 #[cfg(feature = "encode")]
 fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
