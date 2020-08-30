@@ -1,3 +1,5 @@
+//! Introspect the contents of a Tree-Buf file
+
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
@@ -191,6 +193,74 @@ fn visit(path: Path, branch: &DynRootBranch<'_>, breakdown: &mut SizeBreakdown) 
     }
 }
 
+/// When used on a valid Tree-Buf file, details how each byte is allocated. The output is not meant to be parseable.
+/// Instead, this should only be used for information and debugging.
+/// Example from the GraphQL benchmark:
+/// ```ignore
+/// let sizes = tree_buf::experimental::stats::size_breakdown(&bytes);
+/// println!("{}", sizes.unwrap());
+/// ```
+/// Outputs the following...
+///
+/// Largest by path:
+///         32000
+///            data.orders.[1000].id.[32]
+///            Object.Object.Array.Object.Array Fixed.U8 Fixed
+///         5000
+///            data.orders.[1000].createdAt
+///            Object.Object.Array.Object.Prefix Varint
+///         5000
+///            data.orders.[1000].price
+///            Object.Object.Array.Object.Prefix Varint
+///         2836
+///            data.orders.[1000].nft.wearable.representationId.values
+///            Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+///         2452
+///            data.orders.[1000].nft.wearable.name.values
+///            Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+///         952
+///            data.orders.[1000].nft.wearable.representationId.indices
+///            Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+///         948
+///            data.orders.[1000].nft.wearable.name.indices
+///            Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+///         420
+///            data.orders.[1000].nft.wearable.category.discriminants
+///            Object.Object.Array.Object.Object.Object.Enum.Simple16
+///         356
+///            data.orders.[1000].nft.wearable.collection.indices
+///            Object.Object.Array.Object.Object.Object.Dictionary.Simple16
+///         288
+///            data.orders.[1000].nft.wearable.rarity.discriminants
+///            Object.Object.Array.Object.Object.Object.Enum.Simple16
+///         268
+///            data.orders.[1000].status.discriminants
+///            Object.Object.Array.Object.Enum.Simple16
+///         236
+///            data.orders.[1000].nft.wearable.bodyShapes.values.discriminants
+///            Object.Object.Array.Object.Object.Object.Array.Enum.Packed Boolean
+///         120
+///            data.orders.[1000].nft.wearable.bodyShapes.len.runs
+///            Object.Object.Array.Object.Object.Object.Array.RLE.Simple16
+///         85
+///            data.orders.[1000].nft.wearable.collection.values
+///            Object.Object.Array.Object.Object.Object.Dictionary.UTF-8
+///         60
+///            data.orders.[1000].nft.wearable.bodyShapes.len.values
+///            Object.Object.Array.Object.Object.Object.Array.RLE.Simple16
+///         2
+///            data.orders.[1000].nft.wearable.owner.mana.runs
+///            Object.Object.Array.Object.Object.Object.Object.Bool RLE.Prefix Varint
+///
+/// Largest by type:
+///          1x 32000 @ U8 Fixed
+///          3x 10002 @ Prefix Varint
+///          3x 5373 @ UTF-8
+///          8x 3412 @ Simple16
+///          1x 236 @ Packed Boolean
+///
+/// Other: 400
+/// Total: 51423
 pub fn size_breakdown(data: &[u8]) -> DecodeResult<String> {
     let root = decode_root(data)?;
 

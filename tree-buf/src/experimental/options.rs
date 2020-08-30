@@ -1,3 +1,8 @@
+//! Configure aspects about encode-decode like whether to opt into a lossy encoding,
+//! or whether to use parallelism. Options can currently be specified per encode or decode operation,
+//! but the eventual goal is to be able to specify options hierarchically on fields, optionally
+//! recursively. This API is very likely to change.
+
 use crate::prelude::*;
 
 pub use crate::internal::options::{

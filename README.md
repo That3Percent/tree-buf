@@ -228,7 +228,7 @@ How does Tree-Buf enable fast compression and serialization of real-world data?
  2. Use best-in-breed compression that is only available to typed vectors of primitive data.
  3. Amortize the cost of the self-describing schema.
 
-To break these down concretely, it would be useful to track an example using real-world data. We'll take a look at the data, see how maps to the Tree-Buf data model, and then see how Tree-Buf applies compression to each part of the resulting model.
+To break these down concretely, it would be useful to track an example using real-world data. We'll take a look at the data, see how it maps to the Tree-Buf data model, and then see how Tree-Buf applies compression to each part of the resulting model.
 
 Let's say that we want to store all of the game records for a round-robin tournament of Go. To follow along, you won't need any knowledge of the game. Suffice to say that it's played on a 19x19 grid, and players alternate placing white and black stones on the intersections of the board. It looks like this:
 
