@@ -39,19 +39,17 @@ pub use crate::prelude::*;
 
 pub use internal::Ignore;
 
+// TODO: Take Borrow or AsRef
 pub fn encode<T: Encodable>(value: &T) -> Vec<u8> {
     let options = EncodeOptionsDefault;
     crate::experimental::options::encode_with_options(value, &options)
 }
-
 
 #[cfg(feature = "decode")]
 pub fn decode<T: Decodable>(bytes: &[u8]) -> DecodeResult<T> {
     let options = DecodeOptionsDefault;
     crate::experimental::options::decode_with_options(bytes, &options)
 }
-
-
 
 // TODO: Figure out recursion, at least enough to handle this: https://docs.rs/serde_json/1.0.44/serde_json/value/enum.Value.html
 // TODO: Nullable should be able to handle recursion as well, even if Option doesn't. (Option<Box<T>> could though)

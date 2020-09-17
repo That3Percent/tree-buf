@@ -3,11 +3,12 @@
 use crate::internal::encodings::compress;
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
-use num_traits::{AsPrimitive, Bounded};
+use num_traits::{AsPrimitive, Bounded, PrimInt, Unsigned, WrappingSub};
 use simple_16::Simple16;
 use std::any::TypeId;
 use std::convert::{TryFrom, TryInto};
 use std::mem::transmute;
+use std::ops::Sub;
 use std::vec::IntoIter;
 use zigzag::ZigZag;
 
@@ -25,7 +26,8 @@ impl Bounded for U0 {
 }
 mod _0 {
     use super::*;
-    pub type Type = U0;
+    pub type UType = U0;
+    pub type SType = U0;
 
     pub fn encode_array<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         unreachable!();
@@ -36,35 +38,36 @@ mod _0 {
 }
 
 macro_rules! impl_lowerable {
-    ($Ty:ty, $mod_name:ident, $lower:ident, ($($lowers:ty),*), ($($compressions:ty),+)) => {
+    ($UType:ty, $SType:ty, $mod_name:ident, $lower:ident, ($($lowers:ty),*), ($($compressions:ty),+)) => {
         mod $mod_name {
             use super::*;
 
             // This is allowed because nothing lowers to u64
             #[allow(dead_code)]
-            pub type Type = $Ty;
+            pub type UType = $UType;
+            pub type SType = $SType;
 
-            impl TryFrom<$Ty> for U0 {
+            impl TryFrom<UType> for U0 {
                 type Error=();
-                fn try_from(_value: $Ty) -> Result<U0, Self::Error> {
+                fn try_from(_value: UType) -> Result<U0, Self::Error> {
                     Err(())
                 }
             }
-            impl TryFrom<U0> for $Ty {
+            impl TryFrom<U0> for UType {
                 type Error=();
-                fn try_from(_value: U0) -> Result<$Ty, Self::Error> {
+                fn try_from(_value: U0) -> Result<UType, Self::Error> {
                     Err(())
                 }
             }
-            impl AsPrimitive<U0> for $Ty {
+            impl AsPrimitive<U0> for UType {
                 fn as_(self) -> U0 {
                     unreachable!()
                 }
             }
 
             #[cfg(feature = "encode")]
-            impl Encodable for $Ty {
-                type EncoderArray = Vec<$Ty>;
+            impl Encodable for UType {
+                type EncoderArray = Vec<UType>;
                 fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
                     encode_root_uint(*self as u64, stream.bytes)
                 }
@@ -73,18 +76,19 @@ macro_rules! impl_lowerable {
 
 
             #[cfg(feature = "encode")]
-            impl EncoderArray<$Ty> for Vec<$Ty> {
-                fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b $Ty) {
+            impl EncoderArray<UType> for Vec<UType> {
+                fn buffer_one<'a, 'b: 'a>(&'a mut self, value: &'b UType) {
                     self.push(*value);
                 }
-                fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [$Ty]) {
+                fn buffer_many<'a, 'b: 'a>(&'a mut self, values: &'b [UType]) {
                     profile_method!(buffer_many);
                     self.extend_from_slice(values);
                 }
-                fn encode_all<O: EncodeOptions>(values: &[$Ty], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
+                fn encode_all<O: EncodeOptions>(values: &[UType], stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
                     profile_method!(encode_all);
                     // TODO: (Performance) When getting ranges, use SIMD
 
+                    // TODO: (Performance) For u8, I don't think this max is used.
                     let max = values.iter().max();
                     //dbg!(max);
                     if let Some(max) = max {
@@ -107,8 +111,8 @@ macro_rules! impl_lowerable {
             }
 
         #[cfg(feature = "encode")]
-        impl PrimitiveEncoderArray<$Ty> for Vec<$Ty> {
-            fn fast_size_for_all<O: EncodeOptions>(values: &[$Ty], options: &O) -> usize {
+        impl PrimitiveEncoderArray<UType> for Vec<UType> {
+            fn fast_size_for_all<O: EncodeOptions>(values: &[UType], options: &O) -> usize {
                 let max = values.iter().max();
                 if let Some(max) = max {
                     // TODO: (Performance) Use second-stack
@@ -127,8 +131,8 @@ macro_rules! impl_lowerable {
             }
 
             #[cfg(feature = "decode")]
-            impl Decodable for $Ty {
-                type DecoderArray = IntoIter<$Ty>;
+            impl Decodable for UType {
+                type DecoderArray = IntoIter<UType>;
                 fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
                     profile_method!(decode);
                     match sticks {
@@ -144,8 +148,8 @@ macro_rules! impl_lowerable {
             }
 
             #[cfg(feature = "decode")]
-            impl InfallibleDecoderArray for IntoIter<$Ty> {
-                type Decode = $Ty;
+            impl InfallibleDecoderArray for IntoIter<UType> {
+                type Decode = UType;
                 fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
                     profile_method!(new_infallible);
 
@@ -156,10 +160,10 @@ macro_rules! impl_lowerable {
                                 ArrayIntegerEncoding::PrefixVarInt => {
                                     profile_section!(prefix_var_int);
 
-                                    let v: Vec<$Ty> = decode_all(
+                                    let v: Vec<UType> = decode_all(
                                             &bytes,
                                             |bytes, offset| {
-                                                let r: $Ty = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| DecodeError::SchemaMismatch)?;
+                                                let r: UType = decode_prefix_varint(bytes, offset)?.try_into().map_err(|_| DecodeError::SchemaMismatch)?;
                                                 Ok(r)
                                             }
                                     )?;
@@ -170,14 +174,14 @@ macro_rules! impl_lowerable {
 
                                     let mut v = Vec::new();
                                     simple_16::decompress(&bytes, &mut v).map_err(|_| DecodeError::InvalidFormat)?;
-                                    let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<$Ty>::try_into).collect();
+                                    let result: Result<Vec<_>, _> = v.into_iter().map(TryInto::<UType>::try_into).collect();
                                     let v = result.map_err(|_| DecodeError::SchemaMismatch)?;
                                     Ok(v.into_iter())
                                 },
                                 ArrayIntegerEncoding::U8 => {
                                     profile_section!(fixed_u8);
 
-                                    let v: Vec<$Ty> = bytes.iter().map(|&b| b.into()).collect();
+                                    let v: Vec<UType> = bytes.iter().map(|&b| b.into()).collect();
                                     Ok(v.into_iter())
                                 },
                                 ArrayIntegerEncoding::DeltaZig => {
@@ -223,10 +227,10 @@ macro_rules! impl_lowerable {
             }
 
             #[cfg(feature = "encode")]
-            pub fn fast_size_for_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::Type> $(+ AsPrimitive<$lowers>),*>
+            pub fn fast_size_for_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<UType> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::UType> $(+ AsPrimitive<$lowers>),*>
                 (data: &[T], max: T, options: &O) -> usize {
 
-                let lower_max: Result<$Ty, _> = <$lower::Type as Bounded>::max_value().try_into();
+                let lower_max: Result<UType, _> = <$lower::UType as Bounded>::max_value().try_into();
 
                 if let Ok(lower_max) = lower_max {
                     if lower_max >= max.as_() {
@@ -234,7 +238,7 @@ macro_rules! impl_lowerable {
                     }
                 }
 
-                fn fast_inner<O: EncodeOptions>(data: &[$Ty], options: &O, max: $Ty) -> usize {
+                fn fast_inner<O: EncodeOptions>(data: &[UType], options: &O, max: UType) -> usize {
                     let compressors = (
                         $(<$compressions>::new(max),)+
                         RLE::new(($(<$compressions>::new(max),)+))
@@ -243,7 +247,7 @@ macro_rules! impl_lowerable {
                 }
 
                 // Convert data to as<T>, using a transmute if that's already correct
-                if TypeId::of::<$Ty>() == TypeId::of::<T>() {
+                if TypeId::of::<UType>() == TypeId::of::<T>() {
                     // Safety - this is a unit conversion.
                     let data = unsafe { transmute(data) };
                     fast_inner(data, options, max.as_())
@@ -258,10 +262,10 @@ macro_rules! impl_lowerable {
             }
 
             #[cfg(feature = "encode")]
-            pub fn encode_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<$Ty> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::Type> $(+ AsPrimitive<$lowers>),*>
+            pub fn encode_array<O: EncodeOptions, T: Copy + std::fmt::Debug + AsPrimitive<UType> + AsPrimitive<U0> + AsPrimitive<u8> + AsPrimitive<$lower::UType> $(+ AsPrimitive<$lowers>),*>
                 (data: &[T], max: T, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
 
-                let lower_max: Result<$Ty, _> = <$lower::Type as Bounded>::max_value().try_into();
+                let lower_max: Result<UType, _> = <$lower::UType as Bounded>::max_value().try_into();
 
                 if let Ok(lower_max) = lower_max {
                     if lower_max >= max.as_() {
@@ -269,7 +273,7 @@ macro_rules! impl_lowerable {
                     }
                 }
 
-                fn encode_inner<O: EncodeOptions>(data: &[$Ty], stream: &mut EncoderStream<'_, O>, max: $Ty) -> ArrayTypeId {
+                fn encode_inner<O: EncodeOptions>(data: &[UType], stream: &mut EncoderStream<'_, O>, max: UType) -> ArrayTypeId {
                     let compressors = (
                         $(<$compressions>::new(max),)+
                         RLE::new(($(<$compressions>::new(max),)+))
@@ -278,7 +282,7 @@ macro_rules! impl_lowerable {
                 }
 
                 // Convert data to as<T>, using a transmute if that's already correct
-                if TypeId::of::<$Ty>() == TypeId::of::<T>() {
+                if TypeId::of::<UType>() == TypeId::of::<T>() {
                     // Safety - this is a unit conversion.
                     let data = unsafe { transmute(data) };
                     encode_inner(data, stream, max.as_())
@@ -302,10 +306,10 @@ macro_rules! impl_lowerable {
 // Broadly we only want to downcast if it allows for some other kind of compressor to be used.
 
 // Type, array encoder, next lower, next lower encoder, non-inferred lowers
-impl_lowerable!(u64, _64, _32, (u16), (PrefixVarIntCompressor));
-impl_lowerable!(u32, _32, _16, (), (Simple16Compressor<u32>, DeltaZigZagCompressor, PrefixVarIntCompressor)); // TODO: Consider adding Fixed.
-impl_lowerable!(u16, _16, _8, (), (Simple16Compressor<u16>, PrefixVarIntCompressor));
-impl_lowerable!(u8, _8, _0, (), (Simple16Compressor<u8>, BytesCompressor));
+impl_lowerable!(u64, i64, _64, _32, (u16), (PrefixVarIntCompressor));
+impl_lowerable!(u32, i32, _32, _16, (), (Simple16Compressor<u32>, DeltaZigZagCompressor, PrefixVarIntCompressor)); // TODO: Consider adding Fixed.
+impl_lowerable!(u16, i16, _16, _8, (), (Simple16Compressor<u16>, PrefixVarIntCompressor));
+impl_lowerable!(u8, i8, _8, _0, (), (Simple16Compressor<u8>, BytesCompressor));
 
 #[cfg(feature = "encode")]
 fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
@@ -348,6 +352,51 @@ fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
     }
 }
 
+#[cfg(feature = "encode")]
+fn encode_root_sint(value: i64, bytes: &mut Vec<u8>) -> RootTypeId {
+    if value >= 0 {
+        return encode_root_uint(value as u64, bytes);
+    }
+    let value = (value * -1) as u64;
+    let le = value.to_le_bytes();
+    match value {
+        0 => unsafe { std::hint::unreachable_unchecked() },
+        1 => RootTypeId::NegOne,
+        2..=255 => {
+            bytes.push(le[0]);
+            RootTypeId::IntS8
+        }
+        256..=65535 => {
+            bytes.extend_from_slice(&le[..2]);
+            RootTypeId::IntS16
+        }
+        65536..=16777215 => {
+            bytes.extend_from_slice(&le[..3]);
+            RootTypeId::IntS24
+        }
+        16777216..=4294967295 => {
+            bytes.extend_from_slice(&le[..4]);
+            RootTypeId::IntS32
+        }
+        4294967296..=1099511627775 => {
+            bytes.extend_from_slice(&le[..5]);
+            RootTypeId::IntS40
+        }
+        1099511627776..=281474976710655 => {
+            bytes.extend_from_slice(&le[..6]);
+            RootTypeId::IntS48
+        }
+        281474976710656..=72057594037927936 => {
+            bytes.extend_from_slice(&le[..7]);
+            RootTypeId::IntS56
+        }
+        _ => {
+            bytes.extend_from_slice(&le);
+            RootTypeId::IntS64
+        }
+    }
+}
+
 // TODO: One-offing this isn't great.
 // Get unsigned integers implemented
 // TODO: Wrapping over smaller sizes
@@ -360,18 +409,46 @@ impl DeltaZigZagCompressor {
 }
 
 // TODO: Use second-stack
-fn get_delta_zigs(data: &[u32]) -> Result<Vec<u32>, ()> {
+fn get_deltas<T>(data: &[T]) -> Result<Vec<T>, ()>
+where
+    T: Sub<T, Output = T> + WrappingSub<Output = T> + Copy,
+{
+    if data.len() < 2 {
+        return Err(());
+    }
+
+    within_rle(|| {
+        let mut data = data.into_iter();
+        let mut out = Vec::new();
+        // Unwrap is ok because length checked earlier.
+        let mut current = data.next().unwrap();
+
+        out.push(*current);
+        for next in data {
+            let delta = next.wrapping_sub(&current);
+            current = next;
+            out.push(delta);
+        }
+        Ok(out)
+    })
+}
+
+// TODO: Use second-stack
+fn get_delta_zigs<U, I>(data: &[U]) -> Result<Vec<U>, ()>
+where
+    U: Sub<U, Output = U> + WrappingSub<Output = U> + Copy + AsPrimitive<I> + PrimInt + Unsigned,
+    I: ZigZag<UInt = U>,
+{
+    if data.len() < 2 {
+        return Err(());
+    }
     // TODO: Rename? This isn't really in rle
     within_rle(|| {
-        if data.len() < 2 {
-            return Err(());
-        }
         let mut result = Vec::new();
-        let mut current = 0;
+        let mut current = U::zero();
         for next in data.iter() {
-            // TODO: Not hard-coded to u32
             // See also e394b0c7-d5af-40b8-b944-cb68bac33fe9
-            let diff = next.wrapping_sub(current) as i32;
+            let diff = next.wrapping_sub(&current).as_();
             let zig = ZigZag::encode(diff);
             result.push(zig);
             current = *next;
@@ -382,12 +459,12 @@ fn get_delta_zigs(data: &[u32]) -> Result<Vec<u32>, ()> {
 
 impl Compressor<u32> for DeltaZigZagCompressor {
     fn compress<O: EncodeOptions>(&self, data: &[u32], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
-        let deltas = get_delta_zigs(data)?;
+        let deltas = get_delta_zigs::<u32, i32>(data)?;
         let _ignore_id = PrefixVarIntCompressor.compress(&deltas, stream);
         Ok(ArrayTypeId::DeltaZig)
     }
     fn fast_size_for<O: EncodeOptions>(&self, data: &[u32], options: &O) -> Result<usize, ()> {
-        let deltas = get_delta_zigs(data)?;
+        let deltas = get_delta_zigs::<u32, i32>(data)?;
         PrefixVarIntCompressor.fast_size_for(&deltas, options)
     }
 }
@@ -436,7 +513,7 @@ impl<T: Simple16> Simple16Compressor<T> {
     }
 }
 
-impl<T: Simple16 + PartialOrd> Compressor<T> for Simple16Compressor<T> {
+impl<T: Simple16> Compressor<T> for Simple16Compressor<T> {
     fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
         profile_method!(compress);
 
@@ -481,3 +558,31 @@ impl Compressor<u8> for BytesCompressor {
 // TODO: Bitpacking https://crates.io/crates/bitpacking
 // TODO: Mayda https://crates.io/crates/mayda
 // TODO: https://lemire.me/blog/2012/09/12/fast-integer-compression-decoding-billions-of-integers-per-second/
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn simple_deltas() {
+        let input = vec![1u32, 2, 4, 8];
+        let deltas = get_deltas(&input);
+        let expect = vec![1u32, 1, 2, 4];
+        assert_eq!(deltas, Ok(expect));
+    }
+
+    #[test]
+    fn neg_deltas() {
+        let input = vec![9u32, 8];
+        let deltas = get_deltas(&input);
+        let expect = vec![9u32, -1i32 as u32];
+        assert_eq!(deltas, Ok(expect));
+    }
+
+    #[test]
+    fn wrapping_deltas() {
+        let input = vec![0u32, u32::MAX];
+        let deltas = get_deltas(&input);
+        let expect = vec![0u32, -1i32 as u32];
+        assert_eq!(deltas, Ok(expect));
+    }
+}

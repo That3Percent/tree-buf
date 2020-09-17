@@ -483,6 +483,7 @@ fn delta_prefix_var() {
 // TODO: Use coverage marks to ensure all types are used
 // https://ferrous-systems.com/blog/coverage-marks/
 
+/*
 // This was useful for narrowing down a subset of a broken compressor.
 // It may be useful in the future
 #[test]
@@ -530,3 +531,4 @@ fn broken_gorilla() {
         }
     }
 }
+*/
