@@ -132,12 +132,7 @@ macro_rules! impl_lowerable {
                 fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
                     profile_method!(decode);
                     match sticks {
-                        DynRootBranch::Integer(root_int) => {
-                            match root_int {
-                                RootInteger::U(v) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
-                                _ => Err(DecodeError::SchemaMismatch),
-                            }
-                        }
+                        DynRootBranch::Integer(RootInteger::U(v)) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
                         _ => Err(DecodeError::SchemaMismatch),
                     }
                 }

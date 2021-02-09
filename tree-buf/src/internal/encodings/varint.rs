@@ -171,7 +171,7 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
     // so this can remain in an amortized check loop until the size of the remainder
     // is less than 9 bytes.
 
-    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or(DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Check that the compiler does unchecked indexing after this
@@ -236,7 +236,7 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
 #[cfg(feature = "decode")]
 pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or(DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Ensure unchecked indexing follows.

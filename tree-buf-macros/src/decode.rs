@@ -171,10 +171,9 @@ fn fill_decode_skeleton<A: ToTokens>(
 
 fn impl_enum_decode(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     let ident = &ast.ident;
-    let mut array_fields = Vec::new();
-    array_fields.push(quote! {
+    let mut array_fields = vec![quote! {
         tree_buf_discriminant: <u64 as ::tree_buf::Decodable>::DecoderArray
-    });
+    }];
 
     let mut new_matches = Vec::new();
     let mut new_inits = Vec::new();

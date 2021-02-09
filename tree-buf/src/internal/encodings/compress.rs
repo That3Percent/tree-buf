@@ -26,8 +26,6 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
         }
     }
 
-    drop(samples);
-
     profile_section!(actual_compress);
 
     by_size.sort_unstable_by_key(|&(_, size)| size);

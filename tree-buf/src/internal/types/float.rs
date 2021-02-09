@@ -223,7 +223,7 @@ macro_rules! impl_float {
                 if let Some(tolerance) = options.lossy_float_tolerance() {
                     // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                     // before a real lossy compressor (Eg: fzip) is used.
-                    let multiplier = (2.0 as $T).powi(tolerance * -1);
+                    let multiplier = (2.0 as $T).powi(-tolerance);
                     let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                     gorilla::size_for(data)
                 } else {
@@ -239,7 +239,7 @@ macro_rules! impl_float {
                     if let Some(tolerance) = stream.options.lossy_float_tolerance() {
                         // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                         // before a real lossy compressor (Eg: fzip) is used.
-                        let multiplier = (2.0 as $T).powi(tolerance * -1);
+                        let multiplier = (2.0 as $T).powi(-tolerance);
                         let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                         gorilla::compress(data, stream.bytes)
                     } else {

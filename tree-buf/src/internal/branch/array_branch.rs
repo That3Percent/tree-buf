@@ -108,7 +108,7 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
     use ArrayTypeId::*;
 
     fn decode_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> DecodeResult<DynArrayBranch<'a>> {
-        let bytes = decode_bytes_from_len(bytes, offset, lens)?.into();
+        let bytes = decode_bytes_from_len(bytes, offset, lens)?;
         Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 

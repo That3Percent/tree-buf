@@ -12,16 +12,14 @@ struct Path {
 }
 
 impl Path {
-    fn c(s: &String, x: &impl fmt::Display) -> String {
+    fn c(s: &str, x: &impl fmt::Display) -> String {
         let x = format!("{}", x);
         if s.is_empty() {
             x
+        } else if x.is_empty() {
+            s.to_string()
         } else {
-            if x.is_empty() {
-                s.clone()
-            } else {
-                format!("{}.{}", s, x)
-            }
+            format!("{}.{}", s, x)
         }
     }
 

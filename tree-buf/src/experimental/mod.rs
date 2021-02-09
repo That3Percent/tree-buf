@@ -3,7 +3,7 @@
 //! or resulting file may change unexpectedly with any version. Even so, it is worth
 //! poking around.
 
+pub mod options;
 #[doc(hidden)]
 pub mod scratch;
 pub mod stats;
-pub mod options;
