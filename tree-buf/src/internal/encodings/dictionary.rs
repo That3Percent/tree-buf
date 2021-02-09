@@ -77,15 +77,13 @@ fn get_lookup_table<T: PartialEq + Copy + std::fmt::Debug + Hash + Eq>(data: &[T
     let mut values = Vec::new();
     let mut lookup = HashMap::new();
 
-    for value in data.iter() {
-        let index = if let Some(i) = lookup.get(value) {
-            *i
-        } else {
+    for value in data {
+        let index = lookup.get(value).copied().unwrap_or_else(|| {
             let i = lookup.len();
             lookup.insert(value, i);
             values.push(*value);
             i
-        };
+        });
         //indices.push(index.try_into().map_err(|_| ())?);
         indices.push(index as u64);
     }
