@@ -1,7 +1,7 @@
 // TODO: Try Streaming V-Byte (which has a Rust port)
 // https://lemire.me/blog/2017/09/27/stream-vbyte-breaking-new-speed-records-for-integer-compression/
 use crate::internal::encodings::compress;
-use crate::internal::encodings::varint::*;
+use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint, size_for_varint};
 use crate::prelude::*;
 use num_traits::{AsPrimitive, Bounded};
 use simple_16::Simple16;
@@ -24,7 +24,7 @@ impl Bounded for U0 {
     }
 }
 mod _0 {
-    use super::*;
+    use super::{ArrayTypeId, EncodeOptions, EncoderStream, U0};
     pub type Type = U0;
 
     pub fn encode_array<T, O: EncodeOptions>(_data: &[T], _max: T, _stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
@@ -316,23 +316,23 @@ fn encode_root_uint(value: u64, bytes: &mut Vec<u8>) -> RootTypeId {
             bytes.extend_from_slice(&le[..2]);
             RootTypeId::IntU16
         }
-        65536..=16777215 => {
+        65536..=16_777_215 => {
             bytes.extend_from_slice(&le[..3]);
             RootTypeId::IntU24
         }
-        16777216..=4294967295 => {
+        16_777_216..=4_294_967_295 => {
             bytes.extend_from_slice(&le[..4]);
             RootTypeId::IntU32
         }
-        4294967296..=1099511627775 => {
+        4_294_967_296..=1_099_511_627_775 => {
             bytes.extend_from_slice(&le[..5]);
             RootTypeId::IntU40
         }
-        1099511627776..=281474976710655 => {
+        1_099_511_627_776..=281_474_976_710_655 => {
             bytes.extend_from_slice(&le[..6]);
             RootTypeId::IntU48
         }
-        281474976710656..=72057594037927936 => {
+        281_474_976_710_656..=72_057_594_037_927_936 => {
             bytes.extend_from_slice(&le[..7]);
             RootTypeId::IntU56
         }

@@ -1,4 +1,4 @@
-use crate::internal::encodings::varint::*;
+use crate::internal::encodings::varint::{decode_prefix_varint, decode_suffix_varint};
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -105,7 +105,7 @@ pub enum DynArrayBranch<'a> {
 pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
     let id = ArrayTypeId::decode_next(bytes, offset)?;
 
-    use ArrayTypeId::*;
+    use ArrayTypeId::{ArrayFixed, ArrayVar, DeltaZig, Dictionary, DoubleGorilla, Enum, F32, F64, IntPrefixVar, IntSimple16, Map, Nullable, Obj0, Obj1, Obj2, Obj3, Obj4, Obj5, Obj6, Obj7, Obj8, ObjN, PackedBool, RLE, RLEBoolFalse, RLEBoolTrue, Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8, TupleN, U8, Utf8, Void, Zfp32, Zfp64};
 
     fn decode_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> DecodeResult<DynArrayBranch<'a>> {
         let bytes = decode_bytes_from_len(bytes, offset, lens)?;

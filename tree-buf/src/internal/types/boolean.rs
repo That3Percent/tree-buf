@@ -1,5 +1,5 @@
-use crate::internal::encodings::packed_bool::*;
-use crate::internal::encodings::rle_bool::*;
+use crate::internal::encodings::packed_bool::{decode_packed_bool, encode_packed_bool};
+use crate::internal::encodings::rle_bool::{decode_rle_bool, encode_rle_bool, size_of_rle_bool};
 use crate::prelude::*;
 use std::vec::IntoIter;
 

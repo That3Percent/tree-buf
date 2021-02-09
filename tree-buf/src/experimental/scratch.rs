@@ -20,7 +20,7 @@ impl Scratch {
 
 /// A re-usable object which may increase performance when encoding over and over again
 /// in a loop. Avoids allocations
-pub fn scratch<T: Encodable>() -> Scratch {
+#[must_use] pub fn scratch<T: Encodable>() -> Scratch {
     Scratch { buffers: Rc::default() }
 }
 

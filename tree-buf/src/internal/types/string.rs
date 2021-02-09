@@ -1,4 +1,4 @@
-use crate::internal::encodings::varint::*;
+use crate::internal::encodings::varint::{decode_prefix_varint, encode_prefix_varint, size_for_varint};
 use crate::prelude::*;
 use rle::RLE;
 use std::borrow::Borrow;
@@ -104,7 +104,7 @@ impl InfallibleDecoderArray for IntoIter<String> {
             DynArrayBranch::String(bytes) => {
                 profile_section!(str_utf8);
 
-                let strs = decode_all(&bytes, |b, o| decode_str(b, o).map(|v| v.to_owned()))?;
+                let strs = decode_all(&bytes, |b, o| decode_str(b, o).map(std::borrow::ToOwned::to_owned))?;
                 Ok(strs.into_iter())
             }
             DynArrayBranch::RLE { runs, values } => {
