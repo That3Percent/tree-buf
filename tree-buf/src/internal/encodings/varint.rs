@@ -1,7 +1,8 @@
 use crate::prelude::*;
 
 #[cfg(feature = "encode")]
-#[must_use] pub fn size_for_varint(value: u64) -> usize {
+#[must_use]
+pub fn size_for_varint(value: u64) -> usize {
     /*
     // Performance: Tried this lookup table and it was slower
     const LOOKUP: [usize; 65] = [
@@ -233,7 +234,7 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
     Ok(result)
 }
 
-/// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
+/// Because this reads backwards, beware that the offset will end up at `std::usize::MAX` if the first byte is read past.
 #[cfg(feature = "decode")]
 pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
     let first = bytes.get(*offset).ok_or(DecodeError::InvalidFormat)?;

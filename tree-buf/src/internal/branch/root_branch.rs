@@ -86,7 +86,11 @@ pub fn decode_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mu
         Ok(DynRootBranch::String(s))
     }
 
-    use RootTypeId::{Array0, Array1, ArrayN, Enum, F32, F64, False, IntS16, IntS24, IntS32, IntS40, IntS48, IntS56, IntS64, IntS8, IntU16, IntU24, IntU32, IntU40, IntU48, IntU56, IntU64, IntU8, Map, NaN, NegOne, Obj0, Obj1, Obj2, Obj3, Obj4, Obj5, Obj6, Obj7, Obj8, ObjN, One, Str, Str0, Str1, Str2, Str3, True, Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8, TupleN, Void, Zero};
+    use RootTypeId::{
+        Array0, Array1, ArrayN, Enum, False, IntS16, IntS24, IntS32, IntS40, IntS48, IntS56, IntS64, IntS8, IntU16, IntU24, IntU32, IntU40, IntU48, IntU56, IntU64, IntU8, Map,
+        NaN, NegOne, Obj0, Obj1, Obj2, Obj3, Obj4, Obj5, Obj6, Obj7, Obj8, ObjN, One, Str, Str0, Str1, Str2, Str3, True, Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8,
+        TupleN, Void, Zero, F32, F64,
+    };
     let branch = match id {
         Void => DynRootBranch::Void,
 

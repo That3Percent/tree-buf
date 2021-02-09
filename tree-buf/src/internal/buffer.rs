@@ -48,7 +48,7 @@ impl<T: Copy> Buffer<T> {
         check_buffer::<T>();
         unsafe {
             let ptr = alloc(LAYOUT);
-            let ptr = transmute(ptr);
+            let ptr = ptr.cast::<T>();
             let ptr = NonNull::new(ptr).expect("Failed to allocate buffer");
             Self { ptr, len: 0 }
         }

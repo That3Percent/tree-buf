@@ -40,16 +40,14 @@ impl<T: Clone> Iterator for RleIterator<T> {
                 self.current_value = self.values.next();
                 self.next()
             }
-            Some(run) => match run {
-                0 => {
-                    self.current_run = None;
-                    self.current_value.take()
-                }
-                _ => {
-                    self.current_run = Some(run - 1);
-                    self.current_value.clone()
-                }
-            },
+            Some(0) => {
+                self.current_run = None;
+                self.current_value.take()
+            }
+            Some(run) => {
+                self.current_run = Some(run - 1);
+                self.current_value.clone()
+            }
         }
     }
 }
