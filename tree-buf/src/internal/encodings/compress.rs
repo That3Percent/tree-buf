@@ -31,7 +31,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
     by_size.sort_unstable_by_key(|&(_, size)| size);
 
     // Return the first compressor that succeeds
-    for ranked in by_size.iter() {
+    for ranked in &by_size {
         if let Ok(ok) = compressors.compress(ranked.0, data, stream) {
             return ok;
         }

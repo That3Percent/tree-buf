@@ -43,15 +43,13 @@ impl<K: Encodable, V: Encodable, S: Default + BuildHasher> Encodable for HashMap
 impl<K: Decodable + Hash + Eq + Send, V: Decodable + Send, S: Default + BuildHasher> Decodable for HashMap<K, V, S>
 where
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    DecodeError: From<<<K as Decodable>::DecoderArray as DecoderArray>::Error>,
-    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    DecodeError: From<<<V as Decodable>::DecoderArray as DecoderArray>::Error>,
+    DecodeError: From<<<K as Decodable>::DecoderArray as DecoderArray>::Error> + From<<<V as Decodable>::DecoderArray as DecoderArray>::Error>,
 {
     type DecoderArray = Option<HashMapArrayDecoder<K::DecoderArray, V::DecoderArray, S>>;
     fn decode(sticks: DynRootBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
         profile_method!(decode);
 
-        let mut v = Default::default(); // TODO: (Performance) Capacity
+        let mut v = HashMap::default(); // TODO: (Performance) Capacity
         match sticks {
             DynRootBranch::Map0 => Ok(v),
             DynRootBranch::Map1 { key, value } => {
@@ -121,9 +119,7 @@ impl<K: DecoderArray, V: DecoderArray, S: Default + BuildHasher> DecoderArray fo
 where
     K::Decode: Hash + Eq,
     // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    DecodeError: From<K::Error>,
-    // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
-    DecodeError: From<V::Error>,
+    DecodeError: From<K::Error> + From<V::Error>,
 {
     type Decode = HashMap<K::Decode, V::Decode, S>;
     type Error = DecodeError;
@@ -174,7 +170,7 @@ where
             }
             Ok(result)
         } else {
-            Ok(Default::default())
+            Ok(Self::Decode::default())
         }
     }
 }

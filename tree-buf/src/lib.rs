@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 #[doc(hidden)]
 pub mod internal;
 

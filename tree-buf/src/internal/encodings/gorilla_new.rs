@@ -15,7 +15,7 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     let mut data = data.map(f64::to_bits);
     // Initialized to 72 to account for the first value,
     // and 1 byte at end of "remaining bits"
-    let mut bits = 72usize;
+    let mut bits = 72_usize;
 
     let buffer = match data.next() {
         Some(first) => first,
@@ -30,20 +30,19 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     for value in data {
         let xored = previous ^ value;
 
-        match xored {
-            0 => bits += 1,
-            _ => {
-                let lz = xored.leading_zeros().min(31) as usize;
-                let tz = xored.trailing_zeros() as usize;
-                let prev_lz = prev_xor.leading_zeros() as usize;
-                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as usize };
-                if lz >= prev_lz && tz >= prev_tz {
-                    bits += 66 - prev_tz - prev_lz;
-                } else {
-                    bits += 77 - tz - lz;
-                }
+        if let 0 = xored {
+            bits += 1;
+        } else {
+            let lz = xored.leading_zeros().min(31) as usize;
+            let tz = xored.trailing_zeros() as usize;
+            let prev_lz = prev_xor.leading_zeros() as usize;
+            let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as usize };
+            if lz >= prev_lz && tz >= prev_tz {
+                bits += 66 - prev_tz - prev_lz;
+            } else {
+                bits += 77 - tz - lz;
             }
-        };
+        }
 
         previous = value;
         prev_xor = xored;
@@ -94,30 +93,29 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
     for value in data {
         let xored = previous ^ value;
 
-        match xored {
-            0 => encode(0, 1, capacity, buffer, bytes),
-            _ => {
-                let lz = xored.leading_zeros().min(31) as u64;
-                let tz = xored.trailing_zeros() as u64;
-                let prev_lz = prev_xor.leading_zeros() as u64;
-                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as u64 };
-                if lz >= prev_lz && tz >= prev_tz {
-                    let meaningful_bits = xored >> prev_tz;
-                    let meaningful_bit_count = 64 - prev_tz - prev_lz;
+        if let 0 = xored {
+            encode(0, 1, capacity, buffer, bytes)
+        } else {
+            let lz = u64::from(xored.leading_zeros().min(31));
+            let tz = u64::from(xored.trailing_zeros());
+            let prev_lz = u64::from(prev_xor.leading_zeros());
+            let prev_tz = if prev_lz == 64 { 0 } else { u64::from(prev_xor.trailing_zeros()) };
+            if lz >= prev_lz && tz >= prev_tz {
+                let meaningful_bits = xored >> prev_tz;
+                let meaningful_bit_count = 64 - prev_tz - prev_lz;
 
-                    encode(0b10, 2, capacity, buffer, bytes);
-                    encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
-                } else {
-                    let meaningful_bits = xored >> tz;
-                    let meaningful_bit_count = 64 - tz - lz;
+                encode(0b10, 2, capacity, buffer, bytes);
+                encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
+            } else {
+                let meaningful_bits = xored >> tz;
+                let meaningful_bit_count = 64 - tz - lz;
 
-                    encode(0b11, 2, capacity, buffer, bytes);
-                    encode(lz, 5, capacity, buffer, bytes);
-                    encode(meaningful_bit_count - 1, 6, capacity, buffer, bytes);
-                    encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
-                }
+                encode(0b11, 2, capacity, buffer, bytes);
+                encode(lz, 5, capacity, buffer, bytes);
+                encode(meaningful_bit_count - 1, 6, capacity, buffer, bytes);
+                encode(meaningful_bits, meaningful_bit_count as u8, capacity, buffer, bytes);
             }
-        };
+        }
 
         previous = value;
         prev_xor = xored;

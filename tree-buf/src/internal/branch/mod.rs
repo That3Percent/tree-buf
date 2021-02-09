@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use std::convert::{TryFrom, TryInto};
     fn convert_all<T: TryFrom<u8> + Into<u8>>() {
-        for i in 0..=255u8 {
+        for i in 0..=255_u8 {
             let v: Result<T, _> = i.try_into();
             if let Ok(v) = v {
                 debug_assert_eq!(i, v.into());

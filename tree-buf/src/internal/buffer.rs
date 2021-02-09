@@ -21,7 +21,7 @@ pub(crate) struct Buffer<T> {
 
 impl<T> Drop for Buffer<T> {
     fn drop(&mut self) {
-        unsafe { dealloc(self.base() as *mut u8, LAYOUT) }
+        unsafe { dealloc(self.base().cast::<u8>(), LAYOUT) }
     }
 }
 
@@ -107,10 +107,10 @@ impl<T> Buffer<T> {
             ptr::copy_nonoverlapping(slice.as_ptr(), self.top(), take);
         }
         self.len += take;
-        if take != slice.len() {
-            Err(&slice[take..])
-        } else {
+        if take == slice.len() {
             Ok(())
+        } else {
+            Err(&slice[take..])
         }
     }
 
@@ -132,7 +132,7 @@ pub(crate) struct BufferPool {
 
 impl BufferPool {
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     /// Returns an empty Buffer<T>.
@@ -164,7 +164,7 @@ mod tests {
     pub fn can_extend() {
         // Try just a normal extend
         let mut buffer = Buffer::new();
-        let mut data = vec![100u32, 20, 20, 10, 0];
+        let mut data = vec![100_u32, 20, 20, 10, 0];
         assert_eq!(Ok(()), buffer.try_extend(&data[..]));
         assert_eq!(&data[..], &buffer[..]);
 
@@ -187,8 +187,8 @@ mod tests {
     pub fn deref() {
         let mut buffer = Buffer::new();
 
-        let data = vec![0u8, 1, 255, 12];
-        for elem in data.iter() {
+        let data = vec![0_u8, 1, 255, 12];
+        for elem in &data {
             buffer.try_push(*elem).unwrap();
         }
 

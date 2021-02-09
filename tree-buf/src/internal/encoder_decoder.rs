@@ -95,7 +95,7 @@ pub trait InfallibleDecoderArray: Sized {
 /// This trait exists to first reduce a little bit of boilerplate for the common
 /// case of not having fallibility, but also to automatically inline at least the Ok
 /// wrapping portion of the code to aid the optimizer in knowing that the Error path
-/// is impossible. Putting the inline here instead of on a decode_next of a DecoderArray
+/// is impossible. Putting the inline here instead of on a `decode_next` of a `DecoderArray`
 /// implementation allows for not necessarily inlining what may be a larger method.
 /// It may not be necessary, but why not.
 impl<T: InfallibleDecoderArray + Send> DecoderArray for T {

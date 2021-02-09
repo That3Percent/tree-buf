@@ -132,7 +132,7 @@ macro_rules! impl_float {
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f32::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
-                            ArrayFloat::DoubleGorilla(bytes) => gorilla::decompress::<$T>(&bytes).map(|f| f.into_iter()),
+                            ArrayFloat::DoubleGorilla(bytes) => gorilla::decompress::<$T>(&bytes).map(IntoIterator::into_iter),
                             /*
                             ArrayFloat::Zfp32(bytes) => {
                                 // FIXME: This is likely a bug switching between 32 and 64 might just get garbage data out

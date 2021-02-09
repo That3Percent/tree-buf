@@ -155,14 +155,13 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
         TupleN => decode_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         ArrayVar => {
             let len = decode_next_array(bytes, offset, lens)?;
-            match len {
-                DynArrayBranch::Void => DynArrayBranch::Array0,
-                _ => {
-                    let len = Box::new(len);
-                    let values = decode_next_array(bytes, offset, lens)?;
-                    let values = Box::new(values);
-                    DynArrayBranch::Array { len, values }
-                }
+            if let DynArrayBranch::Void = len {
+                DynArrayBranch::Array0
+            } else {
+                let len = Box::new(len);
+                let values = decode_next_array(bytes, offset, lens)?;
+                let values = Box::new(values);
+                DynArrayBranch::Array { len, values }
             }
         }
         ArrayFixed => {
@@ -173,16 +172,15 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
         }
         Map => {
             let len = decode_next_array(bytes, offset, lens)?;
-            match len {
-                DynArrayBranch::Void => DynArrayBranch::Map0,
-                _ => {
-                    let len = Box::new(len);
-                    let keys = decode_next_array(bytes, offset, lens)?;
-                    let keys = Box::new(keys);
-                    let values = decode_next_array(bytes, offset, lens)?;
-                    let values = Box::new(values);
-                    DynArrayBranch::Map { len, keys, values }
-                }
+            if let DynArrayBranch::Void = len {
+                DynArrayBranch::Map0
+            } else {
+                let len = Box::new(len);
+                let keys = decode_next_array(bytes, offset, lens)?;
+                let keys = Box::new(keys);
+                let values = decode_next_array(bytes, offset, lens)?;
+                let values = Box::new(values);
+                DynArrayBranch::Map { len, keys, values }
             }
         }
 

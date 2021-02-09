@@ -96,7 +96,7 @@ fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
     profile_fn!(rle_get_runs);
 
     let mut runs = Vec::new();
-    let mut current_run = 0u64;
+    let mut current_run = 0_u64;
     let mut current_value = data[0];
     let mut values = vec![];
     for item in data[1..].iter() {

@@ -283,14 +283,14 @@ pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
                 | ((bytes[*offset - 1] as u64) << 48)
         }
         8 => {
-            (bytes[*offset - 8] as u64)
-                | ((bytes[*offset - 7] as u64) << 8)
-                | ((bytes[*offset - 6] as u64) << 16)
-                | ((bytes[*offset - 5] as u64) << 24)
-                | ((bytes[*offset - 4] as u64) << 32)
-                | ((bytes[*offset - 3] as u64) << 40)
-                | ((bytes[*offset - 2] as u64) << 48)
-                | ((bytes[*offset - 1] as u64) << 56)
+            u64::from(bytes[*offset - 8])
+                | (u64::from(bytes[*offset - 7]) << 8)
+                | (u64::from(bytes[*offset - 6]) << 16)
+                | (u64::from(bytes[*offset - 5]) << 24)
+                | (u64::from(bytes[*offset - 4]) << 32)
+                | (u64::from(bytes[*offset - 3]) << 40)
+                | (u64::from(bytes[*offset - 2]) << 48)
+                | (u64::from(bytes[*offset - 1]) << 56)
         }
         _ => unreachable!(),
     };

@@ -18,7 +18,7 @@ where
     }
     let last = &bytes[bytes.len() - last_byte_count as usize..];
     let bytes = &bytes[..bytes.len() - last.len()];
-    let mut last_2 = [0u8; 8];
+    let mut last_2 = [0_u8; 8];
     for (i, value) in last.iter().enumerate() {
         last_2[i + (8 - last.len())] = *value;
     }
@@ -42,6 +42,6 @@ where
     let iterator = DoubleStreamIterator::new(reader);
     // FIXME: It seems like this collect can panic if the data is invalid.
     profile_section!(collect);
-    let values: Vec<_> = iterator.map(|v| v.as_()).collect();
+    let values: Vec<_> = iterator.map(AsPrimitive::as_).collect();
     Ok(values)
 }
