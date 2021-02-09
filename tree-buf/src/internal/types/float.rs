@@ -42,6 +42,7 @@ macro_rules! impl_float {
         }
 
         #[cfg(feature = "encode")]
+        #[allow(clippy::float_cmp)]
         impl Encodable for $T {
             type EncoderArray = Vec<$T>;
             fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {

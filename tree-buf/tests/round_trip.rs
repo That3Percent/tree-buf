@@ -440,9 +440,7 @@ fn nested_strings_using_rle() {
 fn long_bool_runs() {
     let mut data = Vec::new();
     for i in 560..570 {
-        for _ in 0..i {
-            data.push(true);
-        }
+        data.extend(vec![true; i]);
         data.push(false);
     }
     round_trip(&data, 36, 68);
