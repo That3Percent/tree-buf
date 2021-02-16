@@ -25,6 +25,7 @@ pub(crate) fn compress<T: PartialEq, O: EncodeOptions>(data: &[T], stream: &mut 
             by_size.push((i, size));
         }
     }
+    drop(samples);
 
     profile_section!(actual_compress);
 

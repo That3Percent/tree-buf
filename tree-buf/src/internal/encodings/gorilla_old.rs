@@ -40,8 +40,10 @@ where
     profile_section!(construct);
     let reader = VecReader::new(&data, num_bits_last_elm);
     let iterator = DoubleStreamIterator::new(reader);
+    drop(construct);
     // FIXME: It seems like this collect can panic if the data is invalid.
     profile_section!(collect);
     let values: Vec<_> = iterator.map(AsPrimitive::as_).collect();
+    drop(collect);
     Ok(values)
 }
