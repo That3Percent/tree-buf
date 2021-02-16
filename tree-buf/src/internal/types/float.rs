@@ -42,6 +42,7 @@ macro_rules! impl_float {
         }
 
         #[cfg(feature = "encode")]
+        #[allow(clippy::float_cmp)]
         impl Encodable for $T {
             type EncoderArray = Vec<$T>;
             fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
@@ -132,7 +133,7 @@ macro_rules! impl_float {
                                 let values = decode_all(&bytes, |bytes, offset| Ok(super::_f32::decode_item(bytes, offset)?.as_()))?;
                                 Ok(values.into_iter())
                             }
-                            ArrayFloat::DoubleGorilla(bytes) => gorilla::decompress::<$T>(&bytes).map(|f| f.into_iter()),
+                            ArrayFloat::DoubleGorilla(bytes) => gorilla::decompress::<$T>(&bytes).map(IntoIterator::into_iter),
                             /*
                             ArrayFloat::Zfp32(bytes) => {
                                 // FIXME: This is likely a bug switching between 32 and 64 might just get garbage data out
@@ -223,7 +224,7 @@ macro_rules! impl_float {
                 if let Some(tolerance) = options.lossy_float_tolerance() {
                     // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                     // before a real lossy compressor (Eg: fzip) is used.
-                    let multiplier = (2.0 as $T).powi(tolerance * -1);
+                    let multiplier = (2.0 as $T).powi(-tolerance);
                     let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                     gorilla::size_for(data)
                 } else {
@@ -239,7 +240,7 @@ macro_rules! impl_float {
                     if let Some(tolerance) = stream.options.lossy_float_tolerance() {
                         // TODO: This is a hack (albeit a surprisingly effective one) to get lossy compression
                         // before a real lossy compressor (Eg: fzip) is used.
-                        let multiplier = (2.0 as $T).powi(tolerance * -1);
+                        let multiplier = (2.0 as $T).powi(-tolerance);
                         let data = data.iter().map(|f| ((f * multiplier).floor() / multiplier) as f64);
                         gorilla::compress(data, stream.bytes)
                     } else {

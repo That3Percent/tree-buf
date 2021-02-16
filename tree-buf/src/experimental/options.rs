@@ -5,16 +5,9 @@
 
 use crate::prelude::*;
 
-pub use crate::internal::options::{
-    DisableParallel,
-    EnableParallel,
-    LosslessFloat,
-    LossyFloatTolerance,
-    EncodeOptions, DecodeOptions
-};
+pub use crate::internal::options::{DecodeOptions, DisableParallel, EnableParallel, EncodeOptions, LosslessFloat, LossyFloatTolerance};
 
-pub use crate::{encode_options, decode_options};
-
+pub use crate::{decode_options, encode_options};
 
 #[cfg(feature = "encode")]
 pub fn encode_with_options<T: Encodable>(value: &T, options: &impl EncodeOptions) -> Vec<u8> {

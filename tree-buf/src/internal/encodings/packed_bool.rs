@@ -28,6 +28,7 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
 }
 
 #[cfg(feature = "decode")]
+#[must_use]
 pub fn decode_packed_bool(bytes: &[u8]) -> Vec<bool> {
     profile_fn!(decode_packed_bool);
 

@@ -4,11 +4,7 @@ use crate::prelude::*;
 impl<T: Encodable> Encodable for Option<T> {
     type EncoderArray = NullableEncoder<T::EncoderArray>;
     fn encode_root<O: EncodeOptions>(&self, stream: &mut EncoderStream<'_, O>) -> RootTypeId {
-        if let Some(value) = self {
-            T::encode_root(value, stream)
-        } else {
-            RootTypeId::Void
-        }
+        self.as_ref().map_or(RootTypeId::Void, |value| T::encode_root(&value, stream))
     }
 }
 
@@ -42,13 +38,11 @@ impl<T: Encodable> EncoderArray<Option<T>> for NullableEncoder<T::EncoderArray> 
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile_method!(flush);
         let Self { opt, value } = self;
-        if let Some(value) = value {
+        value.map_or(ArrayTypeId::Void, |v| {
             stream.encode_with_id(|stream| opt.flush(stream));
-            stream.encode_with_id(|stream| value.flush(stream));
+            stream.encode_with_id(|stream| v.flush(stream));
             ArrayTypeId::Nullable
-        } else {
-            ArrayTypeId::Void
-        }
+        })
     }
 }
 

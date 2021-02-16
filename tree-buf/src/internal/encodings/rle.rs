@@ -40,16 +40,14 @@ impl<T: Clone> Iterator for RleIterator<T> {
                 self.current_value = self.values.next();
                 self.next()
             }
-            Some(run) => match run {
-                0 => {
-                    self.current_run = None;
-                    self.current_value.take()
-                }
-                _ => {
-                    self.current_run = Some(run - 1);
-                    self.current_value.clone()
-                }
-            },
+            Some(0) => {
+                self.current_run = None;
+                self.current_value.take()
+            }
+            Some(run) => {
+                self.current_run = Some(run - 1);
+                self.current_value.clone()
+            }
         }
     }
 }
@@ -96,7 +94,7 @@ fn get_runs<T: PartialEq + Copy>(data: &[T]) -> Result<(Vec<u64>, Vec<T>), ()> {
     profile_fn!(rle_get_runs);
 
     let mut runs = Vec::new();
-    let mut current_run = 0u64;
+    let mut current_run = 0_u64;
     let mut current_value = data[0];
     let mut values = vec![];
     for item in data[1..].iter() {

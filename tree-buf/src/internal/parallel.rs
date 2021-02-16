@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use rayon;
 
 // TODO: Have a way to not use rayon when the operation is considered 'trivial'
 #[inline(always)]

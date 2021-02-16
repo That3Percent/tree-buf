@@ -20,8 +20,9 @@ impl Scratch {
 
 /// A re-usable object which may increase performance when encoding over and over again
 /// in a loop. Avoids allocations
+#[must_use]
 pub fn scratch<T: Encodable>() -> Scratch {
-    Scratch { buffers: Default::default() }
+    Scratch { buffers: Rc::default() }
 }
 
 pub fn encode_into_with_scratch<T: Encodable>(_value: &T, _scratch: &mut Scratch, _into: &mut Vec<u8>) {

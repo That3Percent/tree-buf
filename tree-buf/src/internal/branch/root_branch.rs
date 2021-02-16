@@ -86,7 +86,11 @@ pub fn decode_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mu
         Ok(DynRootBranch::String(s))
     }
 
-    use RootTypeId::*;
+    use RootTypeId::{
+        Array0, Array1, ArrayN, Enum, False, IntS16, IntS24, IntS32, IntS40, IntS48, IntS56, IntS64, IntS8, IntU16, IntU24, IntU32, IntU40, IntU48, IntU56, IntU64, IntU8, Map,
+        NaN, NegOne, Obj0, Obj1, Obj2, Obj3, Obj4, Obj5, Obj6, Obj7, Obj8, ObjN, One, Str, Str0, Str1, Str2, Str3, True, Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8,
+        TupleN, Void, Zero, F32, F64,
+    };
     let branch = match id {
         Void => DynRootBranch::Void,
 
@@ -264,30 +268,30 @@ impl RootInteger {
             (4, false) => Self::U(u32::from_le_bytes(bytes.try_into().unwrap()).into()),
             (5, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 0, 0, 0];
-                u64::from_le_bytes(b).into()
+                u64::from_le_bytes(b)
             }),
             (5, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 0, 0, 0];
-                i64::from_le_bytes(b).into()
+                i64::from_le_bytes(b)
             }),
             (6, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], 0, 0];
-                u64::from_le_bytes(b).into()
+                u64::from_le_bytes(b)
             }),
             (6, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], 0, 0];
-                i64::from_le_bytes(b).into()
+                i64::from_le_bytes(b)
             }),
             (7, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], 0];
-                u64::from_le_bytes(b).into()
+                u64::from_le_bytes(b)
             }),
             (7, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], 0];
-                i64::from_le_bytes(b).into()
+                i64::from_le_bytes(b)
             }),
-            (8, true) => Self::S(i64::from_le_bytes(bytes.try_into().unwrap()).into()),
-            (8, false) => Self::U(u64::from_le_bytes(bytes.try_into().unwrap()).into()),
+            (8, true) => Self::S(i64::from_le_bytes(bytes.try_into().unwrap())),
+            (8, false) => Self::U(u64::from_le_bytes(bytes.try_into().unwrap())),
             _ => unreachable!(),
         };
         Ok(ok)

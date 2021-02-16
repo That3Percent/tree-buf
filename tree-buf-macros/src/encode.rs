@@ -121,12 +121,11 @@ fn impl_enum_encode(ast: &DeriveInput, data_enum: &DataEnum) -> TokenStream {
     // For each variant, possibly it's own encoder struct if it's a tuple or struct sort of DataEnum
     // A discriminant
 
-    let mut array_fields = Vec::new();
-    array_fields.push(quote! {
+    let mut array_fields = vec![quote! {
         // TODO: (Performance) have the size scale to the number of variants
         tree_buf_discriminant: <u64 as ::tree_buf::Encodable>::EncoderArray,
         tree_buf_next_discriminant: u64
-    });
+    }];
 
     let mut array_matches = Vec::new();
     let mut root_matches = Vec::new();

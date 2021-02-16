@@ -118,7 +118,7 @@ pub trait TypeId: Copy + Into<u8> + PartialEq + std::fmt::Debug {
 #[cfg(feature = "decode")]
 pub fn decode_root(bytes: &[u8]) -> DecodeResult<DynRootBranch<'_>> {
     profile_fn!(decode_root);
-    if bytes.len() == 0 {
+    if bytes.is_empty() {
         return Ok(DynRootBranch::Void);
     }
     let mut lens = bytes.len() - 1;
@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use std::convert::{TryFrom, TryInto};
     fn convert_all<T: TryFrom<u8> + Into<u8>>() {
-        for i in 0..=255u8 {
+        for i in 0..=255_u8 {
             let v: Result<T, _> = i.try_into();
             if let Ok(v) = v {
                 debug_assert_eq!(i, v.into());

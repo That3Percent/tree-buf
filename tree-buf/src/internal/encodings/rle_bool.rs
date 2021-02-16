@@ -2,6 +2,7 @@ use crate::prelude::*;
 use std::vec::IntoIter;
 
 #[cfg(feature = "decode")]
+#[must_use]
 pub fn decode_rle_bool(runs: IntoIter<u64>, first: bool) -> IntoIter<bool> {
     let mut results = Vec::new();
     let mut current = first;

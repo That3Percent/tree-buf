@@ -1,4 +1,4 @@
-use crate::internal::encodings::varint::*;
+use crate::internal::encodings::varint::{decode_prefix_varint, decode_suffix_varint};
 use crate::prelude::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -105,10 +105,13 @@ pub enum DynArrayBranch<'a> {
 pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize) -> DecodeResult<DynArrayBranch<'a>> {
     let id = ArrayTypeId::decode_next(bytes, offset)?;
 
-    use ArrayTypeId::*;
+    use ArrayTypeId::{
+        ArrayFixed, ArrayVar, DeltaZig, Dictionary, DoubleGorilla, Enum, IntPrefixVar, IntSimple16, Map, Nullable, Obj0, Obj1, Obj2, Obj3, Obj4, Obj5, Obj6, Obj7, Obj8, ObjN,
+        PackedBool, RLEBoolFalse, RLEBoolTrue, Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8, TupleN, Utf8, Void, Zfp32, Zfp64, F32, F64, RLE, U8,
+    };
 
     fn decode_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> DecodeResult<DynArrayBranch<'a>> {
-        let bytes = decode_bytes_from_len(bytes, offset, lens)?.into();
+        let bytes = decode_bytes_from_len(bytes, offset, lens)?;
         Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 
@@ -155,14 +158,13 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
         TupleN => decode_tuple(decode_prefix_varint(bytes, offset)? as usize + 9, bytes, offset, lens)?,
         ArrayVar => {
             let len = decode_next_array(bytes, offset, lens)?;
-            match len {
-                DynArrayBranch::Void => DynArrayBranch::Array0,
-                _ => {
-                    let len = Box::new(len);
-                    let values = decode_next_array(bytes, offset, lens)?;
-                    let values = Box::new(values);
-                    DynArrayBranch::Array { len, values }
-                }
+            if let DynArrayBranch::Void = len {
+                DynArrayBranch::Array0
+            } else {
+                let len = Box::new(len);
+                let values = decode_next_array(bytes, offset, lens)?;
+                let values = Box::new(values);
+                DynArrayBranch::Array { len, values }
             }
         }
         ArrayFixed => {
@@ -173,16 +175,15 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
         }
         Map => {
             let len = decode_next_array(bytes, offset, lens)?;
-            match len {
-                DynArrayBranch::Void => DynArrayBranch::Map0,
-                _ => {
-                    let len = Box::new(len);
-                    let keys = decode_next_array(bytes, offset, lens)?;
-                    let keys = Box::new(keys);
-                    let values = decode_next_array(bytes, offset, lens)?;
-                    let values = Box::new(values);
-                    DynArrayBranch::Map { len, keys, values }
-                }
+            if let DynArrayBranch::Void = len {
+                DynArrayBranch::Map0
+            } else {
+                let len = Box::new(len);
+                let keys = decode_next_array(bytes, offset, lens)?;
+                let keys = Box::new(keys);
+                let values = decode_next_array(bytes, offset, lens)?;
+                let values = Box::new(values);
+                DynArrayBranch::Map { len, keys, values }
             }
         }
 

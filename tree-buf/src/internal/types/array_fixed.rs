@@ -45,9 +45,7 @@ macro_rules! impl_fixed {
                     profile_method!(decode);
                     match sticks {
                         DynRootBranch::Array0 => {
-                            if $size != 0 {
-                                return Err(DecodeError::SchemaMismatch);
-                            } else {
+                            if $size == 0 {
                                 let data: [MaybeUninit<T>; $size] = unsafe {
                                     MaybeUninit::uninit().assume_init()
                                 };
@@ -55,6 +53,8 @@ macro_rules! impl_fixed {
                                 // it's an empty array of uninit and doesn't need to
                                 // be initialized
                                 Ok(unsafe { transmute(data) })
+                            } else {
+                                return Err(DecodeError::SchemaMismatch);
                             }
                         },
                         DynRootBranch::Array1(inner) => {
