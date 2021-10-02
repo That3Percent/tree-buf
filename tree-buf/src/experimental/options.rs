@@ -18,7 +18,7 @@ pub use crate::{encode_options, decode_options};
 
 #[cfg(feature = "encode")]
 pub fn encode_with_options<T: Encodable>(value: &T, options: &impl EncodeOptions) -> Vec<u8> {
-    profile_fn!(encode_with_options);
+    profile_fn!(T, encode_with_options);
     use crate::internal::encodings::varint::encode_suffix_varint;
 
     let mut lens = Vec::new();
