@@ -9,6 +9,7 @@ use tree_buf::{Decodable, Encodable};
 /// If we add compression and achieve lower, we can ratchet the number down.
 /// This ensures the use of the format is improving.
 /// Works on both arrays and root values to hit both code paths.
+#[track_caller]
 pub fn round_trip<T: Encodable + Decodable + Clone + std::fmt::Debug + PartialEq + 'static>(value: &T, root_size: impl Into<Option<i32>>, array_size: impl Into<Option<i32>>)
 // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
 where
@@ -19,6 +20,7 @@ where
     serialize_eq(&v, &v, array_size);
 }
 
+#[track_caller]
 pub fn serialize_eq<I: Encodable, O: Decodable + Debug + PartialEq>(i: &I, o: &O, size: impl Into<Option<i32>>)
 // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
 where
@@ -26,7 +28,6 @@ where
 {
     let bytes = encode(i);
     let result = decode(&bytes);
-    //dbg!(tree_buf::internal::decode_root(&bytes));
     match result {
         Ok(parsed) => assert_eq!(o, &parsed),
         Err(e) => assert!(false, "{}", e),
@@ -36,6 +37,7 @@ where
     }
 }
 
+#[track_caller]
 pub fn round_trip_default<T: Default + Decodable + Encodable + Debug + PartialEq + Clone + 'static>(root_size: i32, array_size: i32)
 // Overly verbose because of `?` requiring `From` See also ec4fa3ba-def5-44eb-9065-e80b59530af6
 where

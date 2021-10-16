@@ -86,3 +86,4 @@ pub fn decode<T: Decodable>(bytes: &[u8]) -> DecodeResult<T> {
 // TODO: Look at HDF5
 // TODO: Look at zebra +
 // TODO: Read this https://en.wikipedia.org/wiki/Column-oriented_DBMS#Column-oriented_systems
+// TODO: (Security) unrestricted with_capacity can panic

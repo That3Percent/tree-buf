@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-#[macro_use]
 macro_rules! impl_type_id {
     ($T:ident, [$($name:ident: $i:expr,)+]) => {
         impl_type_id_inner!($T, [
