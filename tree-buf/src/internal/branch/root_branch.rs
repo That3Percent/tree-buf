@@ -239,6 +239,7 @@ impl_type_id!(RootTypeId, [
     Str2: 30,
     Str3: 31,
     Str: 32,
+    // TODO: BrotliUtf8?
     Enum: 33,
     Map: 34,
 ]);

@@ -82,6 +82,10 @@ pub enum DynArrayBranch<'a> {
     Float(ArrayFloat<'a>),
     Void,
     String(Bytes<'a>),
+    BrotliUtf8 {
+        utf8: Bytes<'a>,
+        lens: Box<DynArrayBranch<'a>>,
+    },
     Enum {
         discriminants: Box<DynArrayBranch<'a>>,
         variants: Vec<ArrayEnumVariant<'a>>,
@@ -230,6 +234,11 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
             let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::String(bytes)
         }
+        BrotliUtf8 => {
+            let utf8 = decode_bytes_from_len(bytes, offset, lens)?;
+            let lens = decode_next_array(bytes, offset, lens)?.into();
+            DynArrayBranch::BrotliUtf8 { utf8, lens }
+        }
         DoubleGorilla => {
             let bytes = decode_bytes_from_len(bytes, offset, lens)?;
             DynArrayBranch::Float(ArrayFloat::DoubleGorilla(bytes))
@@ -294,6 +303,7 @@ impl_type_id!(ArrayTypeId, [
     RLEBoolTrue: 18,
     RLEBoolFalse: 19,
     DeltaZig: 20,
+    BrotliUtf8: 21,
 ]);
 
 #[derive(Debug)]

@@ -25,6 +25,7 @@ coercible_errors = "0.1.4"
 #zfp-sys-cc = "0.1.0"
 defer = "0.1.0"
 zigzag = "0.1.0"
+brotli = "3.3.2"
 
 [dev-dependencies]
 criterion = "0.3"

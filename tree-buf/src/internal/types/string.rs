@@ -1,7 +1,11 @@
 use crate::internal::encodings::varint::*;
 use crate::prelude::*;
-use rle::RLE;
+use brotli::enc::BrotliEncoderParams;
+use brotli::{BrotliCompress, BrotliDecompress};
 use std::borrow::Borrow;
+use std::convert::TryInto;
+use std::io::Cursor;
+use std::ops::Deref;
 use std::vec::IntoIter;
 
 // TODO: Consider compressed unicode (SCSU?) for String in general,
@@ -74,8 +78,7 @@ impl EncoderArray<String> for Vec<&'static String> {
     fn flush<O: EncodeOptions>(self, stream: &mut EncoderStream<'_, O>) -> ArrayTypeId {
         profile_method!(flush);
 
-        let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)));
-
+        let compressors = (Utf8Compressor, RLE::new((Utf8Compressor,)), Dictionary::new((Utf8Compressor,)), BrotliCompressor);
         compress(&self[..], stream, &compressors)
     }
 }
@@ -100,7 +103,50 @@ impl InfallibleDecoderArray for IntoIter<String> {
     fn new_infallible(sticks: DynArrayBranch<'_>, options: &impl DecodeOptions) -> DecodeResult<Self> {
         profile_method!(new_infallible);
 
+        // TODO: Consider when compressing a bloom filter to decide whether to use a dictionary
+
         match sticks {
+            DynArrayBranch::BrotliUtf8 { utf8, lens } => {
+                profile_section!(brotli_utf8);
+
+                let (long_str, lens) = parallel(
+                    || {
+                        let mut out = Vec::new();
+                        let mut cursor = Cursor::new(utf8.deref());
+                        BrotliDecompress(&mut cursor, &mut out).map_err(|_| DecodeError::InvalidFormat)?;
+                        let s = String::from_utf8(out).map_err(|_| DecodeError::InvalidFormat)?;
+                        Result::<_, DecodeError>::Ok(s)
+                    },
+                    // TODO: Why does not this not use <usize> as Decodable?
+                    // See also cc81c324-ae01-4473-b8c2-e486f8032860
+                    || <u64 as Decodable>::DecoderArray::new(*lens, options),
+                    options,
+                );
+                let lens = lens?;
+
+                // TODO: Support Null for lens to indicate there is exactly 1 item.
+                let long_str = long_str?;
+                let long_str = long_str.as_str();
+
+                // See also c2c4fad7-c231-4fb2-8cf1-50ca1bce7fc6
+                // The last length is implied so we don't have to write it.
+                // Therefore an array with 1 item actually has 2 strings
+                // TODO: NOPE! Nixed the above idea because the length of lens
+                // was not implied, causing us to sometimes take the wrong strings.
+                // Can go back and fix this.
+                let mut all = Vec::with_capacity(lens.len());
+                let mut start: usize = 0;
+                for len in lens {
+                    let len = len.try_into().map_err(|_| DecodeError::InvalidFormat)?;
+                    let end = start.checked_add(len).ok_or(DecodeError::InvalidFormat)?;
+                    let s = long_str.get(start..end).ok_or(DecodeError::InvalidFormat)?;
+                    all.push(s.to_owned());
+                    start = end;
+                }
+                //all.push(long_str[start..].to_owned());
+
+                Ok(all.into_iter())
+            }
             DynArrayBranch::String(bytes) => {
                 profile_section!(str_utf8);
 
@@ -122,6 +168,77 @@ impl InfallibleDecoderArray for IntoIter<String> {
     }
     fn decode_next_infallible(&mut self) -> Self::Decode {
         self.next().unwrap_or_default()
+    }
+}
+
+#[cfg(feature = "encode")]
+pub(crate) struct BrotliCompressor;
+
+// TODO: The Borrow<String> here is interesting. Can we get rid of other lifetimes?
+#[cfg(feature = "encode")]
+impl<T: Borrow<String>> Compressor<T> for BrotliCompressor {
+    fn fast_size_for<O: EncodeOptions>(&self, data: &[T], _options: &O) -> Result<usize, ()> {
+        // TODO: Very unscientific. Basically what we're saying here is that if the other compressors
+        // used more than 10 bytes per item and the minimum length is 100 bytes then use Brotli.
+        // This estimate is totally wrong and it may be nice to have a fast_size_for for Brotli if
+        // it's not crazy difficult.
+        // See also 9003b01b-83e8-4acc-9f38-d584a37e20c6
+        Ok(data.len().max(10) * 10)
+    }
+    fn compress<O: EncodeOptions>(&self, data: &[T], stream: &mut EncoderStream<'_, O>) -> Result<ArrayTypeId, ()> {
+        profile_method!(compress);
+
+        // See also c2c4fad7-c231-4fb2-8cf1-50ca1bce7fc6
+        if data.len() == 0 {
+            // It's not currently possible to hit this.
+            // See also 9003b01b-83e8-4acc-9f38-d584a37e20c6
+            todo!("Support null lens");
+        }
+
+        // TODO: (Performance) It would be good to have a different buffer type that merged
+        // all of the strings and lens separately before this method, which takes &[T] but
+        // could take (&str, &[usize]) instead. Right now we're buffering twice in some cases.
+        let (buffer, lens) = {
+            profile_section!(buffer);
+            let mut buffer = String::new();
+            let mut lens = Vec::new();
+
+            for s in data {
+                let s = s.borrow();
+                buffer.push_str(s);
+                lens.push(s.len() as u64);
+            }
+
+            // See also c2c4fad7-c231-4fb2-8cf1-50ca1bce7fc6
+            //lens.pop();
+
+            (buffer, lens)
+        };
+
+        stream.encode_with_len(|stream| {
+            // TODO: check all the params, including the utf-8 hint
+            let params = BrotliEncoderParams::default();
+            //params.mode = BrotliEncoderMode::BROTLI_FORCE_UTF8_PRIOR;
+            let mut r = Cursor::new(buffer.as_bytes());
+
+            let mut copy = Vec::<u8>::new();
+            let mut w = Cursor::new(&mut copy);
+            // TODO: (Performance) We would like to use the stream directly,
+            // but the borrow checker is unhappy. So we are copying after :(
+            // TODO: deref_mut doesn't work here because it would use the slice.
+            //let mut w = Cursor::new(stream.bytes);
+
+            // TODO: Understand error conditions
+            // TODO: The return here is the "pointer sized integer type".
+            // Is this something we need to account for?
+            BrotliCompress(&mut r, &mut w, &params).expect("Failed to brotli");
+
+            stream.bytes.extend_from_slice(&copy);
+        });
+
+        stream.encode_with_id(|stream| lens.flush(stream));
+
+        Ok(ArrayTypeId::BrotliUtf8)
     }
 }
 

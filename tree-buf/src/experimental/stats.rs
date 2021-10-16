@@ -98,6 +98,7 @@ impl SizeBreakdown {
     }
 }
 
+// TODO: (Security) Re-write without recursion
 fn visit_array(path: Path, branch: &DynArrayBranch, breakdown: &mut SizeBreakdown) {
     match branch {
         DynArrayBranch::ArrayFixed { values, len } => visit_array(path.a(&format!("[{}]", len), &"Array Fixed"), values, breakdown),
@@ -147,6 +148,10 @@ fn visit_array(path: Path, branch: &DynArrayBranch, breakdown: &mut SizeBreakdow
             visit_array(path.a(&"values", &"Dictionary"), values, breakdown);
         }
         DynArrayBranch::String(b) => breakdown.add(&path, "UTF-8", b),
+        DynArrayBranch::BrotliUtf8 { utf8, lens } => {
+            breakdown.add(&path, "BrotliUtf8", utf8);
+            visit_array(path.a(&"lens", &"Dictionary"), lens, breakdown);
+        }
         DynArrayBranch::Tuple { fields } => {
             for (i, field) in fields.iter().enumerate() {
                 visit_array(path.a(&i, &"Tuple"), field, breakdown);

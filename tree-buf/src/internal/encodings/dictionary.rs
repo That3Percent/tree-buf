@@ -39,6 +39,8 @@ impl<T: Send + Clone> DictionaryIterator<T> {
         options: &impl DecodeOptions,
         f: impl Send + FnOnce(DynArrayBranch<'_>) -> DecodeResult<IntoIter<T>>,
     ) -> DecodeResult<Self> {
+        // TODO: Why does not this not use <usize> as Decodable?
+        // See also cc81c324-ae01-4473-b8c2-e486f8032860
         let (indexes, values) = parallel(|| <u64 as Decodable>::DecoderArray::new(*indexes, options), || f(*values), options);
         let indexes = indexes?;
         let values = values?;
