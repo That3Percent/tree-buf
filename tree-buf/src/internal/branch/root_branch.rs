@@ -16,7 +16,7 @@ use std::convert::{TryFrom, TryInto};
 // TODO: Other kinds of self-description may also be interesting, since this is for data self-description is higher value
 // TODO: Bytes/Blog = [u8] compressed (eg: gzip), uncompressed
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum DynRootBranch<'a> {
     Object {
         fields: HashMap<Ident<'a>, DynRootBranch<'a>>,
@@ -37,6 +37,7 @@ pub enum DynRootBranch<'a> {
     Integer(RootInteger),
     Boolean(bool),
     Float(RootFloat),
+    #[default]
     Void,
     String(&'a str),
     Map0,
@@ -191,12 +192,6 @@ pub fn decode_next_root<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mu
         Str => decode_str(decode_prefix_varint(bytes, offset)? as usize, bytes, offset)?,
     };
     Ok(branch)
-}
-
-impl<'a> Default for DynRootBranch<'a> {
-    fn default() -> Self {
-        DynRootBranch::Void
-    }
 }
 
 #[derive(Debug)]
