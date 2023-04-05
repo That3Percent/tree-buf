@@ -47,7 +47,7 @@ fn impl_struct_encode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStrea
 
     // See also: fadaec14-35ad-4dc1-b6dc-6106ab811669
     let (prefix, suffix) = match num_fields {
-        0..=8 => (quote! {}, Ident::new(format!("Obj{}", num_fields).as_str(), Span::call_site())),
+        0..=8 => (quote! {}, Ident::new(format!("Obj{num_fields}").as_str(), Span::call_site())),
         _ => (
             quote! {
                 ::tree_buf::internal::encodings::varint::encode_prefix_varint(#num_fields as u64 - 9, stream.bytes);

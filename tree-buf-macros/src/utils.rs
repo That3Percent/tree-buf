@@ -13,7 +13,7 @@ use {
 // TODO: Unfortunately, the current method is quite inadequate. Consider a language with no case. Consider a letter 'q' having
 // neither uppercase nor lowercase. qq vs q_q is different. But, in this encoding they are the same.
 pub fn canonical_ident(ident: &Ident) -> String {
-    let ident_str = format!("{}", ident);
+    let ident_str = format!("{ident}");
     to_camel_case(&ident_str)
 }
 

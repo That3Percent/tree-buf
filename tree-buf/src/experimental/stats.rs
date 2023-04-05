@@ -13,13 +13,13 @@ struct Path {
 
 impl Path {
     fn c(s: &String, x: &impl fmt::Display) -> String {
-        let x = format!("{}", x);
+        let x = format!("{x}");
         if s.is_empty() {
             x
         } else if x.is_empty() {
             s.clone()
         } else {
-            format!("{}.{}", s, x)
+            format!("{s}.{x}")
         }
     }
 
@@ -99,7 +99,7 @@ impl SizeBreakdown {
 // TODO: (Security) Re-write without recursion
 fn visit_array(path: Path, branch: &DynArrayBranch, breakdown: &mut SizeBreakdown) {
     match branch {
-        DynArrayBranch::ArrayFixed { values, len } => visit_array(path.a(&format!("[{}]", len), &"Array Fixed"), values, breakdown),
+        DynArrayBranch::ArrayFixed { values, len } => visit_array(path.a(&format!("[{len}]"), &"Array Fixed"), values, breakdown),
         DynArrayBranch::Array { len, values } => {
             visit_array(path.a(&"len", &"Array"), len, breakdown);
             visit_array(path.a(&"values", &"Array"), values, breakdown);
@@ -184,7 +184,7 @@ fn visit(path: Path, branch: &DynRootBranch<'_>, breakdown: &mut SizeBreakdown) 
             visit(path.a(&"key", &"Map1"), key, breakdown);
             visit(path.a(&"value", &"Map1"), value, breakdown);
         }
-        DynRootBranch::Array { len, values } => visit_array(path.a(&format!("[{}]", len), &"Array"), values, breakdown),
+        DynRootBranch::Array { len, values } => visit_array(path.a(&format!("[{len}]"), &"Array"), values, breakdown),
         DynRootBranch::Array1(item) => visit(path.a(&"1", &"Array1"), item, breakdown),
         DynRootBranch::Boolean(_)
         | DynRootBranch::Array0
@@ -274,5 +274,5 @@ pub fn size_breakdown(data: &[u8]) -> DecodeResult<String> {
     };
     visit(Path::default(), &root, &mut breakdown);
 
-    Ok(format!("{}", breakdown))
+    Ok(format!("{breakdown}"))
 }
