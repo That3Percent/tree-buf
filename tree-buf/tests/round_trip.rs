@@ -14,7 +14,7 @@ mod hide_namespace {
         pub f: f64,
         pub obj_array: Vec<Bobs>,
         pub extra: Option<Bobs>,
-        pub s: Box<String>,
+        pub s: String,
     }
 
     #[derive(Encode, Decode, PartialEq, Debug, Clone)]
@@ -35,7 +35,7 @@ fn make_item() -> Bits {
             one: vec![99],
             tup: (9999.99, 200.1),
         }),
-        s: Box::new("abc".to_owned()),
+        s: "abc".to_string(),
         obj_array: vec![
             Bobs {
                 one: vec![3, 2, 1, 0],
