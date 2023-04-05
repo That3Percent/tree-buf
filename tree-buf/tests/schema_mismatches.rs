@@ -9,7 +9,7 @@ fn expect_schema_mismatch<TIn: Encodable + Default, TOut: Debug + Decodable>() {
     let result = decode::<TOut>(&bytes);
     match result.unwrap_err() {
         DecodeError::SchemaMismatch => (),
-        _ => assert!(false),
+        _ => panic!(),
     }
 }
 

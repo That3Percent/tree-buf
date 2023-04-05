@@ -30,7 +30,7 @@ where
     let result = decode(&bytes);
     match result {
         Ok(parsed) => assert_eq!(o, &parsed),
-        Err(e) => assert!(false, "{}", e),
+        Err(e) => panic!("{}", e),
     }
     if let Some(size) = size.into() {
         assert_eq!(bytes.len() as i32, size, "Size Before: {}\nSize After: {}", size, bytes.len());
