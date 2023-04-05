@@ -45,10 +45,10 @@ fn canonical_idents_compatible() {
 #[test]
 fn fixed_array_to_vec() {
     let fixed = [0u8, 1, 2, 3, 4];
-    let vec: Vec<_> = fixed.iter().copied().collect();
+    let vec: Vec<_> = fixed.to_vec();
     serialize_eq(&fixed, &vec, 8);
 
     let fixed = [fixed, fixed];
-    let vec: Vec<Vec<_>> = fixed.iter().map(|f| f.iter().copied().collect()).collect();
+    let vec: Vec<Vec<_>> = fixed.iter().map(|f| f.to_vec()).collect();
     serialize_eq(&fixed, &vec, 14);
 }
