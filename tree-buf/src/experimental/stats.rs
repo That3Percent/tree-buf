@@ -16,12 +16,10 @@ impl Path {
         let x = format!("{}", x);
         if s.is_empty() {
             x
+        } else if x.is_empty() {
+            s.clone()
         } else {
-            if x.is_empty() {
-                s.clone()
-            } else {
-                format!("{}.{}", s, x)
-            }
+            format!("{}.{}", s, x)
         }
     }
 
