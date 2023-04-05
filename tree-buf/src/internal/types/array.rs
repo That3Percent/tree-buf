@@ -9,7 +9,7 @@ impl<T: Encodable> Encodable for Vec<T> {
         match self.len() {
             0 => RootTypeId::Array0,
             1 => {
-                stream.encode_with_id(|stream| (&self[0]).encode_root(stream));
+                stream.encode_with_id(|stream| (self[0]).encode_root(stream));
                 RootTypeId::Array1
             }
             _ => {

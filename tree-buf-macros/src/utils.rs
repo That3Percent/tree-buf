@@ -39,7 +39,7 @@ pub fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
             NamedField {
                 ident: field.ident.as_ref().unwrap(),
                 ty: &field.ty,
-                canon_str: canonical_ident(&ident),
+                canon_str: canonical_ident(ident),
             }
         })
         .collect()

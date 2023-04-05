@@ -130,7 +130,7 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
         byte_count += 1;
     }
     let last = &(&buffer.to_le_bytes())[(8 - byte_count) as usize..];
-    bytes.extend_from_slice(&last);
+    bytes.extend_from_slice(last);
     bytes.push(remaining);
 
     Ok(ArrayTypeId::DoubleGorilla)

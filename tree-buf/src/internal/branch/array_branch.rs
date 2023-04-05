@@ -25,7 +25,7 @@ impl Deref for Bytes<'_> {
     type Target = [u8];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 

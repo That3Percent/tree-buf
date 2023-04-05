@@ -425,7 +425,7 @@ where
 
         out.push(*current);
         for next in data {
-            let delta = next.wrapping_sub(&current);
+            let delta = next.wrapping_sub(current);
             current = next;
             out.push(delta);
         }
@@ -491,7 +491,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         profile_method!(compress);
         stream.encode_with_len(|stream| {
             for item in data {
-                encode_prefix_varint((*item).into(), &mut stream.bytes);
+                encode_prefix_varint((*item).into(), stream.bytes);
             }
         });
         Ok(ArrayTypeId::IntPrefixVar)
@@ -519,7 +519,7 @@ impl<T: Simple16> Compressor<T> for Simple16Compressor<T> {
 
         self.check_range()?;
 
-        stream.encode_with_len(|stream| unsafe { simple_16::compress_unchecked(&data, stream.bytes) });
+        stream.encode_with_len(|stream| unsafe { simple_16::compress_unchecked(data, stream.bytes) });
 
         Ok(ArrayTypeId::IntSimple16)
     }
@@ -529,7 +529,7 @@ impl<T: Simple16> Compressor<T> for Simple16Compressor<T> {
 
         self.check_range()?;
 
-        let size = unsafe { simple_16::calculate_size_unchecked(&data) };
+        let size = unsafe { simple_16::calculate_size_unchecked(data) };
 
         Ok(size)
     }
