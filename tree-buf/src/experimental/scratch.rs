@@ -24,6 +24,6 @@ pub fn scratch<T: Encodable>() -> Scratch {
     Scratch { buffers: Default::default() }
 }
 
-pub fn encode_into_with_scratch<T: Encodable>(_value: &T, _scratch: &mut Scratch, _into: &mut Vec<u8>) {
+pub fn encode_into_with_scratch<T: Encodable>(_value: &T, _scratch: &mut Scratch, _into: &mut [u8]) {
     todo!()
 }
