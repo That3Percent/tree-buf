@@ -188,7 +188,7 @@ mod tests {
         let mut buffer = Buffer::new();
 
         let data = vec![0u8, 1, 255, 12];
-        for elem in data.iter() {
+        for elem in &data {
             buffer.try_push(*elem).unwrap();
         }
 

@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn test_prefix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
-        for vec in vecs.iter() {
+        for vec in &vecs {
             round_trip_prefix(vec)?;
         }
 
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn test_suffix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
-        for vec in vecs.iter() {
+        for vec in &vecs {
             round_trip_suffix(vec)?;
         }
 

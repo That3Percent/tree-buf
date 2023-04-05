@@ -39,7 +39,7 @@ fn impl_struct_decode(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStrea
     let mut news_parallel_rhs = quote! {};
     let mut is_first = true;
 
-    for NamedField { ident, ty, .. } in fields.iter() {
+    for NamedField { ident, ty, .. } in &fields {
         if is_first {
             is_first = false;
             parallel_lhs = quote! { #ident };

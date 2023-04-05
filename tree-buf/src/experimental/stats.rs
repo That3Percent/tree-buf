@@ -57,13 +57,13 @@ impl fmt::Display for SizeBreakdown {
         by_type.sort_by_key(|i| usize::MAX - i.1.size);
 
         writeln!(f, "Largest by path:")?;
-        for (path, agg) in by_path.iter() {
+        for (path, agg) in &by_path {
             writeln!(f, "\t{}\n\t   {}\n\t   {}", agg.size, path, agg.types)?;
         }
 
         writeln!(f)?;
         writeln!(f, "Largest by type:")?;
-        for (t, agg) in by_type.iter() {
+        for (t, agg) in &by_type {
             writeln!(f, "\t {}x {} @ {}", agg.count, agg.size, t)?;
         }
 
