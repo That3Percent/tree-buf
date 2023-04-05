@@ -413,7 +413,7 @@ where
     }
 
     within_rle(|| {
-        let mut data = data.into_iter();
+        let mut data = data.iter();
         let mut out = Vec::new();
         // Unwrap is ok because length checked earlier.
         let mut current = data.next().unwrap();
