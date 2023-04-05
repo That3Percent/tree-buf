@@ -410,28 +410,28 @@ fn enum_with_vec() {
     round_trip(&X::X(vec![25, 30, 0, 0, 0]), 11, 21);
 }
 
-fn owned_vec(strs: Vec<&'static str>) -> Vec<String> {
+fn owned_vec(strs: &[&'static str]) -> Vec<String> {
     strs.iter().map(|s| String::from(*s)).collect()
 }
 
 #[test]
 fn strings_using_dictionary() {
-    let data = vec!["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
-    round_trip(&owned_vec(data), 21, 23);
+    let data = ["abcd", "abcd", "def", "abcd", "abcd", "abcd", ""];
+    round_trip(&owned_vec(&data), 21, 23);
 
-    let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd"];
-    round_trip(&owned_vec(data), 13, 15);
+    let data = ["abcd", "abcd", "abcd", "abcd", "abcd"];
+    round_trip(&owned_vec(&data), 13, 15);
 
-    let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
-    round_trip(&owned_vec(data), 17, 20);
+    let data = ["abcd", "abcd", "abcd", "abcd", "abcd", "def", "def"];
+    round_trip(&owned_vec(&data), 17, 20);
 
-    let data = vec!["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
-    round_trip(&owned_vec(data), 17, 20);
+    let data = ["abcd", "abcd", "abcd", "abcd", "abcd", "abcd", "def"];
+    round_trip(&owned_vec(&data), 17, 20);
 }
 
 #[test]
 fn nested_strings_using_rle() {
-    let data = (owned_vec(vec!["abc", "abc", "abc"]), owned_vec(vec!["def", "def", "def"]), 1u32);
+    let data = (owned_vec(&["abc", "abc", "abc"]), owned_vec(&["def", "def", "def"]), 1u32);
 
     round_trip(&data, 26, 30);
 }
@@ -482,7 +482,7 @@ fn delta_prefix_var() {
 
 #[test]
 fn big_brotli_str() {
-    let data = owned_vec(vec![
+    let data = owned_vec(&[
         "id,name,host_id,host_name,neighbourhood_group,neighbourhood,latitude,longitude,room_type,price,minimum_nights,number_of_reviews,last_review,reviews_per_month,calculated_host_listings_count,availability_365",
     "2818,Quiet Garden View Room & Super Fast WiFi,3159,Daniel,,Oostelijk Havengebied - Indische Buurt,52.36575,4.94142,Private room,59,3,277,2019-11-21,2.13,1,0",
     "20168,Studio with private bathroom in the centre 1,59484,Alexander,,Centrum-Oost,52.36509,4.89354,Private room,80,1,306,2019-12-05,2.57,2,198",
