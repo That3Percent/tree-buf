@@ -116,7 +116,7 @@ impl<T> Buffer<T> {
 
     #[inline]
     fn top(&self) -> *mut T {
-        unsafe { self.base().offset(self.len as isize) }
+        unsafe { self.base().add(self.len) }
     }
 
     #[inline]
