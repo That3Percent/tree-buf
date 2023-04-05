@@ -26,9 +26,8 @@ pub type NamedFields<'a> = Vec<NamedField<'a>>;
 
 pub fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
     // TODO: Lift restriction
-    let fields_named = match &data_struct.fields {
-        Fields::Named(fields_named) => fields_named,
-        _ => panic!("The struct must have named fields"),
+    let Fields::Named(fields_named) = &data_struct.fields else {
+        panic!("The struct must have named fields")
     };
 
     fields_named

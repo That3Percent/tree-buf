@@ -17,9 +17,8 @@ pub fn size_for(data: impl Iterator<Item = f64>) -> Result<usize, ()> {
     // and 1 byte at end of "remaining bits"
     let mut bits = 72usize;
 
-    let buffer = match data.next() {
-        Some(first) => first,
-        None => return Err(()),
+    let Some(buffer) = data.next() else {
+        return Err(())
     };
 
     let mut previous = buffer;
@@ -78,9 +77,8 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
         }
     };
 
-    let mut buffer = match data.next() {
-        Some(first) => first,
-        None => return Err(()),
+    let Some(mut buffer) = data.next() else {
+        return Err(())
     };
 
     let mut previous = buffer;
