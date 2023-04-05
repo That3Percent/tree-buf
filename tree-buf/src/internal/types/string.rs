@@ -189,7 +189,7 @@ impl<T: Borrow<String>> Compressor<T> for BrotliCompressor {
         profile_method!(compress);
 
         // See also c2c4fad7-c231-4fb2-8cf1-50ca1bce7fc6
-        if data.len() == 0 {
+        if data.is_empty() {
             // It's not currently possible to hit this.
             // See also 9003b01b-83e8-4acc-9f38-d584a37e20c6
             todo!("Support null lens");
