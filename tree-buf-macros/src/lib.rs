@@ -3,17 +3,15 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
-mod utils;
 mod decode;
 mod encode;
+mod utils;
 
 use {
     decode::impl_decode_macro,
     encode::impl_encode_macro,
     syn::{parse_macro_input, DeriveInput},
 };
-
-
 
 #[proc_macro_derive(Encode)]
 pub fn encode_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
