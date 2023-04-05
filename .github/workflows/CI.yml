@@ -1,0 +1,19 @@
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+name: Continuous integration
+
+jobs:
+
+  fmt:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
