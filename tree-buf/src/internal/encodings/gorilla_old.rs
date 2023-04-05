@@ -9,7 +9,7 @@ where
     f64: AsPrimitive<T>,
 {
     // FIXME: Should do schema mismatch for f32 -> f64
-    let num_bits_last_elm = *bytes.last().ok_or_else(|| DecodeError::InvalidFormat)?;
+    let num_bits_last_elm = *bytes.last().ok_or(DecodeError::InvalidFormat)?;
     // Remove the byte we just read containing the bit count of the last element.
     let bytes = &bytes[..bytes.len() - 1];
     let mut last_byte_count = num_bits_last_elm / 8;
