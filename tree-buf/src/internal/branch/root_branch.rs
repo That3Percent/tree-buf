@@ -244,9 +244,9 @@ impl RootInteger {
     pub fn new(bytes: &[u8], offset: &mut usize, len: usize, signed: bool) -> DecodeResult<Self> {
         let bytes = decode_bytes(len, bytes, offset)?;
         let ok = match (len, signed) {
-            (1, true) => Self::S((bytes[0] as i64) * -1),
+            (1, true) => Self::S(-i64::from(bytes[0])),
             (1, false) => Self::U(bytes[0].into()),
-            (2, true) => Self::S(u16::from_le_bytes(bytes.try_into().unwrap()) as i64 * -1),
+            (2, true) => Self::S(-i64::from(u16::from_le_bytes(bytes.try_into().unwrap()))),
             (2, false) => Self::U(u16::from_le_bytes(bytes.try_into().unwrap()).into()),
             (3, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], 0];
@@ -254,9 +254,9 @@ impl RootInteger {
             }),
             (3, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], 0];
-                u32::from_le_bytes(b) as i64 * -1
+                -i64::from(u32::from_le_bytes(b))
             }),
-            (4, true) => Self::S(u32::from_le_bytes(bytes.try_into().unwrap()) as i64 * -1),
+            (4, true) => Self::S(-i64::from(u32::from_le_bytes(bytes.try_into().unwrap()))),
             (4, false) => Self::U(u32::from_le_bytes(bytes.try_into().unwrap()).into()),
             (5, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 0, 0, 0];
@@ -264,7 +264,7 @@ impl RootInteger {
             }),
             (5, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 0, 0, 0];
-                u64::from_le_bytes(b) as i64 * -1
+                -(u64::from_le_bytes(b) as i64)
             }),
             (6, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], 0, 0];
@@ -272,7 +272,7 @@ impl RootInteger {
             }),
             (6, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], 0, 0];
-                u64::from_le_bytes(b) as i64 * -1
+                -(u64::from_le_bytes(b) as i64)
             }),
             (7, false) => Self::U({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], 0];
@@ -280,9 +280,9 @@ impl RootInteger {
             }),
             (7, true) => Self::S({
                 let b = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], 0];
-                u64::from_le_bytes(b) as i64 * -1
+                -(u64::from_le_bytes(b) as i64)
             }),
-            (8, true) => Self::S(u64::from_le_bytes(bytes.try_into().unwrap()) as i64 * -1),
+            (8, true) => Self::S(-(u64::from_le_bytes(bytes.try_into().unwrap()) as i64)),
             (8, false) => Self::U(u64::from_le_bytes(bytes.try_into().unwrap())),
             _ => unreachable!(),
         };

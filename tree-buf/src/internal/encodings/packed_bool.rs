@@ -6,14 +6,14 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
 
     let mut offset = 0;
     while offset + 7 < items.len() {
-        let b = (items[offset + 0] as u8) << 0
-            | (items[offset + 1] as u8) << 1
-            | (items[offset + 2] as u8) << 2
-            | (items[offset + 3] as u8) << 3
-            | (items[offset + 4] as u8) << 4
-            | (items[offset + 5] as u8) << 5
-            | (items[offset + 6] as u8) << 6
-            | (items[offset + 7] as u8) << 7;
+        let b = u8::from(items[offset + 0]) << 0
+            | u8::from(items[offset + 1]) << 1
+            | u8::from(items[offset + 2]) << 2
+            | u8::from(items[offset + 3]) << 3
+            | u8::from(items[offset + 4]) << 4
+            | u8::from(items[offset + 5]) << 5
+            | u8::from(items[offset + 6]) << 6
+            | u8::from(items[offset + 7]) << 7;
         bytes.push(b);
         offset += 8;
     }
@@ -21,7 +21,7 @@ pub fn encode_packed_bool(items: &[bool], bytes: &mut Vec<u8>) {
     if offset < items.len() {
         let mut b = 0;
         for i in 0..items.len() - offset {
-            b |= (items[offset + i] as u8) << i;
+            b |= u8::from(items[offset + i]) << i;
         }
         bytes.push(b);
     }

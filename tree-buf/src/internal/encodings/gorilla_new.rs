@@ -95,10 +95,10 @@ pub fn compress(data: impl Iterator<Item = f64>, bytes: &mut Vec<u8>) -> Result<
         match xored {
             0 => encode(0, 1, capacity, buffer, bytes),
             _ => {
-                let lz = xored.leading_zeros().min(31) as u64;
-                let tz = xored.trailing_zeros() as u64;
-                let prev_lz = prev_xor.leading_zeros() as u64;
-                let prev_tz = if prev_lz == 64 { 0 } else { prev_xor.trailing_zeros() as u64 };
+                let lz = u64::from(xored.leading_zeros().min(31));
+                let tz = u64::from(xored.trailing_zeros());
+                let prev_lz = u64::from(prev_xor.leading_zeros());
+                let prev_tz = if prev_lz == 64 { 0 } else { u64::from(prev_xor.trailing_zeros()) };
                 if lz >= prev_lz && tz >= prev_tz {
                     let meaningful_bits = xored >> prev_tz;
                     let meaningful_bit_count = 64 - prev_tz - prev_lz;

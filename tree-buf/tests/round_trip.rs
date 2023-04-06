@@ -115,7 +115,7 @@ fn float32_vec() {
 fn lossy_f64_vec() {
     let mut data = Vec::new();
     for i in 0..50 {
-        data.push(0.01 * i as f64);
+        data.push(0.01 * f64::from(i));
     }
     let tolerance = -10;
     let options = encode_options! { options::LossyFloatTolerance(tolerance) };
