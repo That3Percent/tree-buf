@@ -171,7 +171,7 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
     // so this can remain in an amortized check loop until the size of the remainder
     // is less than 9 bytes.
 
-    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or(DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Check that the compiler does unchecked indexing after this
@@ -180,52 +180,52 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
     }
 
     let result = match shift {
-        0 => (first >> 1) as u64,
-        1 => (first >> 2) as u64 | ((bytes[*offset + 1] as u64) << 6),
-        2 => (first >> 3) as u64 | ((bytes[*offset + 1] as u64) << 5) | ((bytes[*offset + 2] as u64) << 13),
-        3 => (first >> 4) as u64 | ((bytes[*offset + 1] as u64) << 4) | ((bytes[*offset + 2] as u64) << 12) | ((bytes[*offset + 3] as u64) << 20),
+        0 => u64::from(first >> 1),
+        1 => u64::from(first >> 2) | (u64::from(bytes[*offset + 1]) << 6),
+        2 => u64::from(first >> 3) | (u64::from(bytes[*offset + 1]) << 5) | (u64::from(bytes[*offset + 2]) << 13),
+        3 => u64::from(first >> 4) | (u64::from(bytes[*offset + 1]) << 4) | (u64::from(bytes[*offset + 2]) << 12) | (u64::from(bytes[*offset + 3]) << 20),
         4 => {
-            (first >> 5) as u64
-                | ((bytes[*offset + 1] as u64) << 3)
-                | ((bytes[*offset + 2] as u64) << 11)
-                | ((bytes[*offset + 3] as u64) << 19)
-                | ((bytes[*offset + 4] as u64) << 27)
+            u64::from(first >> 5)
+                | (u64::from(bytes[*offset + 1]) << 3)
+                | (u64::from(bytes[*offset + 2]) << 11)
+                | (u64::from(bytes[*offset + 3]) << 19)
+                | (u64::from(bytes[*offset + 4]) << 27)
         }
         5 => {
-            (first >> 6) as u64
-                | ((bytes[*offset + 1] as u64) << 2)
-                | ((bytes[*offset + 2] as u64) << 10)
-                | ((bytes[*offset + 3] as u64) << 18)
-                | ((bytes[*offset + 4] as u64) << 26)
-                | ((bytes[*offset + 5] as u64) << 34)
+            u64::from(first >> 6)
+                | (u64::from(bytes[*offset + 1]) << 2)
+                | (u64::from(bytes[*offset + 2]) << 10)
+                | (u64::from(bytes[*offset + 3]) << 18)
+                | (u64::from(bytes[*offset + 4]) << 26)
+                | (u64::from(bytes[*offset + 5]) << 34)
         }
         6 => {
-            (first >> 7) as u64
-                | ((bytes[*offset + 1] as u64) << 1)
-                | ((bytes[*offset + 2] as u64) << 9)
-                | ((bytes[*offset + 3] as u64) << 17)
-                | ((bytes[*offset + 4] as u64) << 25)
-                | ((bytes[*offset + 5] as u64) << 33)
-                | ((bytes[*offset + 6] as u64) << 41)
+            u64::from(first >> 7)
+                | (u64::from(bytes[*offset + 1]) << 1)
+                | (u64::from(bytes[*offset + 2]) << 9)
+                | (u64::from(bytes[*offset + 3]) << 17)
+                | (u64::from(bytes[*offset + 4]) << 25)
+                | (u64::from(bytes[*offset + 5]) << 33)
+                | (u64::from(bytes[*offset + 6]) << 41)
         }
         7 => {
-            (bytes[*offset + 1] as u64)
-                | ((bytes[*offset + 2] as u64) << 8)
-                | ((bytes[*offset + 3] as u64) << 16)
-                | ((bytes[*offset + 4] as u64) << 24)
-                | ((bytes[*offset + 5] as u64) << 32)
-                | ((bytes[*offset + 6] as u64) << 40)
-                | ((bytes[*offset + 7] as u64) << 48)
+            u64::from(bytes[*offset + 1])
+                | (u64::from(bytes[*offset + 2]) << 8)
+                | (u64::from(bytes[*offset + 3]) << 16)
+                | (u64::from(bytes[*offset + 4]) << 24)
+                | (u64::from(bytes[*offset + 5]) << 32)
+                | (u64::from(bytes[*offset + 6]) << 40)
+                | (u64::from(bytes[*offset + 7]) << 48)
         }
         8 => {
-            (bytes[*offset + 1] as u64)
-                | ((bytes[*offset + 2] as u64) << 8)
-                | ((bytes[*offset + 3] as u64) << 16)
-                | ((bytes[*offset + 4] as u64) << 24)
-                | ((bytes[*offset + 5] as u64) << 32)
-                | ((bytes[*offset + 6] as u64) << 40)
-                | ((bytes[*offset + 7] as u64) << 48)
-                | ((bytes[*offset + 8] as u64) << 56)
+            u64::from(bytes[*offset + 1])
+                | (u64::from(bytes[*offset + 2]) << 8)
+                | (u64::from(bytes[*offset + 3]) << 16)
+                | (u64::from(bytes[*offset + 4]) << 24)
+                | (u64::from(bytes[*offset + 5]) << 32)
+                | (u64::from(bytes[*offset + 6]) << 40)
+                | (u64::from(bytes[*offset + 7]) << 48)
+                | (u64::from(bytes[*offset + 8]) << 56)
         }
         _ => unreachable!(),
     };
@@ -236,7 +236,7 @@ pub fn decode_prefix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
 /// Because this reads backwards, beware that the offset will end up at std::usize::MAX if the first byte is read past.
 #[cfg(feature = "decode")]
 pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u64> {
-    let first = bytes.get(*offset).ok_or_else(|| DecodeError::InvalidFormat)?;
+    let first = bytes.get(*offset).ok_or(DecodeError::InvalidFormat)?;
     let shift = first.trailing_zeros();
 
     // TODO: Ensure unchecked indexing follows.
@@ -245,52 +245,52 @@ pub fn decode_suffix_varint(bytes: &[u8], offset: &mut usize) -> DecodeResult<u6
     }
 
     let result = match shift {
-        0 => (first >> 1) as u64,
-        1 => (first >> 2) as u64 | ((bytes[*offset - 1] as u64) << 6),
-        2 => (first >> 3) as u64 | ((bytes[*offset - 2] as u64) << 5) | ((bytes[*offset - 1] as u64) << 13),
-        3 => (first >> 4) as u64 | ((bytes[*offset - 3] as u64) << 4) | ((bytes[*offset - 2] as u64) << 12) | ((bytes[*offset - 1] as u64) << 20),
+        0 => u64::from(first >> 1),
+        1 => u64::from(first >> 2) | (u64::from(bytes[*offset - 1]) << 6),
+        2 => u64::from(first >> 3) | (u64::from(bytes[*offset - 2]) << 5) | (u64::from(bytes[*offset - 1]) << 13),
+        3 => u64::from(first >> 4) | (u64::from(bytes[*offset - 3]) << 4) | (u64::from(bytes[*offset - 2]) << 12) | (u64::from(bytes[*offset - 1]) << 20),
         4 => {
-            (first >> 5) as u64
-                | ((bytes[*offset - 4] as u64) << 3)
-                | ((bytes[*offset - 3] as u64) << 11)
-                | ((bytes[*offset - 2] as u64) << 19)
-                | ((bytes[*offset - 1] as u64) << 27)
+            u64::from(first >> 5)
+                | (u64::from(bytes[*offset - 4]) << 3)
+                | (u64::from(bytes[*offset - 3]) << 11)
+                | (u64::from(bytes[*offset - 2]) << 19)
+                | (u64::from(bytes[*offset - 1]) << 27)
         }
         5 => {
-            (first >> 6) as u64
-                | ((bytes[*offset - 5] as u64) << 2)
-                | ((bytes[*offset - 4] as u64) << 10)
-                | ((bytes[*offset - 3] as u64) << 18)
-                | ((bytes[*offset - 2] as u64) << 26)
-                | ((bytes[*offset - 1] as u64) << 34)
+            u64::from(first >> 6)
+                | (u64::from(bytes[*offset - 5]) << 2)
+                | (u64::from(bytes[*offset - 4]) << 10)
+                | (u64::from(bytes[*offset - 3]) << 18)
+                | (u64::from(bytes[*offset - 2]) << 26)
+                | (u64::from(bytes[*offset - 1]) << 34)
         }
         6 => {
-            (first >> 7) as u64
-                | ((bytes[*offset - 6] as u64) << 1)
-                | ((bytes[*offset - 5] as u64) << 9)
-                | ((bytes[*offset - 4] as u64) << 17)
-                | ((bytes[*offset - 3] as u64) << 25)
-                | ((bytes[*offset - 2] as u64) << 33)
-                | ((bytes[*offset - 1] as u64) << 41)
+            u64::from(first >> 7)
+                | (u64::from(bytes[*offset - 6]) << 1)
+                | (u64::from(bytes[*offset - 5]) << 9)
+                | (u64::from(bytes[*offset - 4]) << 17)
+                | (u64::from(bytes[*offset - 3]) << 25)
+                | (u64::from(bytes[*offset - 2]) << 33)
+                | (u64::from(bytes[*offset - 1]) << 41)
         }
         7 => {
-            (bytes[*offset - 7] as u64)
-                | ((bytes[*offset - 6] as u64) << 8)
-                | ((bytes[*offset - 5] as u64) << 16)
-                | ((bytes[*offset - 4] as u64) << 24)
-                | ((bytes[*offset - 3] as u64) << 32)
-                | ((bytes[*offset - 2] as u64) << 40)
-                | ((bytes[*offset - 1] as u64) << 48)
+            u64::from(bytes[*offset - 7])
+                | (u64::from(bytes[*offset - 6]) << 8)
+                | (u64::from(bytes[*offset - 5]) << 16)
+                | (u64::from(bytes[*offset - 4]) << 24)
+                | (u64::from(bytes[*offset - 3]) << 32)
+                | (u64::from(bytes[*offset - 2]) << 40)
+                | (u64::from(bytes[*offset - 1]) << 48)
         }
         8 => {
-            (bytes[*offset - 8] as u64)
-                | ((bytes[*offset - 7] as u64) << 8)
-                | ((bytes[*offset - 6] as u64) << 16)
-                | ((bytes[*offset - 5] as u64) << 24)
-                | ((bytes[*offset - 4] as u64) << 32)
-                | ((bytes[*offset - 3] as u64) << 40)
-                | ((bytes[*offset - 2] as u64) << 48)
-                | ((bytes[*offset - 1] as u64) << 56)
+            u64::from(bytes[*offset - 8])
+                | (u64::from(bytes[*offset - 7]) << 8)
+                | (u64::from(bytes[*offset - 6]) << 16)
+                | (u64::from(bytes[*offset - 5]) << 24)
+                | (u64::from(bytes[*offset - 4]) << 32)
+                | (u64::from(bytes[*offset - 3]) << 40)
+                | (u64::from(bytes[*offset - 2]) << 48)
+                | (u64::from(bytes[*offset - 1]) << 56)
         }
         _ => unreachable!(),
     };
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn test_prefix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
-        for vec in vecs.iter() {
+        for vec in &vecs {
             round_trip_prefix(vec)?;
         }
 
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn test_suffix() -> DecodeResult<()> {
         let vecs = vec![vec![99, 127, 128, 0, 1, 2, 3, std::u64::MAX]];
-        for vec in vecs.iter() {
+        for vec in &vecs {
             round_trip_suffix(vec)?;
         }
 

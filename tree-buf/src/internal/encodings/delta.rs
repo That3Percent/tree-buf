@@ -4,7 +4,7 @@ use std::ops::{Add, Sub};
 // FIXME: This may not be what is needed. Zigzag may be.
 pub fn delta_encode_in_place<T: Sub<Output = T> + Copy>(data: &mut [T]) {
     profile_fn!(delta_encode_in_place);
-    if data.len() == 0 {
+    if data.is_empty() {
         return;
     }
     let mut current = data[0];

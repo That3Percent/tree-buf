@@ -13,7 +13,7 @@ use {
 // TODO: Unfortunately, the current method is quite inadequate. Consider a language with no case. Consider a letter 'q' having
 // neither uppercase nor lowercase. qq vs q_q is different. But, in this encoding they are the same.
 pub fn canonical_ident(ident: &Ident) -> String {
-    let ident_str = format!("{}", ident);
+    let ident_str = format!("{ident}");
     to_camel_case(&ident_str)
 }
 
@@ -26,9 +26,8 @@ pub type NamedFields<'a> = Vec<NamedField<'a>>;
 
 pub fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
     // TODO: Lift restriction
-    let fields_named = match &data_struct.fields {
-        Fields::Named(fields_named) => fields_named,
-        _ => panic!("The struct must have named fields"),
+    let Fields::Named(fields_named) = &data_struct.fields else {
+        panic!("The struct must have named fields")
     };
 
     fields_named
@@ -39,7 +38,7 @@ pub fn get_named_fields(data_struct: &DataStruct) -> NamedFields {
             NamedField {
                 ident: field.ident.as_ref().unwrap(),
                 ty: &field.ty,
-                canon_str: canonical_ident(&ident),
+                canon_str: canonical_ident(ident),
             }
         })
         .collect()

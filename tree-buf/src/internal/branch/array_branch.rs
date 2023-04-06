@@ -25,7 +25,7 @@ impl Deref for Bytes<'_> {
     type Target = [u8];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
@@ -50,7 +50,7 @@ pub struct ArrayEnumVariant<'a> {
     pub data: DynArrayBranch<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum DynArrayBranch<'a> {
     Object {
         fields: HashMap<Ident<'a>, DynArrayBranch<'a>>,
@@ -80,6 +80,7 @@ pub enum DynArrayBranch<'a> {
     },
     Boolean(ArrayBool<'a>),
     Float(ArrayFloat<'a>),
+    #[default]
     Void,
     String(Bytes<'a>),
     BrotliUtf8 {
@@ -112,7 +113,7 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
     use ArrayTypeId::*;
 
     fn decode_ints<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ mut usize, encoding: ArrayIntegerEncoding) -> DecodeResult<DynArrayBranch<'a>> {
-        let bytes = decode_bytes_from_len(bytes, offset, lens)?.into();
+        let bytes = decode_bytes_from_len(bytes, offset, lens)?;
         Ok(DynArrayBranch::Integer(ArrayInteger { bytes, encoding }))
     }
 
@@ -274,12 +275,6 @@ pub fn decode_next_array<'a>(bytes: &'a [u8], offset: &'_ mut usize, lens: &'_ m
     };
 
     Ok(branch)
-}
-
-impl<'a> Default for DynArrayBranch<'a> {
-    fn default() -> Self {
-        DynArrayBranch::Void
-    }
 }
 
 impl_type_id!(ArrayTypeId, [

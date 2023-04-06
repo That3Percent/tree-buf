@@ -136,12 +136,7 @@ macro_rules! impl_lowerable {
                 fn decode(sticks: DynRootBranch<'_>, _options: &impl DecodeOptions) -> DecodeResult<Self> {
                     profile_method!(decode);
                     match sticks {
-                        DynRootBranch::Integer(root_int) => {
-                            match root_int {
-                                RootInteger::U(v) => v.try_into().map_err(|_| DecodeError::SchemaMismatch),
-                                _ => Err(DecodeError::SchemaMismatch),
-                            }
-                        }
+                        DynRootBranch::Integer(RootInteger::U(v)) =>  v.try_into().map_err(|_| DecodeError::SchemaMismatch),
                         _ => Err(DecodeError::SchemaMismatch),
                     }
                 }
@@ -418,14 +413,14 @@ where
     }
 
     within_rle(|| {
-        let mut data = data.into_iter();
+        let mut data = data.iter();
         let mut out = Vec::new();
         // Unwrap is ok because length checked earlier.
         let mut current = data.next().unwrap();
 
         out.push(*current);
         for next in data {
-            let delta = next.wrapping_sub(&current);
+            let delta = next.wrapping_sub(current);
             current = next;
             out.push(delta);
         }
@@ -491,7 +486,7 @@ impl<T: Into<u64> + Copy> Compressor<T> for PrefixVarIntCompressor {
         profile_method!(compress);
         stream.encode_with_len(|stream| {
             for item in data {
-                encode_prefix_varint((*item).into(), &mut stream.bytes);
+                encode_prefix_varint((*item).into(), stream.bytes);
             }
         });
         Ok(ArrayTypeId::IntPrefixVar)
@@ -519,7 +514,7 @@ impl<T: Simple16> Compressor<T> for Simple16Compressor<T> {
 
         self.check_range()?;
 
-        stream.encode_with_len(|stream| unsafe { simple_16::compress_unchecked(&data, stream.bytes) });
+        stream.encode_with_len(|stream| unsafe { simple_16::compress_unchecked(data, stream.bytes) });
 
         Ok(ArrayTypeId::IntSimple16)
     }
@@ -529,7 +524,7 @@ impl<T: Simple16> Compressor<T> for Simple16Compressor<T> {
 
         self.check_range()?;
 
-        let size = unsafe { simple_16::calculate_size_unchecked(&data) };
+        let size = unsafe { simple_16::calculate_size_unchecked(data) };
 
         Ok(size)
     }
