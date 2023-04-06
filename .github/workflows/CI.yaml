@@ -1,0 +1,26 @@
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+name: Continuous integration
+
+jobs:
+  test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [stable, nightly]
+        os: [ubuntu-latest]
+        include:
+          - build: windows
+            os: windows-latest
+            rust: nightly
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - run: cargo test --all-features
